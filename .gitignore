@@ -5,3 +5,5 @@ node_modules/
 # Supabase等の鍵を入れる設定（コミットしない）
 js/config.js
 config.js
+
+.vercel
