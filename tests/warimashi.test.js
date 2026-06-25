@@ -62,6 +62,18 @@ T('率テーブル: 1.25/1.5/1.5/1.75/0.25/1.35/1.6', function () {
   eq(W.RATE.over60Night, 1.75); eq(W.RATE.night, 0.25); eq(W.RATE.holiday, 1.35); eq(W.RATE.holidayNight, 1.6);
 });
 
+/* 法定休日(1.35) */
+T('かんたん: 法定休日8h → 1592×1.35×8=17,194', function () {
+  var r = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, holidayH: 8, holidayM: 0 });
+  var h = r.lines.find(function (l) { return l.key === 'holiday'; });
+  eq(h.rate, 1.35); eq(h.amount, 17194); eq(r.total, 17194);
+});
+/* 分のみ入力 */
+T('1分単位: 残業0時間30分 → 1592×1.25×0.5=995', function () {
+  var r = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, otH: 0, otM: 30 });
+  eq(r.total, 995);
+});
+
 /* 空入力は0 */
 T('空入力 → 割増0', function () {
   var r = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8 });

@@ -19,14 +19,17 @@
   };
   function openHelp(k){ var h=HELP[k]; if(!h)return; var t=document.getElementById('help-t'),b=document.getElementById('help-b'); t.textContent=h.t; b.innerHTML=h.b; document.getElementById('help-ov').classList.add('on'); }
   // 支給/控除(法定外) のチップ候補
-  var SUP_POOL=['基本給','役職手当','残業手当','深夜手当','休日手当','住宅手当','家族手当','通勤手当','皆勤手当','資格手当','精勤手当','調整手当'];
+  // 残業/深夜/休日手当は「割増」機能で自動計算するためチップから除外(二重計上・単価膨張防止)
+  var SUP_POOL=['基本給','役職手当','住宅手当','家族手当','通勤手当','皆勤手当','資格手当','精勤手当','調整手当'];
   var KOJO_POOL=['社宅費','組合費','財形貯蓄','生命保険','親睦会費','旅行積立'];
 
+  // ライブラリは const SHAKAIHOKEN_HYO 定義で window に付かない→bare参照で取得
+  function SHH(){ try{ if(typeof SHAKAIHOKEN_HYO!=='undefined'&&SHAKAIHOKEN_HYO) return SHAKAIHOKEN_HYO; }catch(e){} return (typeof window!=='undefined'&&window.SHAKAIHOKEN_HYO)||null; }
   function prefOptions(sel){
-    var K=(window.SHAKAIHOKEN_HYO&&window.SHAKAIHOKEN_HYO.KENKO_RITSU)||{tokyo:{name:'東京都'}};
+    var S=SHH(); var K=(S&&S.KENKO_RITSU)||{tokyo:{name:'東京都'}};
     return Object.keys(K).map(function(code){return '<option value="'+code+'"'+(code===sel?' selected':'')+'>'+esc(K[code].name)+'</option>';}).join('');
   }
-  function prefRate(code){ var K=(window.SHAKAIHOKEN_HYO&&window.SHAKAIHOKEN_HYO.KENKO_RITSU)||{}; return (K[code]&&K[code].jugyoin)||0.04955; }
+  function prefRate(code){ var S=SHH(); var K=(S&&S.KENKO_RITSU)||{}; return (K[code]&&K[code].jugyoin)||0.04955; }
 
   function defEmp(name){
     return { id:uid(), name:name||'山田 太郎', no:'', birthYmd:'1980-05-15', dept:'', role:'',
@@ -60,7 +63,10 @@
   }
   function compute(e){
     syncCommute(e);
-    var sb=shahoBasisOf(e); e.hyojunBase=sb.hoshu;
+    var sb=shahoBasisOf(e);
+    // 標準報酬未確定時の暫定基礎は「割増を除く固定支給(通勤含む)」。割増(残業)で社保が膨らまないように。
+    var fb=(e.shikyu||[]).reduce(function(a,x){return a+num(x.value);},0);
+    e.hyojunBase = sb.hoshu>0 ? sb.hoshu : fb;
     var w=warimashiOf(e); e._wari=w;
     var shikyu=(e.shikyu||[]).slice();
     if(w.total>0) shikyu=shikyu.concat([{label:'割増賃金',value:w.total}]); // 課税・総支給・雇用保険ベースに算入
