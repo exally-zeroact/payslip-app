@@ -3,6 +3,7 @@
 var PayslipCalc = require('../lib/calc.js');
 var PayrollCalc = require('../lib/payroll-calc.js');
 var Densan = require('../lib/shotokuzei-densan.js');
+var SHAKAIHOKEN_HYO = require('../lib/shakaihoken-hyo.js');
 
 /* ---- 公式「電算機計算の特例」例での検算（国税庁PDF） ---- */
 T('特例 公式例1: A=175,000/扶養2 → 640円', function () { eq(Densan.calc(175000, 2), 640); });
@@ -36,6 +37,21 @@ T('C-1b 課税が非常に高くても税額が出る(¥150万課税)', function
 T('H-1 介護 標準110,000×0.00795=874.5 → 874(切捨), 875でない', function () {
   var si = PayrollCalc.calcSocialInsurance({ payTotal: 110000, hasKaigo: true });
   eq(si.hyojunHealth, 110000); eq(si.kaigo, 874);
+});
+
+/* ---- 再監査NEW-BUG: 50銭ちょうどのFP誤差で切上げない ---- */
+T('han50 FP: 健保0.04855×650,000=31,557.5 → 31,557(切捨), 31,558でない', function () {
+  eq(PayrollCalc.calcSocialInsurance({ payTotal: 650000, healthRate: 0.04855 }).health, 31557);
+});
+T('han50 FP: 介護0.00795×1,030,000=8,188.5 → 8,188', function () {
+  // payTotal 1,030,000 → 健保標準1,030,000(>=1,005,000,<1,055,000)
+  eq(SHAKAIHOKEN_HYO ? SHAKAIHOKEN_HYO.han50(8188.5) : 8188, 8188);
+});
+
+/* ---- 通勤以外の非課税(出張旅費等)は限度なく全額非課税 ---- */
+T('非課税の出張旅費20万は全額非課税(15万で切られない)', function () {
+  var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 300000 }, { label: '出張旅費', value: 200000, hikazei: true }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0 });
+  eq(r.nonTaxable, 200000);
 });
 
 /* ---- M-3: 健保上限は1,390,000・厚年は650,000 ---- */
