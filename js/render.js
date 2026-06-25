@@ -143,34 +143,10 @@
     return '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><style>'+css+'</style></head><body data-orientation="'+orientation+'">'+body+'</body></html>';
   }
 
-  // ---- 自動テンプレ選択 ----
-  // 容量(実測): cols1=支給/控除 各≤40(段20) / cols2=各≤20 / vstack1=支給+控除 合計≤36項目(18行) / strips=支給段+控除段合計≤17/人
-  function rows2(n){ return Math.ceil(n/2); }
-  function capacity(builderName, people){
-    if(builderName==='cols'){
-      if(people.length===1){ var p=people[0]; return rows2(p.shikyu.length)<=20 && rows2(p.kojo.length)<=20; }
-      return people.slice(0,2).every(function(p){ return rows2(p.shikyu.length)<=10 && rows2(p.kojo.length)<=10; });
-    }
-    if(builderName==='vstack'){ var q=people[0]; return (rows2(q.shikyu.length)+rows2(q.kojo.length))<=18; }
-    if(builderName==='strips'){ return people.every(function(p){ return (rows2(p.shikyu.length)+rows2(p.kojo.length))<=17; }); }
-    return false;
-  }
+  // ---- 自動テンプレ選択（ロジックは lib/select.js = PayslipSelect に集約・テスト可能）----
   function choose(people, prefer){
-    var n=people.length;
-    if(prefer && prefer!=='auto'){
-      if(prefer==='vstack' && n===1) return {builder:'vstack', fits:capacity('vstack',people)};
-      if(prefer==='cols') return {builder:'cols', fits:capacity('cols',people)};
-      if(prefer==='strips') return {builder:'strips', fits:capacity('strips',people)};
-    }
-    if(n===1){ // 多項目→横並び(容量大)、それ以外も既定は横並び。縦読み希望は prefer=vstack
-      return {builder:'cols', fits:capacity('cols',people)};
-    }
-    if(n===2){ // 収まれば縦A4横並び、無理ならストリップ
-      if(capacity('cols',people)) return {builder:'cols', fits:true};
-      return {builder:'strips', fits:capacity('strips',people)};
-    }
-    // 3-4人 = ストリップ
-    return {builder:'strips', fits:capacity('strips',people)};
+    var S = global.PayslipSelect;
+    return S.choose(people, prefer);
   }
 
   var Render = {
