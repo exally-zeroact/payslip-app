@@ -22,19 +22,25 @@
   <!-- ① 設定 -->
   <section class="screen active" id="scr-settings">
     <h2 class="scr-title">設定</h2>
-    <div class="card">
-      <div class="card-h">会社情報</div>
-      <div class="frow"><label>会社名</label><input id="c-name" class="finput" placeholder="株式会社 ゼロアクト"></div>
-      <div class="frow"><label>住所</label><input id="c-addr" class="finput" placeholder="（任意）"></div>
-      <div class="frow2">
-        <div><label>締め日</label><input id="c-close" class="finput" placeholder="末日"></div>
-        <div><label>支給日</label><input id="c-payday" class="finput" placeholder="翌25日"></div>
+    <div class="seg" id="set-seg">
+      <button class="seg-b on" data-set="company">会社情報</button>
+      <button class="seg-b" data-set="emp">従業員マスタ</button>
+    </div>
+    <div id="set-company">
+      <div class="card">
+        <div class="card-h">会社情報</div>
+        <div class="frow"><div class="flabel">会社名</div><input id="c-name" class="finput" placeholder="株式会社 ゼロアクト"></div>
+        <div class="frow"><div class="flabel">住所<span class="hint2">任意</span></div><input id="c-addr" class="finput" placeholder="（任意）"></div>
+        <div class="frow2">
+          <div class="frow"><div class="flabel">締め日</div><input id="c-close" class="finput" placeholder="末日"></div>
+          <div class="frow"><div class="flabel">支給日</div><input id="c-payday" class="finput" placeholder="翌25日"></div>
+        </div>
+        <p class="hint" id="store-mode"></p>
       </div>
     </div>
-    <div class="card">
-      <div class="card-h">従業員マスタ <button class="chip chip-add" id="b-add-emp">＋ 追加</button></div>
-      <div id="emp-master"></div>
-      <p class="hint">氏名・生年月日（介護/年齢計算）・扶養人数（所得税）・住民税・通勤手当などを登録。支給/控除の項目セットもここで決めます。（詳細編集はSTEP2で拡張）</p>
+    <div id="set-emp" style="display:none">
+      <div id="emp-list"></div>
+      <button class="btn-add" id="b-add-emp">＋ 従業員を追加</button>
     </div>
   </section>
 
@@ -81,6 +87,14 @@
   <button class="bn" data-scr="scr-list"><span class="bn-i">▤</span><span class="bn-l">一覧/集計</span></button>
   <button class="bn" data-scr="scr-print"><span class="bn-i">⎙</span><span class="bn-l">印刷</span></button>
 </nav>
+
+<div class="help-ov" id="help-ov">
+  <div class="help-card">
+    <div class="help-t" id="help-t"></div>
+    <div class="help-b" id="help-b"></div>
+    <button class="help-x" id="help-x">閉じる</button>
+  </div>
+</div>
 
 <script src="lib/shotokuzei-hyou.js"></script>
 <script src="lib/shakaihoken-hyo.js"></script>
