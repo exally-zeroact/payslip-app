@@ -1,0 +1,7 @@
+node_modules/
+.vercel/
+.DS_Store
+*.log
+# Supabase等の鍵を入れる設定（コミットしない）
+js/config.js
+config.js

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>給与明細アプリ — ZEROACT</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header class="bar">
+  <div class="brand">給与明細<span>ZEROACT</span></div>
+  <div class="bar-fields">
+    <label>会社名<input id="f-company" type="text" placeholder="株式会社 ゼロアクト"></label>
+    <label>対象月<input id="f-month" type="text" placeholder="令 和 八 年 六 月 分"></label>
+    <label>支給日<input id="f-paydate" type="text" placeholder="令和8年6月25日"></label>
+    <label>レイアウト
+      <select id="f-prefer">
+        <option value="auto">自動</option>
+        <option value="cols">横並び(支給左/控除右)</option>
+        <option value="vstack">縦並び(1人・支給上/控除下)</option>
+        <option value="strips">横ストリップ(2-4人)</option>
+      </select>
+    </label>
+  </div>
+  <div class="bar-actions">
+    <button id="b-save" class="btn">保存</button>
+    <button id="b-load" class="btn ghost">読込</button>
+    <button id="b-new" class="btn ghost">新規</button>
+    <button id="b-print" class="btn primary">印刷 / PDF</button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="editor" id="editor">
+    <div class="people-head">
+      <span>従業員 <b id="count">1</b> 名（最大4）</span>
+      <button id="b-addp" class="btn small">＋ 従業員</button>
+    </div>
+    <div id="people"></div>
+    <p class="hint" id="store-mode"></p>
+  </section>
+
+  <section class="preview">
+    <div class="preview-status" id="status"></div>
+    <div class="preview-stage"><iframe id="frame" title="プレビュー"></iframe></div>
+  </section>
+</main>
+
+<template id="tpl-person">
+  <div class="person card">
+    <div class="person-head">
+      <input class="p-name" type="text" placeholder="氏名（例：山田 太郎）">
+      <span class="p-net">差引 ¥0</span>
+      <button class="b-delp btn small ghost" title="削除">×</button>
+    </div>
+    <div class="group">
+      <div class="group-head">勤怠 <span class="g-cap">（6基準・最大3行）</span><button class="b-add" data-g="kintai">＋</button></div>
+      <div class="rows" data-g="kintai"></div>
+    </div>
+    <div class="group">
+      <div class="group-head">支給 <button class="b-add" data-g="shikyu">＋</button></div>
+      <div class="rows" data-g="shikyu"></div>
+    </div>
+    <div class="group">
+      <div class="group-head">控除 <button class="b-add" data-g="kojo">＋</button></div>
+      <div class="rows" data-g="kojo"></div>
+    </div>
+  </div>
+</template>
+
+<!-- Supabase を使う場合: window.SUPA={url:'...',key:'...'} を config.js で定義し supabase-js を読込む -->
+<script>/* window.SUPA = { url:'', key:'' }; */</script>
+<script src="js/render.js"></script>
+<script src="js/store.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
