@@ -90,6 +90,35 @@ T('介護境界 1986-06-01生: 2026-05は対象/2026-04は非対象', function (
   eq(PayrollCalc.isKaigoTarget('1986-06-01', '2026-04'), false);
 });
 
+/* ---- 標準報酬の決め方(社会保険) ---- */
+T('shahoBase 定時: 支払基礎日数17日未満の月を除外して平均', function () {
+  var r = PayslipCalc.shahoBase({ mode: 'teiji', months: [{ pay: 320000, days: 30 }, { pay: 340000, days: 30 }, { pay: 180000, days: 15 }] });
+  eq(r.hoshu, 330000, '4・5月平均'); eq(r.months, 2); ok(r.excluded.indexOf(2) >= 0, '6月除外');
+});
+T('shahoBase 短時間しきい値15日', function () {
+  var r = PayslipCalc.shahoBase({ mode: 'teiji', threshold: 15, months: [{ pay: 200000, days: 16 }, { pay: 200000, days: 15 }, { pay: 100000, days: 10 }] });
+  eq(r.months, 2); eq(r.hoshu, 200000);
+});
+T('shahoBase 資格取得=見込み / 直接入力=その額', function () {
+  eq(PayslipCalc.shahoBase({ mode: 'shutoku', mikomi: 300000 }).hoshu, 300000);
+  eq(PayslipCalc.shahoBase({ mode: 'manual', value: 360000 }).hoshu, 360000);
+});
+T('shahoBase 未入力/全月除外 → undetermined=true・hoshu0', function () {
+  eq(PayslipCalc.shahoBase({ mode: 'teiji', months: [{ pay: '', days: '30' }, { pay: '', days: '30' }, { pay: '', days: '30' }] }).undetermined, true);
+  eq(PayslipCalc.shahoBase({ mode: 'teiji', months: [{ pay: 300000, days: 10 }, { pay: 300000, days: 12 }] }).hoshu, 0, '全月17日未満→平均0');
+  eq(PayslipCalc.shahoBase({ mode: 'manual', value: 340000 }).undetermined, false);
+});
+T('直接入力→computePayslipまで標準報酬が届く', function () {
+  var sb = PayslipCalc.shahoBase({ mode: 'manual', value: 360000 });
+  var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 200000 }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0, hyojunBase: sb.hoshu });
+  eq(r.si.hyojunHealth, 360000, '当月20万でも標準報酬36万で社保');
+});
+T('hyojunBase固定: 社保は当月支給でなく標準報酬基礎で計算(残業でブレない)', function () {
+  // 当月支給は残業で50万でも、確定した報酬月額34万で社保が決まる
+  var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 500000 }], birthYmd: '1980-05-15', payYm: '2026-06', fuyou: 0, hyojunBase: 340000 });
+  eq(r.si.hyojunHealth, 340000); eq(r.si.health, 16847); eq(r.si.pension, 31110); eq(r.si.kaigo, 2703);
+});
+
 /* ---- 既存の健全性 ---- */
 T('住民税を渡すと控除に住民税が入る', function () {
   var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 250000 }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0, residentTax: 12500 });
