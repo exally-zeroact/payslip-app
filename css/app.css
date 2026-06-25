@@ -68,6 +68,18 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .sh-hero .bd{font-size:11px;color:#3D6B53;line-height:1.6;}.sh-hero .bd b{color:#1a4a2e;font-family:'DM Mono',monospace;}
 .sh-sub{font-size:10.5px;color:#4A6B5A;line-height:1.6;}.sh-sub b{color:#1a4a2e;font-family:'DM Mono',monospace;}
 .sh-warn{background:#FEF3E2;border:1px solid #F4D8A8;border-radius:8px;padding:7px 9px;font-size:10.5px;color:#92500A;line-height:1.55;margin-bottom:9px;}.sh-warn b{color:#7A3F00;}
+/* 割増（時間/分） */
+.dur{display:flex;align-items:center;gap:4px;}
+.dur i{font-style:normal;font-size:10px;color:#7A9A87;}
+.dur-in{width:48px!important;padding:8px 4px!important;text-align:center;font-family:'DM Mono',monospace;}
+.wi-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.wi-l{flex:1;min-width:0;font-size:12px;color:#1a4a2e;font-weight:500;}
+.wi-l small{display:block;font-size:10px;color:#7A9A87;font-weight:400;}
+.wi-f{width:46px;padding:7px 4px;border:1.5px solid #D4EDE1;border-radius:8px;font-size:15px;font-family:'DM Mono',monospace;text-align:center;color:#1a4a2e;-webkit-appearance:none;}
+.wi-res{font-size:12px;color:#2E7D54;font-weight:700;margin-top:6px;}
+.wi-res b{font-family:'DM Mono',monospace;}
+.wi-res .wi-sub{display:block;font-size:10px;color:#7A9A87;font-weight:400;margin-top:1px;}
+.wi-res.wi-zero{color:#7A9A87;font-weight:400;font-size:11px;}
 /* 💡 ヘルプ */
 .help-i{cursor:pointer;margin-left:4px;font-size:13px;line-height:1;user-select:none;}
 .help-ov{display:none;position:fixed;inset:0;z-index:60;background:rgba(20,40,28,.42);align-items:center;justify-content:center;padding:20px;}

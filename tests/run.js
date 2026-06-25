@@ -6,7 +6,7 @@ global.T = function (name, fn) { try { fn(); pass++; console.log('  ✓ ' + name
 global.eq = function (a, b, m) { assert.strictEqual(a, b, m); };
 global.ok = function (c, m) { assert.ok(c, m); };
 
-['./calc.test.js', './select.test.js'].forEach(function (f) {
+['./calc.test.js', './select.test.js', './warimashi.test.js'].forEach(function (f) {
   console.log('\n' + f);
   require(f);
 });
