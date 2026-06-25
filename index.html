@@ -2,74 +2,92 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>給与明細アプリ — ZEROACT</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>給与明細 — ZEROACT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-<header class="bar">
-  <div class="brand">給与明細<span>ZEROACT</span></div>
-  <div class="bar-fields">
-    <label>会社名<input id="f-company" type="text" placeholder="株式会社 ゼロアクト"></label>
-    <label>対象月<input id="f-month" type="text" placeholder="令 和 八 年 六 月 分"></label>
-    <label>支給日<input id="f-paydate" type="text" placeholder="令和8年6月25日"></label>
-    <label>レイアウト
-      <select id="f-prefer">
-        <option value="auto">自動</option>
-        <option value="cols">横並び(支給左/控除右)</option>
-        <option value="vstack">縦並び(1人・支給上/控除下)</option>
-        <option value="strips">横ストリップ(2-4人)</option>
-      </select>
-    </label>
-  </div>
-  <div class="bar-actions">
-    <button id="b-save" class="btn">保存</button>
-    <button id="b-load" class="btn ghost">読込</button>
-    <button id="b-new" class="btn ghost">新規</button>
-    <button id="b-print" class="btn primary">印刷 / PDF</button>
+<header class="appbar">
+  <div class="logo">給与明細</div>
+  <div class="appbar-sub">ZEROACT</div>
+  <div class="appbar-month">
+    <label>対象月</label>
+    <input id="g-month" type="month" class="finput finput-sm">
   </div>
 </header>
 
-<main class="layout">
-  <section class="editor" id="editor">
-    <div class="people-head">
-      <span>従業員 <b id="count">1</b> 名（最大4）</span>
-      <button id="b-addp" class="btn small">＋ 従業員</button>
+<main class="main">
+  <!-- ① 設定 -->
+  <section class="screen active" id="scr-settings">
+    <h2 class="scr-title">設定</h2>
+    <div class="card">
+      <div class="card-h">会社情報</div>
+      <div class="frow"><label>会社名</label><input id="c-name" class="finput" placeholder="株式会社 ゼロアクト"></div>
+      <div class="frow"><label>住所</label><input id="c-addr" class="finput" placeholder="（任意）"></div>
+      <div class="frow2">
+        <div><label>締め日</label><input id="c-close" class="finput" placeholder="末日"></div>
+        <div><label>支給日</label><input id="c-payday" class="finput" placeholder="翌25日"></div>
+      </div>
     </div>
-    <div id="people"></div>
-    <p class="hint" id="store-mode"></p>
+    <div class="card">
+      <div class="card-h">従業員マスタ <button class="chip chip-add" id="b-add-emp">＋ 追加</button></div>
+      <div id="emp-master"></div>
+      <p class="hint">氏名・生年月日（介護/年齢計算）・扶養人数（所得税）・住民税・通勤手当などを登録。支給/控除の項目セットもここで決めます。（詳細編集はSTEP2で拡張）</p>
+    </div>
   </section>
 
-  <section class="preview">
-    <div class="preview-status" id="status"></div>
-    <div class="preview-stage"><iframe id="frame" title="プレビュー"></iframe></div>
+  <!-- ② 入力 -->
+  <section class="screen" id="scr-input">
+    <h2 class="scr-title">入力 <span class="scr-sub" id="in-month"></span></h2>
+    <p class="hint">従業員をタップすると当月の変動値（勤怠・時数・変動手当）を入力できます。法定控除（健保/厚年/介護/雇用/所得税）は自動計算されます。</p>
+    <div id="input-list"></div>
+  </section>
+
+  <!-- ③ 一覧/集計 -->
+  <section class="screen" id="scr-list">
+    <div class="seg">
+      <button class="seg-b on" data-view="list">一覧</button>
+      <button class="seg-b" data-view="sum">集計</button>
+    </div>
+    <div id="view-list"></div>
+    <div id="view-sum" style="display:none"></div>
+  </section>
+
+  <!-- ④ 印刷/PDF -->
+  <section class="screen" id="scr-print">
+    <h2 class="scr-title">印刷 / PDF</h2>
+    <div class="card">
+      <div class="frow2">
+        <div><label>月で選ぶ</label><input id="p-month" type="month" class="finput"></div>
+        <div><label>従業員で選ぶ</label><select id="p-emp" class="finput"></select></div>
+      </div>
+      <div class="frow"><label>明細の色（テーマ）</label>
+        <span class="theme-row" id="theme-row"></span>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" id="b-print">印刷</button>
+        <button class="btn-ghost" id="b-pdf">PDFで保存/送付</button>
+      </div>
+    </div>
+    <div class="preview-wrap"><iframe id="frame" title="プレビュー"></iframe></div>
   </section>
 </main>
 
-<template id="tpl-person">
-  <div class="person card">
-    <div class="person-head">
-      <input class="p-name" type="text" placeholder="氏名（例：山田 太郎）">
-      <span class="p-net">差引 ¥0</span>
-      <button class="b-delp btn small ghost" title="削除">×</button>
-    </div>
-    <div class="group">
-      <div class="group-head">勤怠 <span class="g-cap">（6基準・最大3行）</span><button class="b-add" data-g="kintai">＋</button></div>
-      <div class="rows" data-g="kintai"></div>
-    </div>
-    <div class="group">
-      <div class="group-head">支給 <button class="b-add" data-g="shikyu">＋</button></div>
-      <div class="rows" data-g="shikyu"></div>
-    </div>
-    <div class="group">
-      <div class="group-head">控除 <button class="b-add" data-g="kojo">＋</button></div>
-      <div class="rows" data-g="kojo"></div>
-    </div>
-  </div>
-</template>
+<nav class="botnav">
+  <button class="bn on" data-scr="scr-settings"><span class="bn-i">⚙</span><span class="bn-l">設定</span></button>
+  <button class="bn" data-scr="scr-input"><span class="bn-i">✎</span><span class="bn-l">入力</span></button>
+  <button class="bn" data-scr="scr-list"><span class="bn-i">▤</span><span class="bn-l">一覧/集計</span></button>
+  <button class="bn" data-scr="scr-print"><span class="bn-i">⎙</span><span class="bn-l">印刷</span></button>
+</nav>
 
-<!-- Supabase を使う場合: window.SUPA={url:'...',key:'...'} を config.js で定義し supabase-js を読込む -->
-<script>/* window.SUPA = { url:'', key:'' }; */</script>
+<script src="lib/shotokuzei-hyou.js"></script>
+<script src="lib/shakaihoken-hyo.js"></script>
+<script src="lib/koyohoken-ritsu.js"></script>
+<script src="lib/payroll-calc.js"></script>
+<script src="lib/calc.js"></script>
+<script src="lib/select.js"></script>
 <script src="js/render.js"></script>
 <script src="js/store.js"></script>
 <script src="js/app.js"></script>

@@ -150,12 +150,13 @@
   }
 
   var Render = {
-    build: function(people, doc, prefer){
+    build: function(people, doc, prefer, theme){
       var c = choose(people, prefer);
       var html;
       if(c.builder==='cols') html=buildCols(people, doc);
       else if(c.builder==='vstack') html=buildVstack1(people, doc);
       else html=buildStrips(people, doc);
+      if(theme && theme.accent){ html = html.split('#6f5a3e').join(theme.accent).split('#b6a06d').join(theme.soft||theme.accent); }
       return { html: html, builder: c.builder, fits: c.fits,
                orientation: (c.builder==='strips'?'landscape':'portrait') };
     },
