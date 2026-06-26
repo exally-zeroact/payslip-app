@@ -5,17 +5,35 @@ var PayrollCalc = require('../lib/payroll-calc.js');
 var Densan = require('../lib/shotokuzei-densan.js');
 var SHAKAIHOKEN_HYO = require('../lib/shakaihoken-hyo.js');
 
-/* ---- 公式「電算機計算の特例」例での検算（国税庁PDF） ---- */
-T('特例 公式例1: A=175,000/扶養2 → 640円', function () { eq(Densan.calc(175000, 2), 640); });
-T('特例 公式例2: A=446,000/扶養8 → 1,370円', function () { eq(Densan.calc(446000, 8), 1370); });
-T('特例 公式例3: A=775,200/扶養3 → 61,170円', function () { eq(Densan.calc(775200, 3), 61170); });
+/* ---- 公式「電算機計算の特例」例(国税庁PDF)・年度自動選択 ---- */
+// 令和8年分(denshi_01) 公式例：基礎控除引上げで令和7より低い
+T('特例R8 公式例1: A=175,000/扶養2 → 210円', function () { eq(Densan.calc(175000, 2, { year: 2026 }), 210); });
+T('特例R8 公式例2: A=446,000/扶養8 → 940円', function () { eq(Densan.calc(446000, 8, { year: 2026 }), 940); });
+T('特例R8 公式例3: A=775,200/扶養3 → 59,470円', function () { eq(Densan.calc(775200, 3, { year: 2026 }), 59470); });
+T('既定(opts無し)は令和8扱い', function () { eq(Densan.calc(175000, 2), 210); });
+// 令和7年分(denshi_10) 公式例：year=2025で従来値
+T('特例R7 公式例: A=175,000/扶養2→640・446,000/8→1,370・775,200/3→61,170', function () {
+  eq(Densan.calc(175000, 2, { year: 2025 }), 640);
+  eq(Densan.calc(446000, 8, { year: 2025 }), 1370);
+  eq(Densan.calc(775200, 3, { year: 2025 }), 61170);
+});
+// 乙欄(令和8・denshi_02)
+T('乙欄R8: A<105,000は3.063%(100,000→3,063)', function () { eq(Densan.calcOtsu(100000), 3063); });
+T('乙欄R8: 740,001〜は259,200+超過40.84% / 甲より高い', function () {
+  eq(Densan.calcOtsu(800000), Math.floor(259200 + (800000 - 740000) * 0.4084));
+  ok(Densan.calcOtsu(300000) > Densan.calc(300000, 0, { year: 2026 }), '乙>甲(扶養0)');
+});
+T('calcByClass: otsu→乙・既定→甲', function () {
+  eq(Densan.calcByClass(100000, 0, 'otsu'), 3063);
+  eq(Densan.calcByClass(175000, 2, 'ko', { year: 2026 }), 210);
+});
 
 /* ---- 社保（標準報酬分離・50銭ルール） ---- */
 T('アンカー 支給292,931/扶養1/介護対象: 社保46,311(健14865 厚27450 介2385 雇1611)', function () {
-  var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 292931 }], birthYmd: '1980-05-15', payYm: '2026-06', fuyou: 1 });
+  var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 292931 }], birthYmd: '1980-05-15', payYm: '2025-06', fuyou: 1 });
   eq(r.si.health, 14865); eq(r.si.pension, 27450); eq(r.si.kaigo, 2385); eq(r.si.employ, 1611); eq(r.si.total, 46311);
   eq(r.kazei, 246620, 'A=社保控除後');
-  eq(r.incomeTax, 4810, '特例での所得税');
+  eq(r.incomeTax, 4810, '令和7 特例での所得税');
   eq(r.net, 241810); eq(r.kojoTotal, 51121);
 });
 
@@ -27,9 +45,9 @@ T('不変条件: net=支給-控除, 控除合計=Σ控除', function () {
 
 /* ---- C-1: 高給でも所得税が0にならない（旧バグ回帰） ---- */
 T('C-1 月給45万・独身 → 所得税>0（旧:課税302,000超で0）', function () {
-  var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 450000 }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0 });
+  var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 450000 }], birthYmd: '1990-01-01', payYm: '2025-06', fuyou: 0 });
   eq(r.kazei, 385463, 'A');
-  ok(r.incomeTax > 0, '所得税>0'); eq(r.incomeTax, 15360, '特例での税額');
+  ok(r.incomeTax > 0, '所得税>0'); eq(r.incomeTax, 15360, '令和7 特例での税額');
 });
 T('C-1b 課税が非常に高くても税額が出る(¥150万課税)', function () { ok(Densan.calc(1500000, 0) > 0); });
 
