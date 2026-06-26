@@ -591,9 +591,30 @@
     window.addEventListener('resize',function(){ if($('#scr-print').classList.contains('active'))doPreview(); });
   }
 
+  /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
+  var PKEY='payslip_state_v1';
+  function snapshot(){ return { v:1, company:state.company, employees:state.employees, month:state.month, theme:state.theme, prefer:state.prefer, depts:state.depts, roles:state.roles, showRetired:state.showRetired }; }
+  var _saveT=null;
+  function persistSave(){ try{ localStorage.setItem(PKEY, JSON.stringify(snapshot())); }catch(e){} if(window.Store&&Store.cloudSaveState){ try{ Store.cloudSaveState(snapshot()); }catch(e){} } }
+  function persistSaveDebounced(){ if(_saveT)clearTimeout(_saveT); _saveT=setTimeout(persistSave, 500); }
+  function persistLoad(){
+    var s=null; try{ s=JSON.parse(localStorage.getItem(PKEY)||'null'); }catch(e){}
+    if(s&&s.employees&&s.employees.length){
+      if(s.company) state.company=s.company; state.employees=s.employees;
+      if(s.month) state.month=s.month; if(s.theme) state.theme=s.theme; if(s.prefer) state.prefer=s.prefer;
+      if(s.depts) state.depts=s.depts; if(s.roles) state.roles=s.roles; if(s.showRetired!=null) state.showRetired=s.showRetired;
+    }
+    // クラウド(Supabase)が有効なら後から読み込んで上書き＋再描画
+    if(window.Store&&Store.cloudLoadState){ Store.cloudLoadState().then(function(cs){ if(cs&&cs.employees&&cs.employees.length){ state.company=cs.company||state.company; state.employees=cs.employees; if(cs.month)state.month=cs.month; if(cs.theme)state.theme=cs.theme; if(cs.prefer)state.prefer=cs.prefer; if(cs.depts)state.depts=cs.depts; if(cs.roles)state.roles=cs.roles; fillCompany(); var act=$('.screen.active'); if(act)showScreen(act.id); } }).catch(function(){}); }
+  }
+
   /* init */
+  persistLoad();
   $$('.scr-month').forEach(function(m){ m.value=state.month; });
   fillCompany(); bind(); showScreen('scr-settings');
+  // 変更を自動保存(入力/選択/クリック後・離脱時)
+  ['input','change','click'].forEach(function(ev){ document.addEventListener(ev, persistSaveDebounced, true); });
+  window.addEventListener('beforeunload', persistSave);
   if(location.hash.indexOf('emp')>=0){ var b=$('#set-seg .seg-b[data-set="emp"]'); if(b)b.click(); if(state.employees[0]){state.open[state.employees[0].id]=true;} renderEmpMaster(); }
   if(location.hash==='#emphelp'){ openHelp('fuyou'); }
   if(location.hash==='#carcommute'){ var ec=state.employees[0]; if(ec){ec.commuteType='car';ec.commuteKm='12';ec.commute='15000';state.open[ec.id]=true;} var b2=$('#set-seg .seg-b[data-set="emp"]'); if(b2)b2.click(); renderEmpMaster(); }

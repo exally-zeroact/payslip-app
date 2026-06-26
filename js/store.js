@@ -45,5 +45,12 @@
       lsWrite(lsAll().filter(function(b){ return b.id!==id; })); return Promise.resolve(true);
     }
   };
+
+  // アプリ全体の状態(会社+従業員マスタ等)をクラウド保存。window.SUPA未設定ならlocalStorageのみ(app.js側)で扱う
+  function accountId(){ var k='payslip_account'; var v=null; try{ v=localStorage.getItem(k); }catch(e){} if(!v){ v=uid(); try{ localStorage.setItem(k,v); }catch(e){} } return v; }
+  if(hasSupa){
+    Store.cloudSaveState = function(stateObj){ return sb.from('payslip_state').upsert({ id: accountId(), data: stateObj }).then(function(r){ return r.data; }); };
+    Store.cloudLoadState = function(){ return sb.from('payslip_state').select('data').eq('id', accountId()).single().then(function(r){ return r.data && r.data.data; }); };
+  }
   global.Store = Store;
 })(window);

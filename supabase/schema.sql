@@ -28,3 +28,23 @@ create policy "own rows write" on payslip_batches for all
 
 -- 注: クライアントの store.js は列名 pay_date を payDate にマップしていません。
 --   Supabase 本接続時は store.js 側で {pay_date: batch.payDate} 等の変換を追加してください。
+
+-- ───────────────────────────────────────────────
+-- アプリ全体の状態(会社情報+従業員マスタ+休暇/退職など)を1レコードで保持
+-- store.js の Store.cloudSaveState / cloudLoadState が使用(window.SUPA設定時のみ有効)
+-- 当面 id=端末uid。認証導入後は id=auth.uid()::text + RLS。
+create table if not exists payslip_state (
+  id          text primary key,
+  data        jsonb not null,            -- {company, employees[], month, theme, prefer, ...}
+  updated_at  timestamptz not null default now()
+);
+
+-- 有効化手順:
+--   1) このSQLをSupabase SQL Editorで実行
+--   2) index.html の app.js/store.js より前に:
+--      <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+--      <script>window.SUPA={url:'https://xxxx.supabase.co', key:'(anon public key)'}</script>
+--   これで Store.mode='supabase' になり、状態が自動でクラウド保存/復元される。
+-- 本番(認証導入後)は payslip_state も RLS:
+--   alter table payslip_state enable row level security;
+--   create policy own_state on payslip_state for all using (id = auth.uid()::text) with check (id = auth.uid()::text);
