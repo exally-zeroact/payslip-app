@@ -116,7 +116,9 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .mco-retired{opacity:.62;}
 .ret-badge{display:inline-block;font-size:10px;font-weight:700;color:#7A6A2E;background:#FBF3D6;border:1px solid #E6DCB0;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
 .ws-badge{display:inline-block;font-size:10px;font-weight:700;color:#2E7D54;background:#E3F4EA;border:1px solid #BEE3CC;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
-.seg-wrap{flex-wrap:wrap;}
+/* 設定の4タブは1行に収める(均等割・折返さない) */
+#set-seg{display:flex;width:100%;}
+#set-seg .seg-b{flex:1;padding:8px 2px;font-size:12px;white-space:nowrap;text-align:center;}
 .lv-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 2px;border-bottom:1px solid #EaF3ED;}
 .lv-nm{font-size:14px;font-weight:600;color:#1a4a2e;flex:1;min-width:0;}
 .lv-sel{flex:0 0 150px;}
