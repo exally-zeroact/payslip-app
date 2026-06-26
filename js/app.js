@@ -152,6 +152,8 @@
   function showScreen(id){
     $$('.screen').forEach(function(s){ s.classList.toggle('active', s.id===id); });
     $$('.bn').forEach(function(b){ b.classList.toggle('on', b.dataset.scr===id); });
+    var TABN={'scr-settings':'設定','scr-input':'入力','scr-list':'一覧 / 集計','scr-print':'印刷'}; var at=$('#appbar-tab'); if(at) at.textContent=TABN[id]||''; // ヘッダー右はタブ名
+    $$('.scr-month').forEach(function(m){ m.value=state.month; }); // 対象月はタイトル行(入力/一覧)に表示
     if(id==='scr-settings') renderEmpMaster();
     if(id==='scr-input'){ $('#in-month').textContent=monthLabel(); renderInput(); }
     if(id==='scr-list') renderListView();
@@ -426,7 +428,9 @@
     document.addEventListener('click',function(e){ var hi=e.target.closest('.help-i'); if(hi){ openHelp(hi.dataset.help); } });
     $('#help-x').addEventListener('click',function(){ $('#help-ov').classList.remove('on'); });
     $('#help-ov').addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); });
-    $('#g-month').addEventListener('change',function(){ state.month=this.value||state.month; updatePaydayPreview(); if($('#scr-input').classList.contains('active')){$('#in-month').textContent=monthLabel();renderInput();} });
+    document.addEventListener('change',function(ev){ if(!ev.target.classList.contains('scr-month'))return; state.month=ev.target.value||state.month; $$('.scr-month').forEach(function(m){ m.value=state.month; }); updatePaydayPreview();
+      if($('#scr-input').classList.contains('active')){$('#in-month').textContent=monthLabel();renderInput();}
+      if($('#scr-list').classList.contains('active')) renderListView(); });
 
     // 設定 seg
     $('#set-seg').addEventListener('click',function(ev){ var b=ev.target.closest('.seg-b'); if(!b)return; $$('.seg-b',this).forEach(function(x){x.classList.toggle('on',x===b);}); var s=b.dataset.set; $('#set-company').style.display=s==='company'?'':'none'; $('#set-emp').style.display=s==='emp'?'':'none'; if(s==='emp')renderEmpMaster(); });
@@ -516,7 +520,7 @@
   }
 
   /* init */
-  $('#g-month').value=state.month;
+  $$('.scr-month').forEach(function(m){ m.value=state.month; });
   fillCompany(); bind(); showScreen('scr-settings');
   if(location.hash.indexOf('emp')>=0){ var b=$('#set-seg .seg-b[data-set="emp"]'); if(b)b.click(); if(state.employees[0]){state.open[state.employees[0].id]=true;} renderEmpMaster(); }
   if(location.hash==='#emphelp'){ openHelp('fuyou'); }

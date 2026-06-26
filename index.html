@@ -12,16 +12,12 @@
 <header class="appbar">
   <div class="logo">給与明細</div>
   <div class="appbar-sub">ZEROACT</div>
-  <div class="appbar-month">
-    <label>対象月</label>
-    <input id="g-month" type="month" class="finput finput-sm">
-  </div>
+  <div class="appbar-tab" id="appbar-tab">設定</div>
 </header>
 
 <main class="main">
   <!-- ① 設定 -->
   <section class="screen active" id="scr-settings">
-    <h2 class="scr-title">設定</h2>
     <div class="seg" id="set-seg">
       <button class="seg-b on" data-set="company">会社情報</button>
       <button class="seg-b" data-set="emp">従業員マスタ</button>
@@ -59,13 +55,14 @@
 
   <!-- ② 入力 -->
   <section class="screen" id="scr-input">
-    <h2 class="scr-title">入力 <span class="scr-sub" id="in-month"></span></h2>
+    <div class="scr-head"><span class="scr-sub scr-period" id="in-month"></span><div class="scr-month-wrap"><label>対象月</label><input type="month" class="finput finput-sm scr-month"></div></div>
     <p class="hint">従業員をタップすると当月の変動値（勤怠・時数・変動手当）を入力できます。法定控除（健保/厚年/介護/雇用/所得税）は自動計算されます。</p>
     <div id="input-list"></div>
   </section>
 
   <!-- ③ 一覧/集計 -->
   <section class="screen" id="scr-list">
+    <div class="scr-head"><span class="scr-sub scr-period">月ごとの一覧・集計</span><div class="scr-month-wrap"><label>対象月</label><input type="month" class="finput finput-sm scr-month"></div></div>
     <div class="seg">
       <button class="seg-b on" data-view="list">一覧</button>
       <button class="seg-b" data-view="sum">集計</button>
@@ -76,7 +73,6 @@
 
   <!-- ④ 印刷/PDF -->
   <section class="screen" id="scr-print">
-    <h2 class="scr-title">印刷 / PDF</h2>
     <div class="card">
       <div class="frow2">
         <div><label>月で選ぶ</label><input id="p-month" type="month" class="finput"></div>
