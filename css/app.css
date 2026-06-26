@@ -91,6 +91,10 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .cr-f{padding:9px 10px;border:1.5px solid #D4EDE1;border-radius:9px;font-family:'DM Mono',monospace;font-size:14px;color:#1a4a2e;background:#fff;-webkit-appearance:none;text-align:right;width:130px;}
 .cr-f.cr-dur{width:58px;text-align:center;}
 .cr-f.cr-wide{width:130px;}
+.cr-f.cr-rate{width:64px;text-align:right;}
+.rate-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 2px;}
+.rate-grid>div{min-width:0;}
+.rate-grid .mini-l{font-size:10px;color:#3D6B53;font-weight:700;margin-bottom:3px;}
 .cr-fixed{font-size:11px;color:#8A8A7C;background:#F6F6F4;border:1px solid #E6E6DF;border-radius:8px;padding:8px 10px;margin-top:4px;}.cr-fixed b{font-family:'DM Mono',monospace;color:#6A6A5C;}
 .cr-ok{font-size:10.5px;color:#2E7D54;font-weight:700;margin-top:6px;}
 .cr-warn{font-size:10.5px;color:#92500A;background:#FEF3E2;border:1px solid #F4D8A8;border-radius:7px;padding:7px 9px;margin-top:6px;line-height:1.55;}

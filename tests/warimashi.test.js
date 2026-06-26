@@ -96,6 +96,27 @@ T('detailComponents: 0分は率0でも行は出る(検算表示用)・calcはfil
   eq(W.calc(1592, W.detailComponents({ ot: 120 })).lines.length, 1); // 実額は0除外で1行
 });
 
+/* ── 率オーバーライド(法定は最低・会社は上げられる・合成式) ── */
+T('既定(rates無し)は法定下限のまま不変', function () {
+  var R = W.resolveRates();
+  eq(R.ot, 1.25); eq(R.holiday, 1.35); eq(R.night, 0.25); eq(R.over60Add, 0.25);
+});
+T('残業率を1.3に上げると60h超も連動(合成式 1.3+0.25=1.55)', function () {
+  var c = W.detailComponents({ ot: 60, over60: 60, otNight: 60, holidayNight: 60 }, { ot: 1.3 });
+  var by = {}; c.forEach(function (x) { by[x.key] = x.rate; });
+  eq(by.ot, 1.3); eq(by.over60, 1.55); eq(by.otNight, 1.55); eq(by.holidayNight, 1.6); // 休日は未変更1.35+深夜0.25
+});
+T('深夜率を0.3に上げると深夜系が連動', function () {
+  var c = W.detailComponents({ night: 60, otNight: 60, holidayNight: 60 }, { night: 0.3 });
+  var by = {}; c.forEach(function (x) { by[x.key] = x.rate; });
+  eq(by.night, 0.3); eq(by.otNight, 1.55); eq(by.holidayNight, 1.65);
+});
+T('かんたんも率上書きが効く(残業1.3)', function () {
+  var r = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, otH: 10, rates: { ot: 1.3 } });
+  // 1592*1.3*10=20696
+  eq(r.total, 20696);
+});
+
 /* ── 端数(基発150号): 割増はちょうど50銭で"切上"(社保とは逆) ── */
 T('han50Up: ちょうど50銭は切上(795.5→796) / 未満は切捨', function () {
   eq(W.han50Up(795.5), 796); eq(W.han50Up(795.49), 795); eq(W.han50Up(795.0), 795);

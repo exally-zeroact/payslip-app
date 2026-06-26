@@ -49,10 +49,11 @@
       shaho:{ mode:'teiji', months:[{pay:'',days:'30'},{pay:'',days:'30'},{pay:'',days:'30'}], mikomi:'', manual:'' } };
   }
   var WDAYS=['日','月','火','水','木','金','土'];
-  var RULE_ITEMS=[['teikyu','休みの日'],['shotei','1日の働く時間'],['annual','年間の休み'],['yakan','深夜手当'],['kyukei','休憩時間'],['minashi','固定残業（みなし）'],['shoyo','賞与の有無']];
+  var RULE_ITEMS=[['teikyu','休みの日'],['shotei','1日の働く時間'],['annual','年間の休み'],['warimashiRate','割増の率'],['kyukei','休憩時間'],['minashi','固定残業（みなし）'],['shoyo','賞与の有無']];
   var state={ company:{name:'株式会社 ゼロアクト',addr:'',close:'末日',payday:'翌25日',
       holidays:[0], dailyWorkH:'8', dailyWorkM:'0', annualHolidays:'120',
-      ruleOn:{teikyu:true,shotei:true,annual:true,yakan:true} },
+      ruleOn:{teikyu:true,shotei:true,annual:true,warimashiRate:true},
+      rateOt:'', rateHoliday:'', rateNight:'', rateOver60:'' },
     month:'2026-06', prefer:'auto', theme:THEMES[0], depts:['営業部'], roles:['課長','主任','一般'],
     employees:[defEmp('山田 太郎')], open:{} };
 
@@ -79,12 +80,14 @@
     var ah=(e.annualHolidays!=null&&e.annualHolidays!=='')?e.annualHolidays:co.annualHolidays; // 会社規定・従業員で任意上書き
     var dwh=(e.dailyWorkH!=null&&e.dailyWorkH!=='')?e.dailyWorkH:co.dailyWorkH;
     var dwm=(e.dailyWorkM!=null&&e.dailyWorkM!=='')?e.dailyWorkM:co.dailyWorkM;
-    var w=e.warimashi||{}, common={ base:warimashiBasis(e), annualHolidays:ah, dailyHours:num(dwh)+num(dwm)/60 };
+    var pctRate=function(v){ return (v!=null&&v!=='')?num(v)/100:undefined; };
+    var rates={ ot:pctRate(co.rateOt), holiday:pctRate(co.rateHoliday), night:pctRate(co.rateNight), over60Add:pctRate(co.rateOver60) };
+    var w=e.warimashi||{}, common={ base:warimashiBasis(e), annualHolidays:ah, dailyHours:num(dwh)+num(dwm)/60, rates:rates };
     if(w.mode==='detail'){
       var d=w.detail||{}; var seg={}; ['ot','otNight','over60','over60Night','night','holiday','holidayNight'].forEach(function(k){ seg[k]=dmin(d[k]); });
-      return Warimashi.detail({ base:common.base, annualHolidays:common.annualHolidays, dailyHours:common.dailyHours, seg:seg });
+      return Warimashi.detail({ base:common.base, annualHolidays:common.annualHolidays, dailyHours:common.dailyHours, rates:common.rates, seg:seg });
     }
-    return Warimashi.easy({ base:common.base, annualHolidays:common.annualHolidays, dailyHours:common.dailyHours,
+    return Warimashi.easy({ base:common.base, annualHolidays:common.annualHolidays, dailyHours:common.dailyHours, rates:common.rates,
       otH:w.otH, otM:w.otM, nightH:w.nightH, nightM:w.nightM, holidayH:w.holidayH, holidayM:w.holidayM });
   }
   function compute(e){
@@ -128,7 +131,14 @@
       '<span class="dur"><input class="cr-f cr-dur" data-cf="dailyWorkH" inputmode="numeric" value="'+attr(c.dailyWorkH)+'"><i>時間</i><input class="cr-f cr-dur" data-cf="dailyWorkM" inputmode="numeric" value="'+attr(c.dailyWorkM)+'"><i>分</i></span>'); }
     if(on.annual){
       h+=ruleItemHTML('annual','年間の休み','日','annual','<input class="cr-f cr-wide" data-cf="annualHolidays" inputmode="numeric" value="'+attr(c.annualHolidays)+'">'); }
-    if(on.yakan){ h+=ruleItemHTML('yakan','深夜手当','深夜割増','warimashi','<div class="cr-fixed">🔒 夜 <b>22:00〜5:00</b> は法律で固定・自動で1.25倍（変更できません）</div>'); }
+    if(on.warimashiRate){
+      var rr='<div class="rate-grid">'
+        +'<div><div class="mini-l">残業</div><span class="dur"><input class="cr-f cr-rate" data-cf="rateOt" inputmode="numeric" value="'+attr(c.rateOt)+'" placeholder="125"><i>%</i></span></div>'
+        +'<div><div class="mini-l">法定休日</div><span class="dur"><input class="cr-f cr-rate" data-cf="rateHoliday" inputmode="numeric" value="'+attr(c.rateHoliday)+'" placeholder="135"><i>%</i></span></div>'
+        +'<div><div class="mini-l">深夜（上乗せ）</div><span class="dur"><input class="cr-f cr-rate" data-cf="rateNight" inputmode="numeric" value="'+attr(c.rateNight)+'" placeholder="25"><i>+%</i></span></div>'
+        +'<div><div class="mini-l">月60時間超（上乗せ）</div><span class="dur"><input class="cr-f cr-rate" data-cf="rateOver60" inputmode="numeric" value="'+attr(c.rateOver60)+'" placeholder="25"><i>+%</i></span></div>'
+        +'</div><div class="ri-note">空欄＝法定どおり（残業125%・法定休日135%・深夜+25%・月60h超+25%）。<b>会社はこれ以上に上げられます</b>。深夜帯は法律で<b>22:00〜5:00</b>固定。</div>';
+      h+=ruleItemHTML('warimashiRate','割増の率','残業・休日・深夜','warimashi',rr); }
     if(on.kyukei){ h+=ruleItemHTML('kyukei','休憩時間','分','','<input class="cr-f cr-wide" data-cf="kyukei" inputmode="numeric" value="'+attr(c.kyukei)+'" placeholder="60">'); }
     if(on.minashi){ h+=ruleItemHTML('minashi','固定残業（みなし）','時間','','<input class="cr-f cr-wide" data-cf="minashiH" inputmode="numeric" value="'+attr(c.minashiH)+'" placeholder="0">'); }
     if(on.shoyo){ h+=ruleItemHTML('shoyo','賞与の有無','','','<div class="ri-note">賞与タブで個別に登録します。</div>'); }
