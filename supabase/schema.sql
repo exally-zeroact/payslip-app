@@ -29,22 +29,45 @@ create policy "own rows write" on payslip_batches for all
 -- 注: クライアントの store.js は列名 pay_date を payDate にマップしていません。
 --   Supabase 本接続時は store.js 側で {pay_date: batch.payDate} 等の変換を追加してください。
 
--- ───────────────────────────────────────────────
--- アプリ全体の状態(会社情報+従業員マスタ+休暇/退職など)を1レコードで保持
--- store.js の Store.cloudSaveState / cloudLoadState が使用(window.SUPA設定時のみ有効)
--- 当面 id=端末uid。認証導入後は id=auth.uid()::text + RLS。
-create table if not exists payslip_state (
-  id          text primary key,
-  data        jsonb not null,            -- {company, employees[], month, theme, prefer, ...}
+-- ═══════════════════════════════════════════════════════════════
+-- 給与明細アプリ 専用の棚(pay_*) ★2026-06-27 既存プロジェクト(daikou-seikyu/Exally)に作成済★
+--   構成= 倉庫(プロジェクト)共有・棚はアプリ毎に完全独立・アカウント(auth)共通
+--   →独立アプリだけの人もExally経由の人も同じ pay_* を本人(account_id=auth.uid)で読む
+--   ※代行請求の棚(companies/meisai/issuer/payments/export_tokens)とは完全分離・無関係
+-- ═══════════════════════════════════════════════════════════════
+create table if not exists pay_companies (         -- 会社情報+会社の決まり(1アカウント1社)
+  account_id  uuid primary key default auth.uid(),
+  data        jsonb not null default '{}'::jsonb,
   updated_at  timestamptz not null default now()
 );
+create table if not exists pay_employees (          -- 従業員マスタ(就業状況/退職も data 内)
+  id          text primary key,
+  account_id  uuid not null default auth.uid(),
+  sort        int default 0,
+  data        jsonb not null default '{}'::jsonb,
+  updated_at  timestamptz not null default now()
+);
+create index if not exists idx_pay_employees_acct on pay_employees(account_id, sort);
+create table if not exists pay_payslips (           -- 月次の明細/入力(定時決定4-6月の自動入力・履歴の素)
+  id          text primary key,
+  account_id  uuid not null default auth.uid(),
+  ym          text not null,                        -- 'YYYY-MM'
+  employee_id text,
+  data        jsonb not null default '{}'::jsonb,
+  updated_at  timestamptz not null default now()
+);
+create index if not exists idx_pay_payslips_acct on pay_payslips(account_id, ym);
 
--- 有効化手順:
---   1) このSQLをSupabase SQL Editorで実行
---   2) index.html の app.js/store.js より前に:
---      <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
---      <script>window.SUPA={url:'https://xxxx.supabase.co', key:'(anon public key)'}</script>
---   これで Store.mode='supabase' になり、状態が自動でクラウド保存/復元される。
--- 本番(認証導入後)は payslip_state も RLS:
---   alter table payslip_state enable row level security;
---   create policy own_state on payslip_state for all using (id = auth.uid()::text) with check (id = auth.uid()::text);
+-- RLS: 本人(account_id=auth.uid())の行だけ(代行と同方式)
+alter table pay_companies enable row level security;
+alter table pay_employees enable row level security;
+alter table pay_payslips  enable row level security;
+drop policy if exists own_pay_companies on pay_companies;
+create policy own_pay_companies on pay_companies for all using (account_id = auth.uid()) with check (account_id = auth.uid());
+drop policy if exists own_pay_employees on pay_employees;
+create policy own_pay_employees on pay_employees for all using (account_id = auth.uid()) with check (account_id = auth.uid());
+drop policy if exists own_pay_payslips on pay_payslips;
+create policy own_pay_payslips on pay_payslips for all using (account_id = auth.uid()) with check (account_id = auth.uid());
+
+-- 棚名/列名は後から変更可(データそのまま): alter table 旧 rename to 新; / alter table x rename column 旧 to 新;
+-- 次の配線: index.html に supabase-js(CDN)+window.SUPA、アプリに ログイン(auth) を付け、保存/復元を pay_* に。
