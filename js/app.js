@@ -5,6 +5,7 @@
   var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
   var num=function(v){var n=Number(String(v==null?0:v).replace(/[, ]/g,''));return isNaN(n)?0:n;};
   var yen=function(n){return '¥'+Math.round(n).toLocaleString('ja-JP');};
+  var fmtN=function(v){var n=num(v);return n?n.toLocaleString('ja-JP'):(v===0||v==='0'?'0':'');};
   var esc=function(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
   var attr=function(s){return String(s==null?'':s).replace(/"/g,'&quot;');};
   var uid=function(){return 'e'+Math.abs(Date.now()%1e7).toString(36)+Math.floor(performance.now()).toString(36);};
@@ -201,16 +202,16 @@
       +'<div class="frow2"><div class="frow"><div class="flabel">部署</div>'+deptSelect(e)+'</div>'
         +'<div class="frow"><div class="flabel">役職</div>'+roleSelect(e)+'</div></div>'
       +'<div class="frow2"><div class="frow"><div class="flabel">給与形態</div><select class="finput m-f" data-f="payType">'+PAYTYPES.map(function(p){return '<option'+(p===e.payType?' selected':'')+'>'+p+'</option>';}).join('')+'</select></div>'
-        +'<div class="frow"><div class="flabel">'+(e.payType==='時給'?'時給単価':e.payType==='日給'?'日給額':'基本給')+'<span class="hint2">円</span></div><input class="finput num m-f" data-f="'+(e.payType==='時給'?'hourly':'base')+'" value="'+attr(e.payType==='時給'?e.hourly:e.base)+'"></div></div>'
+        +'<div class="frow"><div class="flabel">'+(e.payType==='時給'?'時給単価':e.payType==='日給'?'日給額':'基本給')+'<span class="hint2">円</span></div><input class="finput num m-f" data-f="'+(e.payType==='時給'?'hourly':'base')+'" inputmode="numeric" value="'+attr(fmtN(e.payType==='時給'?e.hourly:e.base))+'"></div></div>'
       +'<div class="frow2"><div class="frow"><div class="flabel">年間所定休日<span class="hint2">日/年</span><span class="help-i" data-help="shoteibase">💡</span></div><input class="finput num m-f" data-f="annualHolidays" value="'+attr(e.annualHolidays)+'"></div>'
         +'<div class="frow"><div class="flabel">1日の所定労働</div><span class="dur"><input class="finput m-f dur-in" data-f="dailyWorkH" inputmode="numeric" value="'+attr(e.dailyWorkH)+'"><i>時</i><input class="finput m-f dur-in" data-f="dailyWorkM" inputmode="numeric" value="'+attr(e.dailyWorkM)+'"><i>分</i></span></div></div>'
       +'<div class="frow2"><div class="frow"><div class="flabel">扶養人数<span class="hint2">配偶者含</span><span class="help-i" data-help="fuyou">💡</span></div><input class="finput num m-f" data-f="fuyou" value="'+attr(e.fuyou)+'"></div>'
         +'<div class="frow"><div class="flabel">都道府県<span class="hint2">健保率</span></div><select class="finput m-f" data-f="pref">'+prefOptions(e.pref)+'</select></div></div>'
       +'<div class="chip-row" style="margin:-2px 0 10px"><span class="chip'+(e.taxClass==='otsu'?' on':'')+'" data-tax="1">'+(e.taxClass==='otsu'?'✓ ':'')+'副業・掛け持ち（所得税は乙欄）<span class="help-i" data-help="taxclass">💡</span></span></div>'
-      +'<div class="frow2"><div class="frow"><div class="flabel">通勤手当<span class="hint2">円/月</span><span class="help-i" data-help="commute">💡</span></div><input class="finput num m-f" data-f="commute" value="'+attr(e.commute)+'"></div>'
+      +'<div class="frow2"><div class="frow"><div class="flabel">通勤手当<span class="hint2">円/月</span><span class="help-i" data-help="commute">💡</span></div><input class="finput num m-f" data-f="commute" inputmode="numeric" value="'+attr(fmtN(e.commute))+'"></div>'
         +'<div class="frow"><div class="flabel">通勤方法</div><select class="finput m-f" data-f="commuteType"><option value="public"'+(e.commuteType!=='car'?' selected':'')+'>公共交通</option><option value="car"'+(e.commuteType==='car'?' selected':'')+'>マイカー等</option></select></div></div>'
       +(e.commuteType==='car'?'<div class="frow2"><div class="frow"><div class="flabel">片道距離<span class="hint2">km</span></div><input class="finput num m-f" data-f="commuteKm" value="'+attr(e.commuteKm)+'"></div><div class="frow"><div class="flabel">非課税限度<span class="hint2">自動</span></div><input class="finput num" value="'+yen(commuteLimit(e))+'" readonly style="background:#F6FAF7;color:#3D6B53"></div></div>':'<div class="hint" style="margin:-4px 0 10px">公共交通＝月15万まで非課税。マイカーは距離別（自動）。</div>')
-      +'<div class="frow"><div class="flabel">住民税<span class="hint2">円/月</span></div><input class="finput num m-f" data-f="residentTax" value="'+attr(e.residentTax)+'"></div>'
+      +'<div class="frow"><div class="flabel">住民税<span class="hint2">円/月</span></div><input class="finput num m-f" data-f="residentTax" inputmode="numeric" value="'+attr(fmtN(e.residentTax))+'"></div>'
       +'<div class="frow"><div class="flabel">振込先<span class="hint2">任意</span></div><input class="finput m-f" data-f="bank" value="'+attr(e.bank)+'" placeholder="○○銀行 普通 1234567"></div>'
       +shahoSection(e)
       +'<div class="sec-lb" style="border-top:1px dashed #D4EDE1">法定控除（使わないものは外せる）<span class="help-i" data-help="legalkojo">💡</span></div>'
@@ -430,7 +431,7 @@
       if(ev.target.classList.contains('sh-days')){ renderEmpMaster(); return; }
       var f=ev.target.dataset.f; if(!f)return;
       if((f==='dept'||f==='role')&&ev.target.value==='__new'){ var label=f==='dept'?'部署':'役職'; var nv=(prompt('新しい'+label+'名',''))||''; nv=nv.trim(); if(nv){ var list=f==='dept'?state.depts:state.roles; if(list.indexOf(nv)<0)list.push(nv); emp[f]=nv; } renderEmpMaster(); return; }
-      emp[f]=ev.target.value; if(f==='payType'||f==='dept'||f==='role'||f==='commuteType') renderEmpMaster();
+      emp[f]=ev.target.value; if(ev.target.classList.contains('num')){ emp[f]=String(num(ev.target.value)); ev.target.value=fmtN(emp[f]); } if(f==='payType'||f==='dept'||f==='role'||f==='commuteType') renderEmpMaster();
     });
     el.addEventListener('input',function(ev){ var card=ev.target.closest('.mco'); if(!card)return; var i=+card.dataset.i; var emp=state.employees[i]; var t=ev.target;
       if(!emp.shaho)emp.shaho={mode:'teiji',months:[]};
