@@ -8,6 +8,7 @@
   // ---- 共有デザイントークン ----
   var ROOT = ':root{--ink:#23261f;--ink2:#6a6d62;--ink3:#7d7f72;--hair:#ddd7c7;--hair2:#cfc9b8;--accent:#6f5a3e;--accent-soft:#b6a06d;--paper:#ffffff;}' +
     '*{box-sizing:border-box;margin:0;padding:0;}' +
+    '.sum{display:grid!important;grid-template-columns:1fr 1fr;align-items:baseline;}.sum .v{text-align:right;}.sum .l{text-align:left;}.ln.sum .sgrp{display:flex;justify-content:space-between;align-items:baseline;}.r-pad{border-bottom:none!important;}' +
     'body{font-family:"Yu Mincho","YuMincho","Hiragino Mincho ProN","Hiragino Mincho Pro","HG明朝E","MS Mincho",serif;color:var(--ink);-webkit-font-smoothing:antialiased;}';
 
   var YEN = '<span class="yen">¥</span>';
@@ -37,10 +38,16 @@
     '.items2{display:grid;grid-template-columns:1fr 1fr;column-gap:20px;}' +
     '.r{display:flex;justify-content:space-between;align-items:baseline;padding:4px 1px;border-bottom:.7px solid var(--hair);}.r .l{font-size:10.5px;color:var(--ink2);}.r .l .hz{font-size:8px;color:var(--ink3);margin-left:3px;font-family:"Yu Gothic","Hiragino Sans",sans-serif;}.r .v{font-size:11px;font-variant-numeric:tabular-nums;}' +
     '.items2 .r:nth-last-child(-n+2){border-bottom:none;}' +
-    '.r.sum{border-bottom:none;border-top:1px solid var(--accent-soft);margin-top:auto;padding-top:8px;}.r.sum .l{color:var(--ink);letter-spacing:.16em;font-size:12px;}.r.sum .v{font-size:14px;}' +
+    '.r.sum{border-bottom:none;border-top:1px solid var(--accent-soft);margin-top:auto;padding-top:8px;column-gap:20px;}.r.sum .l{color:var(--ink);letter-spacing:.16em;font-size:12px;}.r.sum .v{font-size:14px;}' +
     '@page{size:A4 portrait;margin:0;}@media print{body{background:#fff;}.page,.sheet{box-shadow:none;}}';
 
-  function rowsHTML(items){ return items.map(function(it){ var hz=it.hikazei?'<span class="hz">非課税</span>':''; return '<div class="r"><span class="l">'+esc(it.label)+hz+'</span><span class="v">'+fmt(it.value)+'</span></div>'; }).join(''); }
+  // 行を2列グリッドに流す。奇数なら空セルを補い、行区切り線が全幅で出るようにする
+  function rowsHTML(items){ var h=items.map(function(it){ var hz=it.hikazei?'<span class="hz">非課税</span>':''; return '<div class="r"><span class="l">'+esc(it.label)+hz+'</span><span class="v">'+fmt(it.value)+'</span></div>'; }).join(''); if(items.length%2===1) h+='<div class="r r-pad"></div>'; return h; }
+  // 合計行：金額を左列の金額と同じ位置に揃える(右端に飛ばさない)。cls= r / ln
+  function sumLine(cls, label, value){
+    if(cls==='ln'){ // 縦並び(全幅で離れる)→ラベルを右列の見出し位置(緑線)・値を右列の数字位置に揃える
+      return '<div class="ln sum"><span class="sp"></span><span class="sgrp"><span class="lab">'+label+'</span><span class="amt">'+fmt(value)+'</span></span></div>'; }
+    return '<div class="'+cls+' sum"><span class="l">'+label+'</span><span class="v">'+fmt(value)+'</span></div>'; }
   function kinHTML(kintai){ return '<div class="kin">'+kintai.map(function(k){ return '<div class="k"><div class="kl">'+esc(k.label)+'</div><div class="kv">'+esc(k.value)+'</div></div>'; }).join('')+'</div>'; }
   function metaHTML(p){ return '<div class="meta">支給日　'+esc(p.payDate||'')+'<br>'+esc(p.company||'')+'</div>'; }
 
@@ -51,8 +58,8 @@
       '<div class="hero"><div class="h-co">'+esc(p.company||'')+'</div><div class="h-nm">'+esc(p.name||'')+'<span class="dono">殿</span></div><div class="h-lab">差 引 支 給 額</div><div class="h-val">'+YEN+fmt(p.net)+'</div></div>' +
       '<div class="sec-title" style="margin-top:6px">勤 怠</div>'+kinHTML(p.kintai) +
       '<div class="pd">' +
-        '<div class="col"><div class="st">支 給</div><div class="items2">'+rowsHTML(p.shikyu)+'</div><div class="r sum"><span class="l">支給合計</span><span class="v">'+fmt(p.shikyuTotal!=null?p.shikyuTotal:sum(p.shikyu))+'</span></div></div>' +
-        '<div class="col"><div class="st">控 除</div><div class="items2">'+rowsHTML(p.kojo)+'</div><div class="r sum"><span class="l">控除合計</span><span class="v">'+fmt(p.kojoTotal!=null?p.kojoTotal:sum(p.kojo))+'</span></div></div>' +
+        '<div class="col"><div class="st">支 給</div><div class="items2">'+rowsHTML(p.shikyu)+'</div>'+sumLine('r','支給合計',p.shikyuTotal!=null?p.shikyuTotal:sum(p.shikyu))+'</div>' +
+        '<div class="col"><div class="st">控 除</div><div class="items2">'+rowsHTML(p.kojo)+'</div>'+sumLine('r','控除合計',p.kojoTotal!=null?p.kojoTotal:sum(p.kojo))+'</div>' +
       '</div></div>';
   }
   function colsUnitCompact(p){
@@ -62,8 +69,8 @@
       '<div class="net">差引支給額<b><span class="y">¥</span>'+fmt(p.net)+'</b></div>' +
       kinHTML(p.kintai) +
       '<div class="pd">' +
-        '<div class="col"><div class="st">支 給</div><div class="items2">'+rowsHTML(p.shikyu)+'</div><div class="r sum"><span class="l">支給合計</span><span class="v">'+fmt(p.shikyuTotal!=null?p.shikyuTotal:sum(p.shikyu))+'</span></div></div>' +
-        '<div class="col"><div class="st">控 除</div><div class="items2">'+rowsHTML(p.kojo)+'</div><div class="r sum"><span class="l">控除合計</span><span class="v">'+fmt(p.kojoTotal!=null?p.kojoTotal:sum(p.kojo))+'</span></div></div>' +
+        '<div class="col"><div class="st">支 給</div><div class="items2">'+rowsHTML(p.shikyu)+'</div>'+sumLine('r','支給合計',p.shikyuTotal!=null?p.shikyuTotal:sum(p.shikyu))+'</div>' +
+        '<div class="col"><div class="st">控 除</div><div class="items2">'+rowsHTML(p.kojo)+'</div>'+sumLine('r','控除合計',p.kojoTotal!=null?p.kojoTotal:sum(p.kojo))+'</div>' +
       '</div></div>';
   }
 
@@ -89,10 +96,10 @@
     '.items2{display:grid;grid-template-columns:1fr 1fr;column-gap:46px;}' +
     '.ln{display:flex;justify-content:space-between;align-items:baseline;padding:5.5px 2px;border-bottom:.7px solid var(--hair);}.ln .lab{font-size:12px;color:var(--ink2);}.ln .lab .hz{font-size:8.5px;color:var(--ink3);margin-left:4px;font-family:"Yu Gothic","Hiragino Sans",sans-serif;}.ln .amt{font-size:13px;font-variant-numeric:tabular-nums;}' +
     '.items2 .ln:nth-last-child(-n+2){border-bottom:none;}' +
-    '.ln.sum{border-bottom:none;border-top:1px solid var(--accent-soft);margin-top:6px;padding-top:9px;}.ln.sum .lab{color:var(--ink);letter-spacing:.18em;font-size:12.5px;}.ln.sum .amt{font-size:15px;}' +
+    '.ln.sum{border-bottom:none;border-top:1px solid var(--accent-soft);margin-top:6px;padding-top:9px;column-gap:46px;}.ln.sum .lab{color:var(--ink);letter-spacing:.18em;font-size:12.5px;}.ln.sum .amt{font-size:15px;}' +
     '@page{size:A4 portrait;margin:0;}@media print{body{background:#fff;}.sheet{box-shadow:none;}}';
 
-  function lnHTML(items){ return items.map(function(it){ var hz=it.hikazei?'<span class="hz">非課税</span>':''; return '<div class="ln"><span class="lab">'+esc(it.label)+hz+'</span><span class="amt">'+fmt(it.value)+'</span></div>'; }).join(''); }
+  function lnHTML(items){ var h=items.map(function(it){ var hz=it.hikazei?'<span class="hz">非課税</span>':''; return '<div class="ln"><span class="lab">'+esc(it.label)+hz+'</span><span class="amt">'+fmt(it.value)+'</span></div>'; }).join(''); if(items.length%2===1) h+='<div class="ln r-pad"></div>'; return h; }
   function kinHTMLv(kintai){ return '<div class="kin">'+kintai.map(function(k){ return '<div class="k"><div class="kl">'+esc(k.label)+'</div><div class="kv">'+esc(k.value)+'</div></div>'; }).join('')+'</div>'; }
 
   function buildVstack1(people, doc){
@@ -103,8 +110,8 @@
       '<div class="hero"><div class="hc-co">'+esc(p.company||'')+'</div><div class="hc-name">'+esc(p.name||'')+'<span class="dono">殿</span></div><div class="hc-label">差 引 支 給 額</div><div class="hc-val"><span class="yen">¥</span>'+fmt(p.net)+'</div></div>' +
       '<div class="sec-title" style="margin-top:6px">勤 怠</div>'+kinHTMLv(p.kintai) +
       '<div class="pd">' +
-        '<div class="col"><div class="sec-title">支 給</div><div class="items2">'+lnHTML(p.shikyu)+'</div><div class="ln sum"><span class="lab">支給合計</span><span class="amt">'+fmt(p.shikyuTotal!=null?p.shikyuTotal:sum(p.shikyu))+'</span></div></div>' +
-        '<div class="col"><div class="sec-title">控 除</div><div class="items2">'+lnHTML(p.kojo)+'</div><div class="ln sum"><span class="lab">控除合計</span><span class="amt">'+fmt(p.kojoTotal!=null?p.kojoTotal:sum(p.kojo))+'</span></div></div>' +
+        '<div class="col"><div class="sec-title">支 給</div><div class="items2">'+lnHTML(p.shikyu)+'</div>'+sumLine('ln','支給合計',p.shikyuTotal!=null?p.shikyuTotal:sum(p.shikyu))+'</div>' +
+        '<div class="col"><div class="sec-title">控 除</div><div class="items2">'+lnHTML(p.kojo)+'</div>'+sumLine('ln','控除合計',p.kojoTotal!=null?p.kojoTotal:sum(p.kojo))+'</div>' +
       '</div></div>';
     return wrap(VSTACK_CSS, body, 'portrait');
   }
@@ -120,10 +127,10 @@
     '.r{display:flex;justify-content:space-between;align-items:baseline;padding:3.4px 1px;border-bottom:.6px solid var(--hair);}.r .l{font-size:9px;color:var(--ink2);}.r .l .hz{font-size:6.5px;color:var(--ink3);margin-left:2px;font-family:"Yu Gothic","Hiragino Sans",sans-serif;}.r .v{font-size:9.5px;font-variant-numeric:tabular-nums;}' +
     '.kintai{border-top:1px solid var(--accent-soft);border-bottom:1px solid var(--accent-soft);margin-top:5px;padding:2px 0;}.kintai .k3{display:grid;grid-template-columns:1fr 1fr 1fr;column-gap:14px;}.kintai .r{border-bottom:none;padding:3px 1px;}' +
     '.items2{display:grid;grid-template-columns:1fr 1fr;column-gap:14px;}.items2 .r:nth-last-child(-n+2){border-bottom:none;}' +
-    '.r.sum{border-bottom:none;border-top:1px solid var(--accent-soft);margin-top:5px;padding-top:6px;}.r.sum .l{color:var(--ink);letter-spacing:.1em;}.r.sum .v{font-size:10.5px;}' +
+    '.r.sum{border-bottom:none;border-top:1px solid var(--accent-soft);margin-top:5px;padding-top:6px;column-gap:14px;}.r.sum .l{color:var(--ink);letter-spacing:.1em;}.r.sum .v{font-size:10.5px;}' +
     '@page{size:A4 landscape;margin:0;}@media print{body{background:#fff;}.page{box-shadow:none;}}';
 
-  function srowsHTML(items){ return items.map(function(it){ var hz=it.hikazei?'<span class="hz">非課税</span>':''; return '<div class="r"><span class="l">'+esc(it.label)+hz+'</span><span class="v">'+fmt(it.value)+'</span></div>'; }).join(''); }
+  function srowsHTML(items){ var h=items.map(function(it){ var hz=it.hikazei?'<span class="hz">非課税</span>':''; return '<div class="r"><span class="l">'+esc(it.label)+hz+'</span><span class="v">'+fmt(it.value)+'</span></div>'; }).join(''); if(items.length%2===1) h+='<div class="r r-pad"></div>'; return h; }
   function skinHTML(kintai){ return kintai.map(function(k){ return '<div class="r"><span class="l">'+esc(k.label)+'</span><span class="v">'+esc(k.value)+'</span></div>'; }).join(''); }
   function strip(p){
     return '<div class="strip">' +
@@ -131,8 +138,8 @@
       '<div class="s-who"><div class="s-co">'+esc(p.company||'')+'</div><div class="s-name">'+esc(p.name||'')+'<span class="dono">殿</span></div></div>' +
       '<div class="s-hl">差 引 支 給 額</div><div class="s-val"><span class="yen">¥</span>'+fmt(p.net)+'</div>' +
       '<div class="sl" style="border:none;padding-bottom:0;">勤 怠</div><div class="kintai"><div class="k3">'+skinHTML(p.kintai)+'</div></div>' +
-      '<div class="sl">支 給</div><div class="items2">'+srowsHTML(p.shikyu)+'</div><div class="r sum"><span class="l">支給合計</span><span class="v">'+fmt(p.shikyuTotal!=null?p.shikyuTotal:sum(p.shikyu))+'</span></div>' +
-      '<div class="sl">控 除</div><div class="items2">'+srowsHTML(p.kojo)+'</div><div class="r sum"><span class="l">控除合計</span><span class="v">'+fmt(p.kojoTotal!=null?p.kojoTotal:sum(p.kojo))+'</span></div>' +
+      '<div class="sl">支 給</div><div class="items2">'+srowsHTML(p.shikyu)+'</div>'+sumLine('r','支給合計',p.shikyuTotal!=null?p.shikyuTotal:sum(p.shikyu))+'' +
+      '<div class="sl">控 除</div><div class="items2">'+srowsHTML(p.kojo)+'</div>'+sumLine('r','控除合計',p.kojoTotal!=null?p.kojoTotal:sum(p.kojo))+'' +
       '</div>';
   }
   function buildStrips(people, doc){
