@@ -19,6 +19,9 @@
   var DEFAULT_THEME={accent:'#6f5a3e', line:'#cfc9b8', ink:'#23261f'};
   var COLOR_TARGETS=[['accent','アクセント色'],['line','罫線の色'],['ink','文字の色']];
   var PAYTYPES=['月給','時給','日給','役員'];
+  // 就業状況。産休/育休=社保免除(自動off・上書き可)、介護休/病休=社保継続、休業=会社都合(休業手当)
+  var WORK_STATUS=[['normal','通常'],['sankyu','産休'],['ikukyu','育休'],['kaigokyu','介護休'],['byoukyu','病気休職'],['kyugyo','休業(会社都合)']];
+  var WS_LABEL=function(k){ var f=WORK_STATUS.find(function(x){return x[0]===k;}); return f?f[1]:'通常'; };
   var HELP={
     fuyou:{ t:'💡 扶養人数とは？（配偶者含む）', b:'所得税の計算に使う「扶養親族等の数」です。次の合計人数を入れます。\n\n● <b>源泉控除対象配偶者</b>：1人と数える\n　＝あなたが扶養している配偶者で、配偶者の年収が約150万円以下が目安。\n● <b>控除対象扶養親族</b>：16歳以上で扶養している家族（子・親など）の人数。\n\n※年齢はその年の<b>12月31日時点</b>で判定。<b>16歳未満は数えません（0人）</b>。\n※共働きで配偶者に十分な収入がある場合、配偶者は0。\n\n例）専業主婦の妻＋高校生1人＋5歳の子 → <b>2</b>（妻1＋高校生1。5歳は16歳未満で0）' },
     shaho:{ t:'💡 社会保険（標準報酬月額）とは？', b:'毎月の健康保険・厚生年金・介護は「標準報酬月額」という<b>基準額×料率</b>で決まり、<b>原則1年は固定</b>（残業が多い月でも変わりません）。決め方は4つ：\n\n● <b>毎年の見直し(定時決定)</b>…毎年4〜6月の総支給の平均で決定（支払基礎日数17日以上の月で平均）。9月分〜翌8月分に適用。\n● <b>入社したばかり(資格取得)</b>…実績が無いので入社時の見込み月額で決定。\n● <b>給料が変わった(随時改定)</b>…固定給が変わり3か月平均で2等級以上動いたら途中改定。\n● <b>金額が分かる(直接入力)</b>…決定通知書・額表の額をそのまま。\n\n※支払基礎日数＝給料を払った対象日数。月給は原則その月の暦日数。17日未満の月は平均から外します。' },
@@ -28,6 +31,7 @@
     teikyu:{ t:'💡 休みの日（法定休日）', b:'お店・会社の休みの曜日です。複数えらべます。\n\n● <b>法定休日</b>…法律で「週1日（または4週4日）」与える義務のある休み。出勤すると<b>1.35倍</b>。\n● <b>法定外の休み（所定休日）</b>…それ以外の休み（週休2日の2日目など）。出勤しても割増は週40時間を超えた分の<b>時間外1.25倍</b>だけ。\n\n複数選んだ場合、法律上の休み(法定休日)はアプリが自動で1日特定します（通常は後ろの曜日）。日曜だけ＝週休1日（現場系）もOK。' },
     shotei:{ t:'💡 1日の働く時間（所定労働）', b:'1日の決められた労働時間（例：8時間）。休憩は含みません。\n残業代の1時間単価（月給÷1か月平均所定労働時間）の計算に使います。' },
     annual:{ t:'💡 年間の休み', b:'1年間の休日数（例：120日）。\nフルタイム(1日8時間)だと法律の目安は約105日以上。少ないと「年間の労働時間が法律の目安を超える」と黄色で教えますが、残業として割増計算すれば<b>保存も計算もできます</b>（ブロックしません）。' },
+    workstatus:{ t:'💡 就業状況（産休・育休・休職など）', b:'休んでいる人の区分です。給与計算に自動で反映します（すべて手で調整できます）。\n\n● <b>産休・育休</b>…社会保険（健保・厚年・介護）が<b>免除</b>＝自動で0に。給与は無給が一般的（入力で調整）。出産手当金・育児休業給付金は健保/雇用保険から出るお金で<b>給与には含めません</b>。\n● <b>介護休・病気休職</b>…社会保険は<b>継続</b>（無給でも本人負担が出ます）。介護休業給付金・傷病手当金は別途（給与でない）。\n● <b>休業（会社都合）</b>…<b>休業手当＝平均賃金の60%以上</b>を支給に入れます（課税・社保の対象）。\n\n※自動の社保オフは「法定控除」のチップで個別に戻せます。' },
     taxclass:{ t:'💡 所得税の区分（甲・乙）', b:'所得税の源泉徴収の区分です。\n\n● <b>甲欄</b>…「扶養控除等申告書」を提出している人（＝メインの勤務先）。扶養を加味して計算。通常はこちら。\n● <b>乙欄</b>…申告書を未提出の人（副業・掛け持ちの2か所目など）。税率が高め・扶養は加味しません。\n\n※日雇い（丙欄）は近日対応。年度（令和7/令和8）は給与の対象月から自動で正しい税額表を選びます。' },
     commute:{ t:'💡 通勤手当（非課税）', b:'通勤手当は一定額まで所得税が<b>非課税</b>です。\n\n● <b>公共交通（電車・バス）</b>…月15万円まで非課税。\n● <b>マイカー等</b>…片道距離で月額が決まる（2km未満は全額課税〜95km以上66,400円・国税庁No.2585 令和8年4月〜）。\n\n限度を超えた分は課税されます。※所得税の非課税であって、社会保険・雇用保険では全額が算定基礎に入ります。' },
     legalkojo:{ t:'💡 法定控除（健保・厚年・雇用・所得税・住民税）', b:'給料から天引きする法律上の控除です。原則はかかりますが、<b>使わないものは外せます</b>（タップでオフ）。\n\n● 役員（労働者でない）→ <b>雇用保険は対象外</b>＝外す\n● 社会保険に未加入のパート → 健保・厚年を外す\n● 乙欄/別途納付など → 所得税を外す\n\n外すとその控除は計算しません（課税のもとからも引きません）。最終判断は会社で。' },
@@ -60,7 +64,7 @@
       annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0',
       kintai:[{label:'出勤日数',value:'21'},{label:'欠勤日数',value:'0'},{label:'有給取得',value:'1'}],
       shikyu:[{label:'基本給',value:'250000'},{label:'住宅手当',value:'10000'}],
-      apply:{}, taxClass:'ko', retired:false,
+      apply:{}, taxClass:'ko', retired:false, workStatus:'normal', leavePay:'',
       warimashi:{ mode:'easy', otH:'', otM:'', nightH:'', nightM:'', holidayH:'', holidayM:'',
         detail:{ ot:{h:'',m:''}, otNight:{h:'',m:''}, over60:{h:'',m:''}, over60Night:{h:'',m:''}, night:{h:'',m:''}, holiday:{h:'',m:''}, holidayNight:{h:'',m:''} } },
       wbInclude:[], wbExclude:[],
@@ -119,11 +123,14 @@
   function workedMin(e){ return num(e.workedH)*60+num(e.workedM); }
   function workedLabel(e){ var m=workedMin(e); return Math.floor(m/60)+':'+('0'+(m%60)).slice(-2); }
   // 時給=時給単価×労働時間 / 日給=日給額×出勤日数 で基本給を自動算出(月給は手入力のまま)
+  // 基本給を状態から導出(単一ソース)。休暇中=休暇中の金額・時給=時給×労働時間・日給=日給×出勤・月給/役員=基本給。復職/再就職で自動的に元へ戻る
   function syncBasePay(e){
-    if(e.payType!=='時給'&&e.payType!=='日給') return;
     if(!e.shikyu) e.shikyu=[];
-    var amt = e.payType==='時給' ? Math.round(num(e.hourly)*workedMin(e)/60)
-                                 : Math.round(num(e.base)*kintaiVal(e,/出勤/));
+    var amt;
+    if(e.workStatus && e.workStatus!=='normal') amt=num(e.leavePay);
+    else if(e.payType==='時給') amt=Math.round(num(e.hourly)*workedMin(e)/60);
+    else if(e.payType==='日給') amt=Math.round(num(e.base)*kintaiVal(e,/出勤/));
+    else amt=num(e.base);
     var idx=e.shikyu.findIndex(function(x){return /基本給/.test(x.label||'');});
     if(idx<0) e.shikyu.unshift({label:'基本給',value:String(amt)}); else e.shikyu[idx].value=String(amt);
   }
@@ -204,6 +211,16 @@
     var opts=state.roles.map(function(r){return '<option'+(r===e.role?' selected':'')+'>'+esc(r)+'</option>';}).join('');
     return '<select class="finput m-f" data-f="role"><option value=""'+(e.role?'':' selected')+'>（なし）</option>'+opts+'<option value="__new">＋新規</option></select>';
   }
+  function wsBadge(e){ return (e.workStatus&&e.workStatus!=='normal')?' <span class="ws-badge">'+esc(WS_LABEL(e.workStatus))+'</span>':''; }
+  function wsNoteHTML(e){
+    var s=e.workStatus||'normal'; if(s==='normal') return '';
+    var msg={ sankyu:'産休：健保・厚年・介護を自動で免除(0)。給与は無給が一般的→入力で調整。出産手当金は健保へ申請(給与に含めない)。',
+      ikukyu:'育休：社保を自動で免除(0)。育児休業給付金は雇用保険(給与でない)。給与は入力で調整。',
+      kaigokyu:'介護休：社保は継続(無給でも本人負担あり)。介護休業給付金は雇用保険(給与でない)。',
+      byoukyu:'病気休職：社保は継続(本人負担あり)。傷病手当金は健保(給与でない)。',
+      kyugyo:'会社都合の休業：休業手当=平均賃金の60%以上を支給に入れる(課税・社保対象)。' }[s];
+    return '<div class="ri-note" style="margin-top:6px">'+msg+'<br>※自動の社保オフは下の「法定控除」で個別に戻せます。</div>';
+  }
   function chips(e,pool,key){
     var have=e[key].map(function(x){return x.label;});
     var fixed = key==='shikyu' ? ['通勤手当'] : []; // 通勤は通勤手当フィールドで管理
@@ -222,6 +239,7 @@
         +'<div class="frow"><div class="flabel">役職</div>'+roleSelect(e)+'</div></div>'
       +'<div class="frow2"><div class="frow"><div class="flabel">給与形態</div><select class="finput m-f" data-f="payType">'+PAYTYPES.map(function(p){return '<option'+(p===e.payType?' selected':'')+'>'+p+'</option>';}).join('')+'</select></div>'
         +'<div class="frow"><div class="flabel">'+(e.payType==='時給'?'時給単価':e.payType==='日給'?'日給額':e.payType==='役員'?'役員報酬':'基本給')+'<span class="hint2">円</span></div><input class="finput num m-f" data-f="'+(e.payType==='時給'?'hourly':'base')+'" inputmode="numeric" value="'+attr(fmtN(e.payType==='時給'?e.hourly:e.base))+'"></div></div>'
+      +'<div class="frow"><div class="flabel">就業状況<span class="hint2">産休/育休/休職等</span><span class="help-i" data-help="workstatus">💡</span></div><select class="finput m-f" data-f="workStatus">'+WORK_STATUS.map(function(w){return '<option value="'+w[0]+'"'+((e.workStatus||'normal')===w[0]?' selected':'')+'>'+w[1]+'</option>';}).join('')+'</select>'+wsNoteHTML(e)+'</div>'
       +'<div class="frow2"><div class="frow"><div class="flabel">年間所定休日<span class="hint2">日/年</span><span class="help-i" data-help="shoteibase">💡</span></div><input class="finput num m-f" data-f="annualHolidays" value="'+attr(e.annualHolidays)+'"></div>'
         +'<div class="frow"><div class="flabel">1日の所定労働</div><span class="dur"><input class="finput m-f dur-in" data-f="dailyWorkH" inputmode="numeric" value="'+attr(e.dailyWorkH)+'"><i>時</i><input class="finput m-f dur-in" data-f="dailyWorkM" inputmode="numeric" value="'+attr(e.dailyWorkM)+'"><i>分</i></span></div></div>'
       +'<div class="frow2"><div class="frow"><div class="flabel">扶養人数<span class="hint2">配偶者含</span><span class="help-i" data-help="fuyou">💡</span></div><input class="finput num m-f" data-f="fuyou" value="'+attr(e.fuyou)+'"></div>'
@@ -268,9 +286,15 @@
       body+='<div class="sh-tip">決定通知書・保険料額表の<b>標準報酬月額</b>をそのまま入力します。</div><div class="frow"><div class="flabel">標準報酬月額<span class="hint2">円</span></div><input class="finput num sh-manual" value="'+attr(s.manual)+'" placeholder="340000"></div>';
     }
     var period=mode==='auto'?'基本給ベース（自動・あとで上書き可）':mode==='teiji'?'その年9月〜翌8月（毎年見直し）':mode==='shutoku'?'入社月〜（次の見直しまで）':mode==='zuiji'?'変動の4か月目〜（次の見直しまで）':'通知書のとおり';
-    return '<div class="sec-lb" style="border-top:1px dashed #D4EDE1">社会保険（毎月の天引き）<span class="help-i" data-help="shaho">💡</span></div>'+seg+body+shahoHeroHTML(r,period,sb.undetermined,mode==='auto');
+    var exempt=(e.workStatus==='sankyu'||e.workStatus==='ikukyu');
+    return '<div class="sec-lb" style="border-top:1px dashed #D4EDE1">社会保険（毎月の天引き）<span class="help-i" data-help="shaho">💡</span></div>'+seg+body+shahoHeroHTML(r,period,sb.undetermined,mode==='auto',exempt);
   }
-  function shahoHeroHTML(r,period,undet,isAuto){
+  function shahoHeroHTML(r,period,undet,isAuto,exempt){
+    if(exempt){
+      return '<div class="sh-hero"><div class="lb">毎月この人から天引きする社会保険（本人負担）</div><div class="big">'+yen(0)+'<span style="font-size:12px;color:#3D9E72;font-family:\'Noto Sans JP\'"> 免除中</span></div>'
+        +'<div class="bd">産休・育休中は健保・厚年・介護が<b>免除</b>（本人・会社とも0）</div></div>'
+        +'<div class="sh-sub">※復帰したら就業状況を「通常」に戻すと自動で再開します。</div>';
+    }
     var soho=r.si.health+r.si.pension+(r.si.kaigo||0);
     var tag=isAuto?' 自動':undet?' 暫定':'';
     return '<div class="sh-hero"><div class="lb">毎月この人から天引きする社会保険（本人負担）</div><div class="big">'+yen(soho)+(tag?'<span style="font-size:12px;color:#7A9A87;font-family:\'Noto Sans JP\'">'+tag+'</span>':'')+'</div>'
@@ -282,7 +306,29 @@
     var r=compute(e); var mode=(e.shaho&&e.shaho.mode)||'auto';
     var period=mode==='auto'?'基本給ベース（自動・あとで上書き可）':mode==='teiji'?'その年9月〜翌8月（毎年見直し）':mode==='shutoku'?'入社月〜（次の見直しまで）':mode==='zuiji'?'変動の4か月目〜（次の見直しまで）':'通知書のとおり';
     var hero=card.querySelector('.sh-hero'); var sub=card.querySelector('.sh-sub');
-    if(hero&&sub){ var tmp=document.createElement('div'); tmp.innerHTML=shahoHeroHTML(r,period,shahoBasisOf(e).undetermined,mode==='auto'); hero.replaceWith(tmp.firstChild); card.querySelector('.sh-sub').replaceWith(tmp.lastChild); }
+    if(hero&&sub){ var tmp=document.createElement('div'); tmp.innerHTML=shahoHeroHTML(r,period,shahoBasisOf(e).undetermined,mode==='auto',(e.workStatus==='sankyu'||e.workStatus==='ikukyu')); hero.replaceWith(tmp.firstChild); card.querySelector('.sh-sub').replaceWith(tmp.lastChild); }
+  }
+  function renderLeaveMaster(){
+    var host=$('#leave-list'); if(!host) return;
+    var act=state.employees.filter(function(e){return !e.retired;});
+    if(!act.length){ host.innerHTML='<p class="hint">従業員がいません。</p>'; return; }
+    host.innerHTML=act.map(function(e){ var i=state.employees.indexOf(e); var s=e.workStatus||'normal';
+      var opts=WORK_STATUS.map(function(w){return '<option value="'+w[0]+'"'+(s===w[0]?' selected':'')+'>'+w[1]+'</option>';}).join('');
+      var row='<div class="lv-row"><span class="lv-nm">'+esc(e.name||'（無名）')+wsBadge(e)+'</span><select class="finput lv-sel" data-ls="'+i+'">'+opts+'</select></div>';
+      if(s!=='normal'){ row+='<div class="lv-detail">'+wsNoteHTML(e)
+        +'<div class="frow"><div class="flabel">休暇中の支給額<span class="hint2">円/月</span></div><input class="finput num lv-pay" data-lp="'+i+'" inputmode="numeric" value="'+attr(fmtN(e.leavePay))+'" placeholder="0（無給）"></div>'
+        +'<div style="text-align:right;margin-top:8px"><button class="btn-ghost lv-back" data-lback="'+i+'" style="color:#2E7D54;border-color:#BEE3CC;padding:8px 16px">復職させる（通常に戻す）</button></div></div>'; }
+      return row;
+    }).join('');
+  }
+  function renderRetireMaster(){
+    var host=$('#retire-list'); if(!host) return;
+    var rows=state.employees.map(function(e){ var i=state.employees.indexOf(e);
+      return '<div class="lv-row'+(e.retired?' mco-retired':'')+'"><span class="lv-nm">'+esc(e.name||'（無名）')+(e.retired?' <span class="ret-badge">退職'+(e.retiredYmd?'・'+esc(e.retiredYmd):'')+'</span>':'')+'</span>'
+        +'<button class="btn-ghost" data-rt="'+i+'" style="padding:7px 14px;'+(e.retired?'color:#2E7D54;border-color:#BEE3CC':'color:#7A6A2E;border-color:#e6dcb0')+'">'+(e.retired?'再就職させる':'退職にする')+'</button></div>';
+    }).join('');
+    var retN=state.employees.filter(function(e){return e.retired;}).length;
+    host.innerHTML=rows+'<p class="hint" style="margin-top:8px">退職者 '+retN+'名 / 在籍 '+(state.employees.length-retN)+'名</p>';
   }
   function renderEmpMaster(){
     fillCompany();
@@ -299,7 +345,10 @@
       groups[g].forEach(function(i){
         var e=state.employees[i], op=state.open[e.id];
         html+='<div class="mco'+(op?' open':'')+(e.retired?' mco-retired':'')+'" data-i="'+i+'">'
-          +'<div class="mco-hd" data-toggle="'+i+'"><span class="mco-nm">'+esc(e.name||'（無名）')+(e.retired?' <span class="ret-badge">退職</span>':'')+'</span><span class="mco-sub">'+esc(e.payType)+(e.role?' / '+esc(e.role):'')+'</span><span class="mco-cv">▾</span></div>'
+          +'<div class="mco-hd" data-toggle="'+i+'"><span class="mco-nm">'+esc(e.name||'（無名）')+'</span>'
+            +'<span class="hd-chip'+(e.workStatus&&e.workStatus!=='normal'?' on':'')+'" data-goleave="'+i+'">'+(e.workStatus&&e.workStatus!=='normal'?esc(WS_LABEL(e.workStatus)):'休暇')+'</span>'
+            +'<span class="hd-chip" data-goretire="'+i+'">退職</span>'
+            +'<span class="mco-sub">'+esc(e.payType)+(e.role?' / '+esc(e.role):'')+'</span><span class="mco-cv">▾</span></div>'
           +(op?empCardBody(e,i):'')+'</div>';
       });
     });
@@ -371,7 +420,7 @@
       if(e.retired) return '';
       var r=compute(e), open=state.open['I'+e.id];
       return '<div class="acc'+(open?' open':'')+'" data-i="'+i+'">'
-        +'<div class="acc-h" data-toggle="'+i+'"><span class="acc-nm">'+esc(e.name)+'</span><span class="acc-net">'+yen(r.net)+'</span><span class="acc-cv">▾</span></div>'
+        +'<div class="acc-h" data-toggle="'+i+'"><span class="acc-nm">'+esc(e.name)+wsBadge(e)+'</span><span class="acc-net">'+yen(r.net)+'</span><span class="acc-cv">▾</span></div>'
         +'<div class="acc-body">'
           +'<div class="grp"><div class="grp-h">勤怠<button class="mini add" data-add="kintai" data-i="'+i+'">＋</button></div><div class="rows">'+rowsHTML('kintai',e.kintai)+'</div>'+workedRowHTML(e,i)+'</div>'
           +basePayInputHTML(e,i)
@@ -439,7 +488,17 @@
       if($('#scr-list').classList.contains('active')) renderListView(); });
 
     // 設定 seg
-    $('#set-seg').addEventListener('click',function(ev){ var b=ev.target.closest('.seg-b'); if(!b)return; $$('.seg-b',this).forEach(function(x){x.classList.toggle('on',x===b);}); var s=b.dataset.set; $('#set-company').style.display=s==='company'?'':'none'; $('#set-emp').style.display=s==='emp'?'':'none'; if(s==='emp')renderEmpMaster(); });
+    $('#set-seg').addEventListener('click',function(ev){ var b=ev.target.closest('.seg-b'); if(!b)return; $$('.seg-b',this).forEach(function(x){x.classList.toggle('on',x===b);}); var s=b.dataset.set;
+      $('#set-company').style.display=s==='company'?'':'none'; $('#set-emp').style.display=s==='emp'?'':'none'; $('#set-leave').style.display=s==='leave'?'':'none'; $('#set-retire').style.display=s==='retire'?'':'none';
+      if(s==='emp')renderEmpMaster(); if(s==='leave')renderLeaveMaster(); if(s==='retire')renderRetireMaster(); });
+    // 休暇マスタ：就業状況の変更
+    $('#leave-list').addEventListener('change',function(ev){ var sel=ev.target.closest('select[data-ls]'); if(!sel)return; var emp=state.employees[+sel.dataset.ls]; emp.workStatus=sel.value; if(!emp.apply)emp.apply={}; var off=(emp.workStatus==='sankyu'||emp.workStatus==='ikukyu'); ['health','pension','kaigo'].forEach(function(k){ if(off) emp.apply[k]=false; else delete emp.apply[k]; }); renderLeaveMaster(); });
+    $('#leave-list').addEventListener('input',function(ev){ var p=ev.target.closest('input[data-lp]'); if(!p)return; state.employees[+p.dataset.lp].leavePay=p.value.replace(/[^0-9]/g,''); });
+    $('#leave-list').addEventListener('click',function(ev){ var b=ev.target.closest('[data-lback]'); if(!b)return; var emp=state.employees[+b.dataset.lback]; emp.workStatus='normal'; if(emp.apply){ delete emp.apply.health; delete emp.apply.pension; delete emp.apply.kaigo; } renderLeaveMaster(); });
+    // 退職マスタ：退職/復職
+    $('#retire-list').addEventListener('click',function(ev){ var b=ev.target.closest('[data-rt]'); if(!b)return; var emp=state.employees[+b.dataset.rt];
+      if(emp.retired){ emp.retired=false; } else { if(activeEmps().length<=1){ alert('稼働中は最低1名必要です'); return; } if(!confirm((emp.name||'この従業員')+' を退職にしますか？')) return; emp.retired=true; emp.retiredYmd=state.month; }
+      renderRetireMaster(); });
     ['name','addr','close'].forEach(function(k){ var el=$('#c-'+k); if(el) el.addEventListener('input',function(){ state.company[k]=this.value; }); });
     var pr=$('#c-payrel'); if(pr) pr.addEventListener('change',function(){ state.company.paydayRel=this.value; updatePaydayPreview(); });
     var pd=$('#c-payday-day'); if(pd) pd.addEventListener('input',function(){ state.company.paydayDay=this.value.replace(/[^0-9末]/g,''); updatePaydayPreview(); });
@@ -462,6 +521,8 @@
     var el=$('#emp-list');
     el.addEventListener('click',function(ev){
       if(ev.target.dataset.showret){ state.showRetired=!state.showRetired; renderEmpMaster(); return; }
+      if(ev.target.dataset.goleave!=null){ var gl=+ev.target.dataset.goleave; var ge=state.employees[gl]; if((ge.workStatus||'normal')==='normal'){ ge.workStatus='sankyu'; if(!ge.apply)ge.apply={}; ge.apply.health=false;ge.apply.pension=false;ge.apply.kaigo=false; } var lvb=$('#set-seg .seg-b[data-set="leave"]'); if(lvb)lvb.click(); return; }
+      if(ev.target.dataset.goretire!=null){ var gr=+ev.target.dataset.goretire; if(activeEmps().length<=1){ alert('稼働中は最低1名必要です'); return; } if(!confirm((state.employees[gr].name||'この従業員')+' を退職にしますか？')) return; state.employees[gr].retired=true; state.employees[gr].retiredYmd=state.month; var rtb=$('#set-seg .seg-b[data-set="retire"]'); if(rtb)rtb.click(); return; }
       var card=ev.target.closest('.mco');
       var tg=ev.target.closest('[data-toggle]');
       if(tg){ var ti=+tg.dataset.toggle; var e=state.employees[ti]; state.open[e.id]=!state.open[e.id]; renderEmpMaster(); return; }
@@ -480,7 +541,9 @@
       if(ev.target.classList.contains('sh-days')){ renderEmpMaster(); return; }
       var f=ev.target.dataset.f; if(!f)return;
       if((f==='dept'||f==='role')&&ev.target.value==='__new'){ var label=f==='dept'?'部署':'役職'; var nv=(prompt('新しい'+label+'名',''))||''; nv=nv.trim(); if(nv){ var list=f==='dept'?state.depts:state.roles; if(list.indexOf(nv)<0)list.push(nv); emp[f]=nv; } renderEmpMaster(); return; }
-      emp[f]=ev.target.value; if(ev.target.classList.contains('num')){ emp[f]=String(num(ev.target.value)); ev.target.value=fmtN(emp[f]); } if(f==='payType'||f==='dept'||f==='role'||f==='commuteType') renderEmpMaster();
+      emp[f]=ev.target.value; if(ev.target.classList.contains('num')){ emp[f]=String(num(ev.target.value)); ev.target.value=fmtN(emp[f]); }
+      if(f==='workStatus'){ if(!emp.apply)emp.apply={}; var off=(emp.workStatus==='sankyu'||emp.workStatus==='ikukyu'); ['health','pension','kaigo'].forEach(function(k){ if(off) emp.apply[k]=false; else delete emp.apply[k]; }); }
+      if(f==='payType'||f==='dept'||f==='role'||f==='commuteType'||f==='workStatus') renderEmpMaster();
     });
     el.addEventListener('input',function(ev){ var card=ev.target.closest('.mco'); if(!card)return; var i=+card.dataset.i; var emp=state.employees[i]; var t=ev.target;
       if(!emp.shaho)emp.shaho={mode:'teiji',months:[]};

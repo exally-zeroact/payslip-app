@@ -18,9 +18,11 @@
 <main class="main">
   <!-- ① 設定 -->
   <section class="screen active" id="scr-settings">
-    <div class="seg" id="set-seg">
+    <div class="seg seg-wrap" id="set-seg">
       <button class="seg-b on" data-set="company">会社情報</button>
       <button class="seg-b" data-set="emp">従業員マスタ</button>
+      <button class="seg-b" data-set="leave">休暇マスタ</button>
+      <button class="seg-b" data-set="retire">退職マスタ</button>
     </div>
     <div id="set-company">
       <div class="card">
@@ -50,6 +52,20 @@
     <div id="set-emp" style="display:none">
       <div id="emp-list"></div>
       <button class="btn-add" id="b-add-emp">＋ 従業員を追加</button>
+    </div>
+    <div id="set-leave" style="display:none">
+      <div class="card">
+        <div class="card-h">休暇マスタ<span class="help-i" data-help="workstatus">💡</span></div>
+        <p class="hint" style="margin:-4px 0 8px">休んでいる人の状況をここでまとめて設定できます（産休・育休は社保を自動免除）。詳しい給与は従業員マスタ／入力で。</p>
+        <div id="leave-list"></div>
+      </div>
+    </div>
+    <div id="set-retire" style="display:none">
+      <div class="card">
+        <div class="card-h">退職マスタ</div>
+        <p class="hint" style="margin:-4px 0 8px">退職した人の管理。退職にすると給与計算・印刷の対象から外れます（データは残る）。復職で戻せます。</p>
+        <div id="retire-list"></div>
+      </div>
     </div>
   </section>
 
