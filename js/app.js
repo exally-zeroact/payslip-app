@@ -9,7 +9,13 @@
   var attr=function(s){return String(s==null?'':s).replace(/"/g,'&quot;');};
   var uid=function(){return 'e'+Math.abs(Date.now()%1e7).toString(36)+Math.floor(performance.now()).toString(36);};
 
-  var THEMES=[{accent:'#6f5a3e',soft:'#b6a06d',name:'焦茶ゴールド'},{accent:'#3D9E72',soft:'#9ad9bb',name:'ミント'},{accent:'#2f4858',soft:'#9bb2c2',name:'ネイビー'},{accent:'#7a3b3b',soft:'#caa0a0',name:'えんじ'},{accent:'#3a3a3a',soft:'#aaaaaa',name:'モノクロ'}];
+  // Excelで使える色パレット(標準色+濃淡+定番)。アクセント/罫線/文字を別々に選ぶ
+  var PALETTE=['#000000','#23261f','#404040','#595959','#808080','#A6A6A6','#BFBFBF','#D9D9D9','#E7E6E6','#F2F2F2',
+    '#C00000','#FF0000','#E36C0A','#FFC000','#FFFF00','#92D050','#00B050','#00B0F0','#0070C0','#002060','#7030A0',
+    '#6f5a3e','#b6a06d','#cfc9b8','#2f4858','#9bb2c2','#7a3b3b','#caa0a0','#1f4e3d','#3D9E72','#9ad9bb','#7f6000','#833c00','#203864'];
+  // 既定テーマ(焦茶系・文字は濃いインク・罫線は淡グレー)
+  var DEFAULT_THEME={accent:'#6f5a3e', line:'#cfc9b8', ink:'#23261f'};
+  var COLOR_TARGETS=[['accent','アクセント色'],['line','罫線の色'],['ink','文字の色']];
   var PAYTYPES=['月給','時給','日給'];
   var HELP={
     fuyou:{ t:'💡 扶養人数とは？（配偶者含む）', b:'所得税の計算に使う「扶養親族等の数」です。次の合計人数を入れます。\n\n● <b>源泉控除対象配偶者</b>：1人と数える\n　＝あなたが扶養している配偶者で、配偶者の年収が約150万円以下が目安。\n● <b>控除対象扶養親族</b>：16歳以上で扶養している家族（子・親など）の人数。\n\n※年齢はその年の<b>12月31日時点</b>で判定。<b>16歳未満は数えません（0人）</b>。\n※共働きで配偶者に十分な収入がある場合、配偶者は0。\n\n例）専業主婦の妻＋高校生1人＋5歳の子 → <b>2</b>（妻1＋高校生1。5歳は16歳未満で0）' },
@@ -62,7 +68,7 @@
       holidays:[0], dailyWorkH:'8', dailyWorkM:'0', annualHolidays:'120',
       ruleOn:{teikyu:true,shotei:true,annual:true,warimashiRate:true,koyoGyoshu:true},
       rateOt:'', rateHoliday:'', rateNight:'', rateOver60:'', gyoshu:'ippan' },
-    month:'2026-06', prefer:'auto', theme:THEMES[0], depts:['営業部'], roles:['課長','主任','一般'],
+    month:'2026-06', prefer:'auto', theme:{accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}, depts:['営業部'], roles:['課長','主任','一般'],
     employees:[defEmp('山田 太郎')], open:{} };
 
   // マイカー通勤 1か月非課税限度(片道km・国税庁No.2585 令和8年4月〜)
@@ -360,7 +366,9 @@
     var sel=$('#p-emp'); sel.innerHTML='<option value="__all">全員（自動レイアウト）</option>'+state.employees.map(function(e,i){return '<option value="'+i+'">'+esc(e.name)+'</option>';}).join('');
     var TPL=[['auto','自動'],['vstack','縦1人'],['cols','2カラム'],['strips','横ストリップ']];
     $('#tpl-row').innerHTML=TPL.map(function(t){return '<button class="seg-b'+((state.prefer||'auto')===t[0]?' on':'')+'" data-tpl="'+t[0]+'">'+t[1]+'</button>';}).join('');
-    $('#theme-row').innerHTML=THEMES.map(function(t,i){return '<span class="sw'+(state.theme.accent===t.accent?' on':'')+'" data-ti="'+i+'" title="'+t.name+'" style="display:inline-block;width:26px;height:26px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #D4EDE1'+(state.theme.accent===t.accent?',0 0 0 2px #52B788':'')+';background:'+t.accent+';cursor:pointer"></span>';}).join('');
+    var bar=COLOR_TARGETS.map(function(t){ var cur=state.theme[t[0]]||''; var op=state._oc===t[0]; return '<button class="cp-toggle'+(op?' open':'')+'" data-cpk="'+t[0]+'"><span class="cp-cur" style="background:'+cur+'"></span>'+t[1]+'<span class="cp-cv">▾</span></button>'; }).join('');
+    var pal=''; if(state._oc){ var cur2=state.theme[state._oc]||''; pal='<div class="cp-sw">'+PALETTE.map(function(col){ var on=cur2.toLowerCase()===col.toLowerCase(); return '<span class="cw'+(on?' on':'')+'" data-ck="'+state._oc+'" data-col="'+col+'" title="'+col+'" style="background:'+col+'"></span>'; }).join('')+'</div>'; }
+    $('#color-pickers').innerHTML='<div class="cp-bar">'+bar+'</div>'+pal;
     doPreview();
   }
   function doPreview(){
@@ -462,7 +470,7 @@
     $('#p-emp').addEventListener('change',doPreview);
     $('#p-month').addEventListener('change',function(){ state.month=this.value||state.month; doPreview(); });
     $('#tpl-row').addEventListener('click',function(e){ var b=e.target.closest('[data-tpl]'); if(!b)return; state.prefer=b.dataset.tpl; renderPrint(); });
-    $('#theme-row').addEventListener('click',function(e){ if(!e.target.dataset.ti)return; state.theme=THEMES[+e.target.dataset.ti]; renderPrint(); });
+    $('#color-pickers').addEventListener('click',function(e){ var tg=e.target.closest('.cp-toggle'); if(tg){ state._oc=(state._oc===tg.dataset.cpk)?null:tg.dataset.cpk; renderPrint(); return; } var w=e.target.closest('.cw'); if(w){ state.theme[w.dataset.ck]=w.dataset.col; state._oc=null; renderPrint(); } });
     $('#b-print').addEventListener('click',function(){ var f=$('#frame'); try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} });
     $('#b-pdf').addEventListener('click',function(){ alert('PDF保存/送付はSTEP5でpdf-lib配線します（今は印刷からPDF保存可）'); });
     window.addEventListener('resize',function(){ if($('#scr-print').classList.contains('active'))doPreview(); });
