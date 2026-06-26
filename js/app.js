@@ -58,7 +58,7 @@
   }
   var WDAYS=['日','月','火','水','木','金','土'];
   var RULE_ITEMS=[['teikyu','休みの日'],['shotei','1日の働く時間'],['annual','年間の休み'],['warimashiRate','割増の率'],['koyoGyoshu','雇用保険の業種'],['kyukei','休憩時間'],['minashi','固定残業（みなし）'],['shoyo','賞与の有無']];
-  var state={ company:{name:'株式会社 ゼロアクト',addr:'',close:'末日',payday:'翌25日',
+  var state={ company:{name:'株式会社 ゼロアクト',addr:'',close:'末日',paydayRel:'next',paydayDay:'25',
       holidays:[0], dailyWorkH:'8', dailyWorkM:'0', annualHolidays:'120',
       ruleOn:{teikyu:true,shotei:true,annual:true,warimashiRate:true,koyoGyoshu:true},
       rateOt:'', rateHoliday:'', rateNight:'', rateOver60:'', gyoshu:'ippan' },
@@ -114,7 +114,15 @@
     if(w.total>0) shikyu=shikyu.concat([{label:'割増賃金',value:w.total}]); // 課税・総支給・雇用保険ベースに算入
     return PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:num(e.fuyou), residentTax:num(e.residentTax), healthRate:prefRate(e.pref), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:e.apply, extraKojo:e.extraKojo });
   }
-  function payDateStr(){ return '令和'+(Number((state.month||'2026-06').slice(0,4))-2018)+'年'+Number((state.month||'2026-06').slice(5,7))+'月 '+(state.company.payday||''); }
+  function payDateObj(){
+    var ym=state.month||'2026-06', y=Number(ym.slice(0,4)), m=Number(ym.slice(5,7)), c=state.company||{};
+    var py=y, pm=m; if((c.paydayRel||'next')==='next'){ pm=m+1; if(pm>12){pm=1;py++;} }
+    var dd=String(c.paydayDay==null?'':c.paydayDay); var last=new Date(py, pm, 0).getDate();
+    var day=/末/.test(dd)?last:Math.min(parseInt(dd,10)||25, last); if(day<1)day=1;
+    return {y:py,m:pm,d:day};
+  }
+  function payDateStr(){ var o=payDateObj(); return '令和'+(o.y-2018)+'年'+o.m+'月'+o.d+'日'; }
+  function updatePaydayPreview(){ var el=$('#payday-preview'); if(el) el.textContent='→ 支給日：'+payDateStr(); }
   function monthLabel(){ var y=Number((state.month||'2026-06').slice(0,4)), m=Number((state.month||'2026-06').slice(5,7)); var k=['','一','二','三','四','五','六','七','八','九','十','十一','十二']; return '令 和 '+(y-2018)+' 年 '+k[m]+' 月 分'; }
 
   /* ---------- ナビ ---------- */
@@ -128,7 +136,7 @@
   }
 
   /* ---------- 設定: 会社情報 ---------- */
-  function fillCompany(){ $('#c-name').value=state.company.name; $('#c-addr').value=state.company.addr; $('#c-close').value=state.company.close; $('#c-payday').value=state.company.payday; renderRuleChips(); renderCompanyRules(); }
+  function fillCompany(){ $('#c-name').value=state.company.name; $('#c-addr').value=state.company.addr; $('#c-close').value=state.company.close; $('#c-payrel').value=state.company.paydayRel||'next'; $('#c-payday-day').value=state.company.paydayDay||''; updatePaydayPreview(); renderRuleChips(); renderCompanyRules(); }
   function renderRuleChips(){
     var host=$('#rule-chips'); if(!host)return; var on=state.company.ruleOn||{};
     host.innerHTML=RULE_ITEMS.map(function(it){var o=!!on[it[0]];return '<span class="chip'+(o?' on':'')+'" data-rule="'+it[0]+'">'+(o?'✓ ':'')+it[1]+'</span>';}).join('')+'<span class="chip chip-add" data-rule-add="1">＋自由に追加</span>';
@@ -249,7 +257,7 @@
     var anyDept=state.employees.some(function(e){return e.dept;});
     var groups={}; var order=[];
     state.employees.forEach(function(e,i){ var g=e.dept||'未分類'; if(!groups[g]){groups[g]=[];order.push(g);} groups[g].push(i); });
-    var html='';
+    var html='<div class="hint" style="margin:0 2px 8px">カードを左にスワイプ＝削除（または開いて下の「削除」）</div>';
     order.forEach(function(g){
       if(anyDept) html+='<div class="grp-hd">'+esc(g)+'（'+groups[g].length+'名）</div>';
       groups[g].forEach(function(i){
@@ -370,11 +378,13 @@
     document.addEventListener('click',function(e){ var hi=e.target.closest('.help-i'); if(hi){ openHelp(hi.dataset.help); } });
     $('#help-x').addEventListener('click',function(){ $('#help-ov').classList.remove('on'); });
     $('#help-ov').addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); });
-    $('#g-month').addEventListener('change',function(){ state.month=this.value||state.month; if($('#scr-input').classList.contains('active')){$('#in-month').textContent=monthLabel();renderInput();} });
+    $('#g-month').addEventListener('change',function(){ state.month=this.value||state.month; updatePaydayPreview(); if($('#scr-input').classList.contains('active')){$('#in-month').textContent=monthLabel();renderInput();} });
 
     // 設定 seg
     $('#set-seg').addEventListener('click',function(ev){ var b=ev.target.closest('.seg-b'); if(!b)return; $$('.seg-b',this).forEach(function(x){x.classList.toggle('on',x===b);}); var s=b.dataset.set; $('#set-company').style.display=s==='company'?'':'none'; $('#set-emp').style.display=s==='emp'?'':'none'; if(s==='emp')renderEmpMaster(); });
-    ['name','addr','close','payday'].forEach(function(k){ var el=$('#c-'+k); if(el) el.addEventListener('input',function(){ state.company[k]=this.value; }); });
+    ['name','addr','close'].forEach(function(k){ var el=$('#c-'+k); if(el) el.addEventListener('input',function(){ state.company[k]=this.value; }); });
+    var pr=$('#c-payrel'); if(pr) pr.addEventListener('change',function(){ state.company.paydayRel=this.value; updatePaydayPreview(); });
+    var pd=$('#c-payday-day'); if(pd) pd.addEventListener('input',function(){ state.company.paydayDay=this.value.replace(/[^0-9末]/g,''); updatePaydayPreview(); });
     // 会社の決まり：項目チップ
     $('#rule-chips').addEventListener('click',function(ev){
       var ch=ev.target.closest('[data-rule]'); if(ch){ var k=ch.dataset.rule; if(!state.company.ruleOn)state.company.ruleOn={}; state.company.ruleOn[k]=!state.company.ruleOn[k]; renderRuleChips(); renderCompanyRules(); return; }
@@ -418,6 +428,11 @@
       if(t.classList.contains('sh-mikomi')){ emp.shaho.mikomi=t.value; refreshShaho(i); return; }
       if(t.classList.contains('sh-manual')){ emp.shaho.manual=t.value; refreshShaho(i); return; }
       var f=t.dataset.f; if(f&&!t.matches('select')) emp[f]=t.value; var nm=card.querySelector('.mco-nm'); if(f==='name'&&nm)nm.textContent=t.value||'（無名）'; });
+    // 従業員カードを左スワイプで削除
+    var swX=0,swY=0,swCard=null;
+    el.addEventListener('touchstart',function(ev){ swCard=ev.target.closest('.mco'); if(swCard){ swX=ev.touches[0].clientX; swY=ev.touches[0].clientY; } },{passive:true});
+    el.addEventListener('touchend',function(ev){ if(!swCard)return; var c=swCard; swCard=null; var dx=ev.changedTouches[0].clientX-swX, dy=ev.changedTouches[0].clientY-swY;
+      if(dx<-60 && Math.abs(dy)<40){ var i=+c.dataset.i, e=state.employees[i]; if(state.employees.length<=1){ alert('最低1名は必要です'); return; } if(confirm((e&&e.name||'この従業員')+' を削除しますか？')){ state.employees.splice(i,1); renderEmpMaster(); } } });
 
     // 入力 accordion
     var il=$('#input-list');
