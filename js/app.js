@@ -215,7 +215,10 @@
       +'<div class="frow"><div class="flabel">振込先<span class="hint2">任意</span></div><input class="finput m-f" data-f="bank" value="'+attr(e.bank)+'" placeholder="○○銀行 普通 1234567"></div>'
       +shahoSection(e)
       +'<div class="sec-lb" style="border-top:1px dashed #D4EDE1">法定控除（使わないものは外せる）<span class="help-i" data-help="legalkojo">💡</span></div>'
-      +'<div class="chip-row">'+LEGAL_KOJO.map(function(lk){var off=(e.apply&&e.apply[lk[0]]===false); return '<span class="chip'+(off?'':' on')+'" data-apply="'+lk[0]+'">'+(off?'':'✓ ')+esc(lk[1])+'</span>';}).join('')+'</div>'
+      +'<div class="chip-row">'+LEGAL_KOJO.map(function(lk){
+          if(lk[0]==='kaigo'){ var kt=(window.PayrollCalc&&PayrollCalc.isKaigoTarget(e.birthYmd,state.month)); if(!kt) return '<span class="chip chip-dim" title="40〜64歳が対象。生年月日から自動">介護保険（対象外）</span>'; var ko=(e.apply&&e.apply.kaigo===false); return '<span class="chip'+(ko?'':' on')+'" data-apply="kaigo" title="40〜64歳=自動で対象">'+(ko?'':'✓ ')+'介護保険（自動）</span>'; }
+          var off=(e.apply&&e.apply[lk[0]]===false); return '<span class="chip'+(off?'':' on')+'" data-apply="'+lk[0]+'">'+(off?'':'✓ ')+esc(lk[1])+'</span>';
+        }).join('')+'</div>'
       +'<div class="sec-lb">支給項目（タップでON/OFF・通勤は上の欄）</div><div class="chip-row">'+chips(e,SUP_POOL,'shikyu')+'</div>'
       +'<div class="addcustom"><input class="finput ac-inp" data-g="shikyu" placeholder="自由な項目名（例：特別手当）"><button class="btn-ghost ac-btn" data-g="shikyu" style="padding:10px 12px">＋追加</button></div>'
       +'<div class="sec-lb">控除項目（法定は自動・任意分のみ）</div><div class="chip-row">'+chips(e,KOJO_POOL,'extraKojo')+'</div>'
@@ -280,7 +283,8 @@
   /* ---------- 入力（自動計算） ---------- */
   function rowsHTML(g,arr){
     return arr.map(function(it,ri){
-      var hz=g==='shikyu'?'<label class="row-hz" style="display:flex;align-items:center;gap:3px;font-size:10px;color:#7A9A87"><input type="checkbox" class="ck" data-g="'+g+'" data-ri="'+ri+'" '+(it.hikazei?'checked':'')+'>非課税</label>':'';
+      var isNT=(it.hikazei||/通勤|出張|旅費|宿泊|日当/.test(it.label||''));
+      var hz=(g==='shikyu'&&isNT)?'<span class="row-hz" title="項目名から自動で非課税扱い" style="font-size:10px;color:#3D9E72;white-space:nowrap;font-weight:700">非課税</span>':'';
       return '<div class="row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px"><input class="finput" data-g="'+g+'" data-ri="'+ri+'" data-f="label" value="'+attr(it.label)+'" style="flex:1.3" placeholder="項目"><input class="finput num" data-g="'+g+'" data-ri="'+ri+'" data-f="value" value="'+attr(it.value)+'" style="flex:1" placeholder="'+(g==='kintai'?'値':'金額')+'">'+hz+'<button class="b-del m-del" data-g="'+g+'" data-ri="'+ri+'">×</button></div>';
     }).join('');
   }

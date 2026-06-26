@@ -27,6 +27,11 @@ T('calcByClass: otsu→乙・既定→甲', function () {
   eq(Densan.calcByClass(100000, 0, 'otsu'), 3063);
   eq(Densan.calcByClass(175000, 2, 'ko', { year: 2026 }), 210);
 });
+T('非課税 自動判定: 出張旅費は非課税(課税対象から除外)', function () {
+  var nt = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 200000 }, { label: '出張旅費', value: 30000 }], payYm: '2026-06' });
+  var tx = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 200000 }, { label: '役職手当', value: 30000 }], payYm: '2026-06' });
+  ok(nt.kazei < tx.kazei, '出張旅費分だけ課税対象が小さい');
+});
 
 /* ---- 社保（標準報酬分離・50銭ルール） ---- */
 T('アンカー 支給292,931/扶養1/介護対象: 社保46,311(健14865 厚27450 介2385 雇1611)', function () {
