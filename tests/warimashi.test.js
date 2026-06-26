@@ -74,6 +74,55 @@ T('1分単位: 残業0時間30分 → 1592×1.25×0.5=995', function () {
   eq(r.total, 995);
 });
 
+/* 詳細7区分：各率で計算・かんたんと整合 */
+T('詳細: 時間外43h+時間外深夜2h=90,346（かんたん45h/深夜2hと一致）', function () {
+  var r = W.detail({ base: 260000, annualHolidays: 120, dailyHours: 8, seg: { ot: 43 * 60, otNight: 2 * 60 } });
+  eq(r.total, 90346);
+});
+T('詳細: 全7区分の率が正しく乗る', function () {
+  var seg = { ot: 60, otNight: 60, over60: 60, over60Night: 60, night: 60, holiday: 60, holidayNight: 60 }; // 各1h
+  var r = W.detail({ base: 260000, annualHolidays: 120, dailyHours: 8, seg: seg });
+  var u = 1592;
+  var exp = W.han50(u * 1.25) + W.han50(u * 1.5) + W.han50(u * 1.5) + W.han50(u * 1.75) + W.han50(u * 0.25) + W.han50(u * 1.35) + W.han50(u * 1.6);
+  eq(r.total, exp);
+  eq(r.lines.length, 7);
+});
+T('詳細: 法定休日×深夜は1.6', function () {
+  var r = W.detail({ base: 260000, annualHolidays: 120, dailyHours: 8, seg: { holidayNight: 60 } });
+  eq(r.lines[0].rate, 1.6); eq(r.total, W.han50(1592 * 1.6));
+});
+T('detailComponents: 0分は率0でも行は出る(検算表示用)・calcはfilterで0除外', function () {
+  eq(W.detailComponents({ ot: 120 }).length, 7); // 全区分の枠
+  eq(W.calc(1592, W.detailComponents({ ot: 120 })).lines.length, 1); // 実額は0除外で1行
+});
+
+/* ── 歩合給(出来高払) ── */
+T('歩合単価=歩合総額÷総労働時間(所定+時間外)', function () {
+  // 歩合20万・総労働160h → 1250/h
+  eq(W.commissionUnit(200000, 160 * 60), 1250);
+});
+T('歩合の割増は0.25のみ(時間外)・固定給1.25と別', function () {
+  // 単価1250・時間外10h → han50(1250*0.25*10)=3125
+  var r = W.commission({ commissionTotal: 200000, totalWorkMin: 160 * 60, seg: { ot: 10 * 60 } });
+  eq(r.total, 3125);
+});
+T('歩合の深夜+0.25・法定休日+0.35', function () {
+  var r = W.commission({ commissionTotal: 200000, totalWorkMin: 160 * 60, seg: { night: 2 * 60, holiday: 8 * 60 } });
+  // 深夜 han50(1250*0.25*2)=625 / 休日 han50(1250*0.35*8)=3500
+  eq(r.total, 625 + 3500);
+});
+T('保障給/高い方: 歩合 vs 時給×総時間 の高い方', function () {
+  // 歩合15万 vs 時給1200×160h=192000 → 高い方192000
+  eq(W.guaranteePay(1200, 160 * 60), 192000);
+  eq(W.higherOf(150000, W.guaranteePay(1200, 160 * 60)), 192000);
+  eq(W.higherOf(250000, W.guaranteePay(1200, 160 * 60)), 250000);
+});
+T('最低賃金チェック: 賃金÷総時間 ≧ 地域別最賃', function () {
+  // 時給換算 192000/160=1200 → 東京1163以上=OK / 1100基準割れ
+  eq(W.minWageOk(192000, 160 * 60, 1163), true);
+  eq(W.minWageOk(170000, 160 * 60, 1163), false); // 1062.5<1163
+});
+
 /* 空入力は0 */
 T('空入力 → 割増0', function () {
   var r = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8 });
