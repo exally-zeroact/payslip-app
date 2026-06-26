@@ -119,6 +119,24 @@ T('hyojunBase固定: 社保は当月支給でなく標準報酬基礎で計算(�
   eq(r.si.hyojunHealth, 340000); eq(r.si.health, 16847); eq(r.si.pension, 31110); eq(r.si.kaigo, 2703);
 });
 
+/* ---- 法定控除の従業員ごとオン/オフ（役員・非加入対応） ---- */
+T('apply.employ=false → 雇用保険を引かない(役員等)', function () {
+  var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 300000 }], birthYmd: '1980-05-15', payYm: '2026-06', fuyou: 0, apply: { employ: false } });
+  ok(!r.kojo.some(function (k) { return k.label === '雇用保険'; }), '雇用保険なし');
+  ok(r.kojo.some(function (k) { return k.label === '健康保険'; }), '健保は残る');
+});
+T('社保を全部オフ → 課税Aは社保控除なし(所得税が増える)', function () {
+  var base = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 300000 }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0 });
+  var off = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 300000 }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0, apply: { health: false, pension: false, employ: false } });
+  ok(!off.kojo.some(function (k) { return /健康保険|厚生年金|雇用保険/.test(k.label); }), '社保3つ消える');
+  ok(off.kazei > base.kazei, '社保控除なしで課税Aが増える');
+  ok(off.incomeTax > base.incomeTax, '所得税が増える');
+});
+T('apply.incomeTax=false → 所得税0(明細に出さない)', function () {
+  var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 450000 }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0, apply: { incomeTax: false } });
+  ok(!r.kojo.some(function (k) { return k.label === '所得税'; }));
+});
+
 /* ---- 既存の健全性 ---- */
 T('住民税を渡すと控除に住民税が入る', function () {
   var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 250000 }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0, residentTax: 12500 });
