@@ -358,6 +358,8 @@
   function renderPrint(){
     $('#p-month').value=state.month;
     var sel=$('#p-emp'); sel.innerHTML='<option value="__all">全員（自動レイアウト）</option>'+state.employees.map(function(e,i){return '<option value="'+i+'">'+esc(e.name)+'</option>';}).join('');
+    var TPL=[['auto','自動'],['vstack','縦1人'],['cols','2カラム'],['strips','横ストリップ']];
+    $('#tpl-row').innerHTML=TPL.map(function(t){return '<button class="seg-b'+((state.prefer||'auto')===t[0]?' on':'')+'" data-tpl="'+t[0]+'">'+t[1]+'</button>';}).join('');
     $('#theme-row').innerHTML=THEMES.map(function(t,i){return '<span class="sw'+(state.theme.accent===t.accent?' on':'')+'" data-ti="'+i+'" title="'+t.name+'" style="display:inline-block;width:26px;height:26px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #D4EDE1'+(state.theme.accent===t.accent?',0 0 0 2px #52B788':'')+';background:'+t.accent+';cursor:pointer"></span>';}).join('');
     doPreview();
   }
@@ -459,6 +461,7 @@
     // 印刷
     $('#p-emp').addEventListener('change',doPreview);
     $('#p-month').addEventListener('change',function(){ state.month=this.value||state.month; doPreview(); });
+    $('#tpl-row').addEventListener('click',function(e){ var b=e.target.closest('[data-tpl]'); if(!b)return; state.prefer=b.dataset.tpl; renderPrint(); });
     $('#theme-row').addEventListener('click',function(e){ if(!e.target.dataset.ti)return; state.theme=THEMES[+e.target.dataset.ti]; renderPrint(); });
     $('#b-print').addEventListener('click',function(){ var f=$('#frame'); try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} });
     $('#b-pdf').addEventListener('click',function(){ alert('PDF保存/送付はSTEP5でpdf-lib配線します（今は印刷からPDF保存可）'); });
@@ -470,6 +473,7 @@
   fillCompany(); bind(); showScreen('scr-settings');
   if(location.hash.indexOf('emp')>=0){ var b=$('#set-seg .seg-b[data-set="emp"]'); if(b)b.click(); if(state.employees[0]){state.open[state.employees[0].id]=true;} renderEmpMaster(); }
   if(location.hash==='#emphelp'){ openHelp('fuyou'); }
+  if(location.hash==='#print2'){ if(state.employees.length<2){ state.employees.push(defEmp('鈴木 花子')); } state.prefer='cols'; showScreen('scr-print'); }
   if(location.hash==='#carcommute'){ var ec=state.employees[0]; if(ec){ec.commuteType='car';ec.commuteKm='12';ec.commute='15000';state.open[ec.id]=true;} var b2=$('#set-seg .seg-b[data-set="emp"]'); if(b2)b2.click(); renderEmpMaster(); }
   if(location.hash==='#input'){ if(state.employees[0]){var e0=state.employees[0]; e0.warimashi.mode='easy'; e0.warimashi.otH='45';e0.warimashi.otM='0';e0.warimashi.nightH='2';e0.warimashi.nightM='0'; state.open['I'+e0.id]=true;} showScreen('scr-input'); }
   if(location.hash==='#inputd'){ if(state.employees[0]){var ed=state.employees[0]; ed.warimashi.mode='detail'; ed.warimashi.detail={ot:{h:'43',m:''},otNight:{h:'2',m:''},over60:{h:'',m:''},over60Night:{h:'',m:''},night:{h:'',m:''},holiday:{h:'',m:''},holidayNight:{h:'1',m:''}}; state.open['I'+ed.id]=true;} showScreen('scr-input'); }

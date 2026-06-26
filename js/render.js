@@ -6,7 +6,7 @@
   'use strict';
 
   // ---- 共有デザイントークン ----
-  var ROOT = ':root{--ink:#23261f;--ink2:#6a6d62;--ink3:#7d7f72;--hair:#ddd7c7;--hair2:#cfc9b8;--accent:#6f5a3e;--accent-soft:#b6a06d;--paper:#fffefb;}' +
+  var ROOT = ':root{--ink:#23261f;--ink2:#6a6d62;--ink3:#7d7f72;--hair:#ddd7c7;--hair2:#cfc9b8;--accent:#6f5a3e;--accent-soft:#b6a06d;--paper:#ffffff;}' +
     '*{box-sizing:border-box;margin:0;padding:0;}' +
     'body{font-family:"Yu Mincho","YuMincho","Hiragino Mincho ProN","Hiragino Mincho Pro","HG明朝E","MS Mincho",serif;color:var(--ink);-webkit-font-smoothing:antialiased;}';
 
@@ -33,6 +33,7 @@
     '.kin{display:grid;grid-template-columns:repeat(6,1fr);row-gap:7px;border-top:1px solid var(--accent-soft);border-bottom:1px solid var(--accent-soft);margin:10px 0 9px;padding:7px 0;}.kin .k{text-align:center;padding:0 2px;}.kin .k .kl{font-size:9px;color:#6a6d62;}.kin .k .kv{font-size:12px;margin-top:3px;font-variant-numeric:tabular-nums;}' +
     '.sec-title,.st{font-size:12px;letter-spacing:.40em;color:var(--accent);padding-left:.40em;margin-bottom:2px;}' +
     '.pd{display:flex;gap:36px;align-items:stretch;}.p1 .pd{min-height:283px;}.p2 .pd{min-height:283px;}.pd .col{flex:1;display:flex;flex-direction:column;}.pd .st{padding-bottom:8px;border-bottom:.7px solid var(--hair2);margin-bottom:3px;}' +
+    '.p2 .unit:first-child{border-bottom:1px dashed #d3d3d3;padding-bottom:20px;margin-bottom:0;}.p2 .unit:last-child{padding-top:20px;}' +
     '.items2{display:grid;grid-template-columns:1fr 1fr;column-gap:20px;}' +
     '.r{display:flex;justify-content:space-between;align-items:baseline;padding:4px 1px;border-bottom:.7px solid var(--hair);}.r .l{font-size:10.5px;color:#5f6258;}.r .l .hz{font-size:8px;color:var(--ink3);margin-left:3px;font-family:"Yu Gothic","Hiragino Sans",sans-serif;}.r .v{font-size:11px;font-variant-numeric:tabular-nums;}' +
     '.items2 .r:nth-last-child(-n+2){border-bottom:none;}' +
