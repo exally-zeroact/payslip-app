@@ -71,6 +71,12 @@ T('M-1 通勤20万(非課税)→非課税は15万まで・超過5万は課税', 
   eq(r.nonTaxable, 150000, '非課税は限度まで');
 });
 
+/* ---- 通勤 マイカー距離別 非課税(nonTaxLimit) ---- */
+T('通勤マイカー10km(非課税7,300)・支給10,000→非課税7,300・超過2,700課税', function () {
+  var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 300000 }, { label: '通勤手当', value: 10000, hikazei: true, nonTaxLimit: 7300 }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0 });
+  eq(r.nonTaxable, 7300);
+});
+
 /* ---- M-4: 差引マイナスは警告フラグ ---- */
 T('M-4 控除過大で差引マイナス → netNegative=true', function () {
   var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 100000 }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0, extraKojo: [{ label: '社宅費', value: 200000 }] });
