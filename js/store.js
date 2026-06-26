@@ -46,11 +46,44 @@
     }
   };
 
-  // アプリ全体の状態(会社+従業員マスタ等)をクラウド保存。window.SUPA未設定ならlocalStorageのみ(app.js側)で扱う
-  function accountId(){ var k='payslip_account'; var v=null; try{ v=localStorage.getItem(k); }catch(e){} if(!v){ v=uid(); try{ localStorage.setItem(k,v); }catch(e){} } return v; }
+  // ── 認証(メール+パスワード) ──
   if(hasSupa){
-    Store.cloudSaveState = function(stateObj){ return sb.from('payslip_state').upsert({ id: accountId(), data: stateObj }).then(function(r){ return r.data; }); };
-    Store.cloudLoadState = function(){ return sb.from('payslip_state').select('data').eq('id', accountId()).single().then(function(r){ return r.data && r.data.data; }); };
+    Store.auth = {
+      session: function(){ return sb.auth.getSession().then(function(r){ return r.data && r.data.session; }); },
+      user:    function(){ return sb.auth.getUser().then(function(r){ return r.data && r.data.user; }); },
+      signIn:  function(email,pw){ return sb.auth.signInWithPassword({email:email,password:pw}); },
+      signUp:  function(email,pw){ return sb.auth.signUp({email:email,password:pw}); },
+      signOut: function(){ return sb.auth.signOut(); },
+      onChange:function(cb){ sb.auth.onAuthStateChange(function(_e,s){ cb(s); }); }
+    };
+  }
+  // ── アプリ状態をクラウドへ(棚分け: pay_companies=会社/設定・pay_employees=従業員) ──
+  // RLSで本人(account_id=auth.uid)のみ。未ログイン時はnull/no-op(app.js側はlocalStorageで動作)
+  if(hasSupa){
+    function curUid(){ return sb.auth.getUser().then(function(r){ return r.data && r.data.user && r.data.user.id; }); }
+    Store.cloudSaveState = function(state){
+      return curUid().then(function(uid){ if(!uid) return null; var now=new Date().toISOString();
+        var settings={ company:state.company, month:state.month, theme:state.theme, prefer:state.prefer, depts:state.depts, roles:state.roles, showRetired:state.showRetired };
+        var emps=(state.employees||[]).map(function(e,i){ return { id:e.id, account_id:uid, sort:i, data:e, updated_at:now }; });
+        var ids=emps.map(function(e){ return e.id; });
+        return Promise.all([
+          sb.from('pay_companies').upsert({ account_id:uid, data:settings, updated_at:now }),
+          emps.length? sb.from('pay_employees').upsert(emps) : Promise.resolve(),
+          sb.from('pay_employees').select('id').eq('account_id',uid).then(function(r){ var ex=(r.data||[]).map(function(x){return x.id;}); var rm=ex.filter(function(id){ return ids.indexOf(id)<0; }); return rm.length? sb.from('pay_employees').delete().in('id',rm) : null; })
+        ]);
+      });
+    };
+    Store.cloudLoadState = function(){
+      return curUid().then(function(uid){ if(!uid) return null;
+        return Promise.all([
+          sb.from('pay_companies').select('data').eq('account_id',uid).maybeSingle(),
+          sb.from('pay_employees').select('data,sort').eq('account_id',uid).order('sort',{ascending:true})
+        ]).then(function(res){
+          var co=res[0].data && res[0].data.data; var emps=(res[1].data||[]).map(function(r){ return r.data; });
+          if(!co && !emps.length) return null; var s=co||{}; s.employees=emps; return s;
+        });
+      });
+    };
   }
   global.Store = Store;
 })(window);

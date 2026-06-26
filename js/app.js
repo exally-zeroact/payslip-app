@@ -605,8 +605,15 @@
       if(s.depts) state.depts=s.depts; if(s.roles) state.roles=s.roles; if(s.showRetired!=null) state.showRetired=s.showRetired;
     }
     // クラウド(Supabase)が有効なら後から読み込んで上書き＋再描画
-    if(window.Store&&Store.cloudLoadState){ Store.cloudLoadState().then(function(cs){ if(cs&&cs.employees&&cs.employees.length){ state.company=cs.company||state.company; state.employees=cs.employees; if(cs.month)state.month=cs.month; if(cs.theme)state.theme=cs.theme; if(cs.prefer)state.prefer=cs.prefer; if(cs.depts)state.depts=cs.depts; if(cs.roles)state.roles=cs.roles; fillCompany(); var act=$('.screen.active'); if(act)showScreen(act.id); } }).catch(function(){}); }
+    reloadCloud();
   }
+  function applyCloudState(cs){ if(!(cs&&cs.employees&&cs.employees.length)) return false;
+    state.company=cs.company||state.company; state.employees=cs.employees;
+    if(cs.month)state.month=cs.month; if(cs.theme)state.theme=cs.theme; if(cs.prefer)state.prefer=cs.prefer;
+    if(cs.depts)state.depts=cs.depts; if(cs.roles)state.roles=cs.roles; if(cs.showRetired!=null)state.showRetired=cs.showRetired;
+    $$('.scr-month').forEach(function(m){ m.value=state.month; }); fillCompany(); var act=$('.screen.active'); if(act)showScreen(act.id); return true; }
+  function reloadCloud(){ if(window.Store&&Store.cloudLoadState){ return Store.cloudLoadState().then(applyCloudState).catch(function(){return false;}); } return Promise.resolve(false); }
+  window.PayslipReloadCloud=reloadCloud; window.PayslipPersistSave=persistSave;
 
   /* init */
   persistLoad();
