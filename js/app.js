@@ -127,11 +127,7 @@
     if(on.shotei){ h+=ruleItemHTML('shotei','1日の働く時間','所定労働','shotei',
       '<span class="dur"><input class="cr-f cr-dur" data-cf="dailyWorkH" inputmode="numeric" value="'+attr(c.dailyWorkH)+'"><i>時間</i><input class="cr-f cr-dur" data-cf="dailyWorkM" inputmode="numeric" value="'+attr(c.dailyWorkM)+'"><i>分</i></span>'); }
     if(on.annual){
-      var ann=num(c.annualHolidays), dh=num(c.dailyWorkH)+num(c.dailyWorkM)/60, yearH=Math.max(0,(365-ann)*dh), lim=365/7*40;
-      var msg = ann<=0 ? '' : (yearH<=lim+1
-        ? '<div class="cr-ok">✓ この設定だと年間 約'+Math.round(yearH).toLocaleString('ja-JP')+'時間（法律の目安 約2,085時間 以内）</div>'
-        : '<div class="cr-warn">⚠ 年間 約'+Math.round(yearH).toLocaleString('ja-JP')+'時間で目安(約2,085h)を超えます。超えた分は残業として自動で割増します。保存も計算もできます。</div>');
-      h+=ruleItemHTML('annual','年間の休み','日','annual','<input class="cr-f cr-wide" data-cf="annualHolidays" inputmode="numeric" value="'+attr(c.annualHolidays)+'">'+msg); }
+      h+=ruleItemHTML('annual','年間の休み','日','annual','<input class="cr-f cr-wide" data-cf="annualHolidays" inputmode="numeric" value="'+attr(c.annualHolidays)+'">'); }
     if(on.yakan){ h+=ruleItemHTML('yakan','深夜手当','深夜割増','warimashi','<div class="cr-fixed">🔒 夜 <b>22:00〜5:00</b> は法律で固定・自動で1.25倍（変更できません）</div>'); }
     if(on.kyukei){ h+=ruleItemHTML('kyukei','休憩時間','分','','<input class="cr-f cr-wide" data-cf="kyukei" inputmode="numeric" value="'+attr(c.kyukei)+'" placeholder="60">'); }
     if(on.minashi){ h+=ruleItemHTML('minashi','固定残業（みなし）','時間','','<input class="cr-f cr-wide" data-cf="minashiH" inputmode="numeric" value="'+attr(c.minashiH)+'" placeholder="0">'); }
@@ -202,8 +198,7 @@
   }
   function shahoHeroHTML(r,period,undet){
     var soho=r.si.health+r.si.pension+(r.si.kaigo||0);
-    var warn=undet?'<div class="sh-warn">⚠ 標準報酬がまだ<b>未確定</b>です。上で「4〜6月の総支給」または「金額が分かる→標準報酬」を入力してください。今は<b>当月の支給額から暫定計算</b>中です（毎月ブレます）。</div>':'';
-    return '<div class="sh-hero">'+warn+'<div class="lb">毎月この人から天引きする社会保険（本人負担）</div><div class="big">'+yen(soho)+(undet?'<span style="font-size:12px;color:#b45309;font-family:\'Noto Sans JP\'"> 暫定</span>':'')+'</div>'
+    return '<div class="sh-hero"><div class="lb">毎月この人から天引きする社会保険（本人負担）</div><div class="big">'+yen(soho)+(undet?'<span style="font-size:12px;color:#7A9A87;font-family:\'Noto Sans JP\'"> 暫定</span>':'')+'</div>'
       +'<div class="bd">健康保険 <b>'+yen(r.si.health)+'</b>　＋　厚生年金 <b>'+yen(r.si.pension)+'</b>'+(r.si.kaigo?'　＋　介護保険 <b>'+yen(r.si.kaigo)+'</b>':'')+'</div></div>'
       +'<div class="sh-sub">もとになる「標準報酬月額」＝<b>'+yen(r.hyojun)+'</b>'+(undet?'（暫定：当月支給ベース）':'（保険料計算の“ものさし”・自動で決まる）')+'／適用：'+period+'</div>';
   }
@@ -426,5 +421,5 @@
   if(location.hash==='#emphelp'){ openHelp('fuyou'); }
   if(location.hash==='#input'){ if(state.employees[0]){var e0=state.employees[0]; e0.warimashi.mode='easy'; e0.warimashi.otH='45';e0.warimashi.otM='0';e0.warimashi.nightH='2';e0.warimashi.nightM='0'; state.open['I'+e0.id]=true;} showScreen('scr-input'); }
   if(location.hash==='#inputd'){ if(state.employees[0]){var ed=state.employees[0]; ed.warimashi.mode='detail'; ed.warimashi.detail={ot:{h:'43',m:''},otNight:{h:'2',m:''},over60:{h:'',m:''},over60Night:{h:'',m:''},night:{h:'',m:''},holiday:{h:'',m:''},holidayNight:{h:'1',m:''}}; state.open['I'+ed.id]=true;} showScreen('scr-input'); }
-  var sm=$('#store-mode'); if(sm) sm.textContent='保存先: '+(window.Store?Store.mode:'local')==='supabase'?'Supabase（クラウド）':'このブラウザ（localStorage）';
+  var sm=$('#store-mode'); if(sm) sm.textContent='保存先: '+(((window.Store?Store.mode:'local')==='supabase')?'Supabase（クラウド）':'このブラウザ（localStorage）');
 })();
