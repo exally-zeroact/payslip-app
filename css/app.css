@@ -107,6 +107,7 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .cw{width:24px;height:24px;border-radius:5px;border:1px solid rgba(0,0,0,.12);cursor:pointer;}
 .cw.on{outline:2px solid #52B788;outline-offset:1px;}
 .chip-dim{background:#F0F2F0;color:#A9B3AC;border:1px dashed #D4DDD7;cursor:default;}
+.wk-f{width:46px;padding:7px 4px;border:1.5px solid #D4EDE1;border-radius:8px;font-size:15px;font-family:'DM Mono',monospace;text-align:center;color:#1a4a2e;-webkit-appearance:none;}
 .cr-fixed{font-size:11px;color:#8A8A7C;background:#F6F6F4;border:1px solid #E6E6DF;border-radius:8px;padding:8px 10px;margin-top:4px;}.cr-fixed b{font-family:'DM Mono',monospace;color:#6A6A5C;}
 .cr-ok{font-size:10.5px;color:#2E7D54;font-weight:700;margin-top:6px;}
 .cr-warn{font-size:10.5px;color:#92500A;background:#FEF3E2;border:1px solid #F4D8A8;border-radius:7px;padding:7px 9px;margin-top:6px;line-height:1.55;}
