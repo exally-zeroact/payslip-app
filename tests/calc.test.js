@@ -176,3 +176,19 @@ T('40歳未満は介護保険なし', function () {
   eq(r.hasKaigo, false); ok(!r.kojo.some(function (k) { return k.label === '介護保険'; }));
 });
 T('空入力でも例外なく数値', function () { var r = PayslipCalc.computePayslip({}); eq(typeof r.net, 'number'); eq(r.shikyuTotal, 0); });
+
+/* ── 統合テスト(対立監査2026-06-28の配線漏れ回帰防止・computePayslip通し) ── */
+T('乙欄配線: taxClass=otsu を computePayslip に渡すと乙欄(甲より高い源泉)で計算される', function () {
+  var ko = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 300000 }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 1, taxClass: 'ko' });
+  var ot = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 300000 }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 1, taxClass: 'otsu' });
+  ok(ot.incomeTax > 0, '乙欄の所得税が計算される'); ok(ot.incomeTax > ko.incomeTax, '乙欄は甲欄より高い(' + ot.incomeTax + '>' + ko.incomeTax + ')');
+});
+T('無給休業(payTotal=0)でも標準報酬が確定していれば 健保/厚年 は継続徴収(介護休・病休)', function () {
+  var r = PayslipCalc.computePayslip({ shikyu: [], birthYmd: '1980-01-01', payYm: '2026-06', hyojunBase: 300000, apply: {} });
+  ok(r.si.health > 0, '健保は標準報酬ベースで継続'); ok(r.si.pension > 0, '厚年も継続');
+  eq(r.si.employ, 0, '雇用保険は実支給0なので0');
+});
+T('産休育休は apply で社保オフ(=0)になる(免除・継続徴収と区別)', function () {
+  var r = PayslipCalc.computePayslip({ shikyu: [], birthYmd: '1980-01-01', payYm: '2026-06', hyojunBase: 300000, apply: { health: false, pension: false, kaigo: false } });
+  ok(!r.kojo.some(function (k) { return k.label === '健康保険' || k.label === '厚生年金'; }), '免除で控除に出ない');
+});
