@@ -31,6 +31,7 @@
     teikyu:{ t:'💡 休みの日（法定休日）', b:'お店・会社の休みの曜日です。複数えらべます。\n\n● <b>法定休日</b>…法律で「週1日（または4週4日）」与える義務のある休み。出勤すると<b>1.35倍</b>。\n● <b>法定外の休み（所定休日）</b>…それ以外の休み（週休2日の2日目など）。出勤しても割増は週40時間を超えた分の<b>時間外1.25倍</b>だけ。\n\n複数選んだ場合、法律上の休み(法定休日)はアプリが自動で1日特定します（通常は後ろの曜日）。日曜だけ＝週休1日（現場系）もOK。' },
     shotei:{ t:'💡 1日の働く時間（所定労働）', b:'1日の決められた労働時間（例：8時間）。休憩は含みません。\n残業代の1時間単価（月給÷1か月平均所定労働時間）の計算に使います。' },
     annual:{ t:'💡 年間の休み', b:'1年間の休日数（例：120日）。\nフルタイム(1日8時間)だと法律の目安は約105日以上。少ないと「年間の労働時間が法律の目安を超える」と黄色で教えますが、残業として割増計算すれば<b>保存も計算もできます</b>（ブロックしません）。' },
+    design:{ t:'💡 明細のデザイン', b:'給与明細の見た目を決めます（ここが毎月の既定）。\n\n● <b>レイアウト</b>…縦1人（1人1枚）／2カラム（1枚に2人）／横ストリップ（横向きに数人）。人数が多くても<b>自動で複数ページに分けて全員</b>出ます。\n● <b>色</b>…アクセント・罫線・文字を別々に。Excelで使える色から選べます。\n● <b>初期設定に戻す</b>…レイアウトと色を最初の状態に戻します。\n\n印刷タブで「その回だけ」変えることもできます。' },
     workstatus:{ t:'💡 就業状況（産休・育休・休職など）', b:'休んでいる人の区分です。給与計算に自動で反映します（すべて手で調整できます）。\n\n● <b>産休・育休</b>…社会保険（健保・厚年・介護）が<b>免除</b>＝自動で0に。給与は無給が一般的（入力で調整）。出産手当金・育児休業給付金は健保/雇用保険から出るお金で<b>給与には含めません</b>。\n● <b>介護休・病気休職</b>…社会保険は<b>継続</b>（無給でも本人負担が出ます）。介護休業給付金・傷病手当金は別途（給与でない）。\n● <b>休業（会社都合）</b>…<b>休業手当＝平均賃金の60%以上</b>を支給に入れます（課税・社保の対象）。\n\n※自動の社保オフは「法定控除」のチップで個別に戻せます。' },
     taxclass:{ t:'💡 所得税の区分（甲・乙）', b:'所得税の源泉徴収の区分です。\n\n● <b>甲欄</b>…「扶養控除等申告書」を提出している人（＝メインの勤務先）。扶養を加味して計算。通常はこちら。\n● <b>乙欄</b>…申告書を未提出の人（副業・掛け持ちの2か所目など）。税率が高め・扶養は加味しません。\n\n※日雇い（丙欄）は近日対応。年度（令和7/令和8）は給与の対象月から自動で正しい税額表を選びます。' },
     commute:{ t:'💡 通勤手当（非課税）', b:'通勤手当は一定額まで所得税が<b>非課税</b>です。\n\n● <b>公共交通（電車・バス）</b>…月15万円まで非課税。\n● <b>マイカー等</b>…片道距離で月額が決まる（2km未満は全額課税〜95km以上66,400円・国税庁No.2585 令和8年4月〜）。\n\n限度を超えた分は課税されます。※所得税の非課税であって、社会保険・雇用保険では全額が算定基礎に入ります。' },
@@ -77,7 +78,7 @@
       holidays:[0], dailyWorkH:'8', dailyWorkM:'0', annualHolidays:'120',
       ruleOn:{teikyu:true,shotei:true,annual:true,warimashiRate:true,koyoGyoshu:true},
       rateOt:'', rateHoliday:'', rateNight:'', rateOver60:'', gyoshu:'ippan' },
-    month:'2026-06', prefer:'auto', theme:{accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}, depts:['営業部'], roles:['課長','主任','一般'],
+    month:'2026-06', prefer:'cols', theme:{accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}, depts:['営業部'], roles:['課長','主任','一般'],
     employees:[defEmp('山田 太郎')], open:{} };
 
   // マイカー通勤 1か月非課税限度(片道km・国税庁No.2585 令和8年4月〜)
@@ -169,7 +170,7 @@
   }
 
   /* ---------- 設定: 会社情報 ---------- */
-  function fillCompany(){ $('#c-name').value=state.company.name; $('#c-addr').value=state.company.addr; $('#c-close').value=state.company.close; $('#c-payrel').value=state.company.paydayRel||'next'; $('#c-payday-day').value=state.company.paydayDay||''; updatePaydayPreview(); renderRuleChips(); renderCompanyRules(); }
+  function fillCompany(){ $('#c-name').value=state.company.name; $('#c-addr').value=state.company.addr; $('#c-close').value=state.company.close; $('#c-payrel').value=state.company.paydayRel||'next'; $('#c-payday-day').value=state.company.paydayDay||''; updatePaydayPreview(); renderRuleChips(); renderCompanyRules(); renderDesign(); }
   function renderRuleChips(){
     var host=$('#rule-chips'); if(!host)return; var on=state.company.ruleOn||{};
     host.innerHTML=RULE_ITEMS.map(function(it){var o=!!on[it[0]];return '<span class="chip'+(o?' on':'')+'" data-rule="'+it[0]+'">'+(o?'✓ ':'')+it[1]+'</span>';}).join('')+'<span class="chip chip-add" data-rule-add="1">＋自由に追加</span>';
@@ -456,14 +457,29 @@
 
   /* ---------- 印刷 / PDF ---------- */
   function buildPeople(emps){ return emps.map(function(e){ var r=compute(e); var k=(e.kintai||[]).slice(); var oi=k.findIndex(function(x){return /出勤/.test(x.label||'');}); var wt={label:'労働時間',value:workedLabel(e)}; if(oi>=0)k.splice(oi+1,0,wt); else k.unshift(wt); return { name:e.name, company:state.company.name, payDate:payDateStr(), kintai:k, shikyu:r.shikyu, kojo:r.kojo, net:r.net, shikyuTotal:r.shikyuTotal, kojoTotal:r.kojoTotal }; }); }
+  // 明細デザイン(レイアウト+色)＝設定タブに表示。自動は廃止(全員ページ分割で対応)
+  // テンプレの種類(縦並び/2カラム/横ストリップ)。複数人は自動でページ分割
+  var TPL_OPTS=[
+    ['vstack','縦並び（1人）','tpl_vstack','支給の下に控除・大きく（A4たて）',0],
+    ['vstack2','縦並び（2人）','tpl_vstack2','支給の下に控除・1枚に2人（A4たて）',0],
+    ['cols','2カラム（1人）','tpl_cols','支給と控除を横に・大きく（A4たて）',0],
+    ['cols2','2カラム（2人）','tpl_cols2','支給と控除を横に・1枚に2人（A4たて）',0],
+    ['strips','横ストリップ','tpl_strips','横向きに数人まとめて（A4よこ）',1]
+  ];
+  function renderDesign(){
+    // 色(上)
+    var cp=$('#color-pickers'); if(cp){
+      var bar=COLOR_TARGETS.map(function(t){ var cur=state.theme[t[0]]||''; var op=state._oc===t[0]; return '<button class="cp-toggle'+(op?' open':'')+'" data-cpk="'+t[0]+'"><span class="cp-cur" style="background:'+cur+'"></span>'+t[1]+'<span class="cp-cv">▾</span></button>'; }).join('');
+      var pal=''; if(state._oc){ var cur2=state.theme[state._oc]||''; pal='<div class="cp-sw">'+PALETTE.map(function(col){ var on=cur2.toLowerCase()===col.toLowerCase(); return '<span class="cw'+(on?' on':'')+'" data-ck="'+state._oc+'" data-col="'+col+'" title="'+col+'" style="background:'+col+'"></span>'; }).join('')+'</div>'; }
+      cp.innerHTML='<div class="cp-bar">'+bar+'<button class="cp-toggle cp-reset" data-reset="1">↺ 色を初期に戻す</button></div>'+pal;
+    }
+    // テンプレの種類ギャラリー(横ストリップは横長カード=full幅)
+    var tr=$('#tpl-row'); if(tr){ tr.innerHTML=TPL_OPTS.map(function(t){ var on=(state.prefer||'cols')===t[0];
+      return '<button type="button" class="tpl-card'+(on?' on':'')+(t[4]?' land':'')+'" data-tpl="'+t[0]+'"><span class="tpl-badge">✓</span><img class="tpl-thumb" src="img/'+t[2]+'.png" alt="'+t[1]+'"><div class="tpl-meta"><div class="tpl-name">'+t[1]+'</div><div class="tpl-desc">'+t[3]+'</div></div></button>'; }).join(''); }
+  }
   function renderPrint(){
     $('#p-month').value=state.month;
-    var sel=$('#p-emp'); sel.innerHTML='<option value="__all">全員（自動レイアウト）</option>'+state.employees.map(function(e,i){return e.retired?'':'<option value="'+i+'">'+esc(e.name)+'</option>';}).join('');
-    var TPL=[['auto','自動'],['vstack','縦1人'],['cols','2カラム'],['strips','横ストリップ']];
-    $('#tpl-row').innerHTML=TPL.map(function(t){return '<button class="seg-b'+((state.prefer||'auto')===t[0]?' on':'')+'" data-tpl="'+t[0]+'">'+t[1]+'</button>';}).join('');
-    var bar=COLOR_TARGETS.map(function(t){ var cur=state.theme[t[0]]||''; var op=state._oc===t[0]; return '<button class="cp-toggle'+(op?' open':'')+'" data-cpk="'+t[0]+'"><span class="cp-cur" style="background:'+cur+'"></span>'+t[1]+'<span class="cp-cv">▾</span></button>'; }).join('');
-    var pal=''; if(state._oc){ var cur2=state.theme[state._oc]||''; pal='<div class="cp-sw">'+PALETTE.map(function(col){ var on=cur2.toLowerCase()===col.toLowerCase(); return '<span class="cw'+(on?' on':'')+'" data-ck="'+state._oc+'" data-col="'+col+'" title="'+col+'" style="background:'+col+'"></span>'; }).join('')+'</div>'; }
-    $('#color-pickers').innerHTML='<div class="cp-bar">'+bar+'</div>'+pal;
+    var sel=$('#p-emp'); sel.innerHTML='<option value="__all">全員</option>'+state.employees.map(function(e,i){return e.retired?'':'<option value="'+i+'">'+esc(e.name)+'</option>';}).join('');
     doPreview();
   }
   function doPreview(){
@@ -489,8 +505,8 @@
 
     // 設定 seg
     $('#set-seg').addEventListener('click',function(ev){ var b=ev.target.closest('.seg-b'); if(!b)return; $$('.seg-b',this).forEach(function(x){x.classList.toggle('on',x===b);}); var s=b.dataset.set;
-      $('#set-company').style.display=s==='company'?'':'none'; $('#set-emp').style.display=s==='emp'?'':'none'; $('#set-leave').style.display=s==='leave'?'':'none'; $('#set-retire').style.display=s==='retire'?'':'none';
-      if(s==='emp')renderEmpMaster(); if(s==='leave')renderLeaveMaster(); if(s==='retire')renderRetireMaster(); });
+      $('#set-company').style.display=s==='company'?'':'none'; $('#set-emp').style.display=s==='emp'?'':'none'; $('#set-leave').style.display=s==='leave'?'':'none'; $('#set-retire').style.display=s==='retire'?'':'none'; $('#set-design').style.display=s==='design'?'':'none';
+      if(s==='emp')renderEmpMaster(); if(s==='leave')renderLeaveMaster(); if(s==='retire')renderRetireMaster(); if(s==='design')renderDesign(); });
     // 休暇マスタ：就業状況の変更
     $('#leave-list').addEventListener('change',function(ev){ var sel=ev.target.closest('select[data-ls]'); if(!sel)return; var emp=state.employees[+sel.dataset.ls]; emp.workStatus=sel.value; if(!emp.apply)emp.apply={}; var off=(emp.workStatus==='sankyu'||emp.workStatus==='ikukyu'); ['health','pension','kaigo'].forEach(function(k){ if(off) emp.apply[k]=false; else delete emp.apply[k]; }); renderLeaveMaster(); });
     $('#leave-list').addEventListener('input',function(ev){ var p=ev.target.closest('input[data-lp]'); if(!p)return; state.employees[+p.dataset.lp].leavePay=p.value.replace(/[^0-9]/g,''); });
@@ -583,8 +599,12 @@
     // 印刷
     $('#p-emp').addEventListener('change',doPreview);
     $('#p-month').addEventListener('change',function(){ state.month=this.value||state.month; doPreview(); });
-    $('#tpl-row').addEventListener('click',function(e){ var b=e.target.closest('[data-tpl]'); if(!b)return; state.prefer=b.dataset.tpl; renderPrint(); });
-    $('#color-pickers').addEventListener('click',function(e){ var tg=e.target.closest('.cp-toggle'); if(tg){ state._oc=(state._oc===tg.dataset.cpk)?null:tg.dataset.cpk; renderPrint(); return; } var w=e.target.closest('.cw'); if(w){ state.theme[w.dataset.ck]=w.dataset.col; state._oc=null; renderPrint(); } });
+    function afterDesign(){ renderDesign(); if($('#scr-print')&&$('#scr-print').classList.contains('active')) doPreview(); }
+    $('#tpl-row').addEventListener('click',function(e){ var b=e.target.closest('[data-tpl]'); if(!b)return; state.prefer=b.dataset.tpl; afterDesign(); });
+    $('#color-pickers').addEventListener('click',function(e){
+      if(e.target.closest('[data-reset]')){ state.theme={accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}; state._oc=null; afterDesign(); return; } // 色のみ初期化(レイアウトは維持)
+      var tg=e.target.closest('.cp-toggle:not(.cp-reset)'); if(tg){ state._oc=(state._oc===tg.dataset.cpk)?null:tg.dataset.cpk; renderDesign(); return; }
+      var w=e.target.closest('.cw'); if(w){ state.theme[w.dataset.ck]=w.dataset.col; state._oc=null; afterDesign(); } });
     $('#b-print').addEventListener('click',function(){ var f=$('#frame'); try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} });
     $('#b-pdf').addEventListener('click',function(){ alert('PDF保存/送付はSTEP5でpdf-lib配線します（今は印刷からPDF保存可）'); });
     $('#b-xlsx').addEventListener('click',function(){ if(!window.PayslipXlsx)return; var v=$('#p-emp').value; var emps=(v==='__all')?activeEmps():[state.employees[+v]]; PayslipXlsx.download(buildPeople(emps), {company:state.company.name, monthLabel:monthLabel().replace(/ /g,''), filename:'給与明細_'+state.month+'.xlsx'}); });

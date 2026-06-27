@@ -23,6 +23,7 @@
       <button class="seg-b" data-set="emp">従業員マスタ</button>
       <button class="seg-b" data-set="leave">休暇マスタ</button>
       <button class="seg-b" data-set="retire">退職マスタ</button>
+      <button class="seg-b" data-set="design">明細デザイン</button>
     </div>
     <div id="set-company">
       <div class="card">
@@ -67,6 +68,16 @@
         <div id="retire-list"></div>
       </div>
     </div>
+    <div id="set-design" style="display:none">
+      <div class="card">
+        <div class="card-h">明細のデザイン<span class="help-i" data-help="design">💡</span></div>
+        <p class="hint" style="margin:-4px 0 10px">見た目を選びます。ここで選んだものが毎月の既定です（印刷で「その回だけ」変えることも可）。</p>
+        <label class="d-lb">色（アクセント・罫線・文字を別々に）</label>
+        <div id="color-pickers"></div>
+        <label class="d-lb" style="margin-top:16px">レイアウト（テンプレの種類）</label>
+        <div class="tpl-grid" id="tpl-row"></div>
+      </div>
+    </div>
   </section>
 
   <!-- ② 入力 -->
@@ -94,12 +105,7 @@
         <div><label>月で選ぶ</label><input id="p-month" type="month" class="finput"></div>
         <div><label>従業員で選ぶ</label><select id="p-emp" class="finput"></select></div>
       </div>
-      <div class="frow"><label>レイアウト（テンプレ）</label>
-        <span class="seg" id="tpl-row"></span>
-      </div>
-      <div class="frow"><label>明細の色（アクセント・罫線・文字を別々に）</label>
-        <div id="color-pickers"></div>
-      </div>
+      <p class="hint" style="margin:-2px 0 8px">見た目（レイアウト・色）は「設定 ▸ 明細デザイン」で決めます。</p>
       <div class="btn-row">
         <button class="btn-primary" id="b-print">印刷</button>
         <button class="btn-ghost" id="b-pdf">PDFで保存/送付</button>
