@@ -85,5 +85,29 @@
       });
     };
   }
+  // ── 月次明細(pay_payslips): 定時決定の4-6月を履歴から自動入力する素 ──
+  // 同じ月×同じ従業員は上書き(id='ps_'+ym+'_'+employeeId)。未ログイン/未SUPAはlocalStorage層。
+  var PS_KEY = 'payslip_payslips_v1';
+  function psAll(){ try{ return JSON.parse(localStorage.getItem(PS_KEY)||'[]'); }catch(e){ return []; } }
+  function psWrite(arr){ try{ localStorage.setItem(PS_KEY, JSON.stringify(arr)); }catch(e){} }
+  Store.savePayslip = function(ym, employeeId, data){
+    var id = 'ps_'+ym+'_'+employeeId;
+    if(hasSupa){
+      return sb.auth.getUser().then(function(r){ var uid=r.data&&r.data.user&&r.data.user.id; if(!uid) return null;
+        return sb.from('pay_payslips').upsert({ id:id, account_id:uid, ym:ym, employee_id:employeeId, data:data, updated_at:new Date().toISOString() });
+      });
+    }
+    var arr=psAll(); var i=arr.findIndex(function(x){ return x.id===id; }); var row={ id:id, ym:ym, employee_id:employeeId, data:data };
+    if(i>=0) arr[i]=row; else arr.push(row); psWrite(arr); return Promise.resolve(row);
+  };
+  Store.getPayslipsByYm = function(ymFrom, ymTo){
+    if(hasSupa){
+      return sb.from('pay_payslips').select('ym,employee_id,data').gte('ym',ymFrom).lte('ym',ymTo)
+        .then(function(r){ return r.data||[]; });
+    }
+    return Promise.resolve(psAll().filter(function(x){ return x.ym>=ymFrom && x.ym<=ymTo; })
+      .map(function(x){ return { ym:x.ym, employee_id:x.employee_id, data:x.data }; }));
+  };
+
   global.Store = Store;
 })(window);

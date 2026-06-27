@@ -9,14 +9,14 @@
 
   var st=document.createElement('style');
   st.textContent='#auth-overlay{position:fixed;inset:0;z-index:1000;background:linear-gradient(160deg,#EAF6EF,#F0FAF4);display:none;align-items:center;justify-content:center;padding:20px;font-family:"Noto Sans JP",sans-serif;}'
-    +'.auth-card{width:100%;max-width:360px;background:#fff;border:1px solid #D4EDE1;border-radius:18px;box-shadow:0 10px 36px rgba(30,60,40,.12);padding:26px 22px;}'
-    +'.auth-logo{font-size:22px;font-weight:800;color:#1a4a2e;text-align:center;margin-bottom:4px;}.auth-logo small{display:block;font-size:10px;letter-spacing:.18em;color:#7A9A87;font-weight:500;margin-top:2px;}'
-    +'.auth-card p.lead{font-size:12px;color:#7A9A87;text-align:center;margin:8px 0 16px;}'
-    +'.auth-card input{width:100%;padding:12px 12px;margin-bottom:10px;border:1.5px solid #D4EDE1;border-radius:10px;font-size:15px;color:#1a4a2e;-webkit-appearance:none;}'
+    +'.auth-card{width:100%;max-width:360px;background:#fff;border:1px solid #d4eae0;border-radius:18px;box-shadow:0 10px 36px rgba(30,60,40,.12);padding:26px 22px;}'
+    +'.auth-logo{font-size:22px;font-weight:800;color:#1a4a2e;text-align:center;margin-bottom:4px;}.auth-logo small{display:block;font-size:10px;letter-spacing:.18em;color:#7aa08c;font-weight:500;margin-top:2px;}'
+    +'.auth-card p.lead{font-size:12px;color:#7aa08c;text-align:center;margin:8px 0 16px;}'
+    +'.auth-card input{width:100%;padding:12px 12px;margin-bottom:10px;border:1.5px solid #d4eae0;border-radius:10px;font-size:15px;color:#1a4a2e;-webkit-appearance:none;}'
     +'.auth-card input:focus{outline:none;border-color:#52B788;}'
     +'#auth-msg{font-size:12px;min-height:16px;margin:2px 0 10px;text-align:center;}'
     +'.auth-card .b1{width:100%;padding:12px;border:none;border-radius:10px;background:#3D9E72;color:#fff;font-size:15px;font-weight:700;cursor:pointer;}'
-    +'.auth-card .b2{width:100%;padding:11px;margin-top:8px;border:1.5px solid #D4EDE1;border-radius:10px;background:#fff;color:#3D6B53;font-size:14px;font-weight:700;cursor:pointer;}'
+    +'.auth-card .b2{width:100%;padding:11px;margin-top:8px;border:1.5px solid #d4eae0;border-radius:10px;background:#fff;color:#3D6B53;font-size:14px;font-weight:700;cursor:pointer;}'
     +'.auth-out{margin-left:8px;color:#C0392B;text-decoration:underline;cursor:pointer;font-size:12px;}';
   document.head.appendChild(st);
 
