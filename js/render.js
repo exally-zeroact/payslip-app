@@ -32,7 +32,7 @@
     '.h-lab{font-size:11px;letter-spacing:.40em;color:var(--accent);margin-top:10px;}.h-val{font-size:36px;margin-top:5px;line-height:1.05;font-variant-numeric:tabular-nums;}.h-val .yen{font-size:18px;color:var(--accent);margin-right:2px;}' +
     '.nm{text-align:center;margin-top:7px;font-size:14px;letter-spacing:.06em;}.nm .dono{font-size:10px;color:var(--ink3);margin-left:.3em;}.rule{height:.7px;background:var(--hair2);margin:8px 0;}' +
     '.net{text-align:center;font-size:11px;color:var(--accent);letter-spacing:.2em;}.net b{font-size:21px;color:var(--ink);font-weight:500;margin-left:8px;font-variant-numeric:tabular-nums;}.net b .y{font-size:12px;color:var(--accent);margin-right:1px;}' +
-    '.kin{display:grid;justify-content:center;column-gap:0;row-gap:8px;border-top:1px solid var(--accent-soft);border-bottom:1px solid var(--accent-soft);margin:10px 0 9px;padding:7px 0;}.kin .k{text-align:center;padding:0 6px;}.kin .k .kl{font-size:9px;color:var(--ink2);}.kin .k .kv{font-size:12px;margin-top:3px;font-variant-numeric:tabular-nums;}.kin .k.kb{border-bottom:.7px solid var(--hair-lt);padding-bottom:6px;}' +
+    '.kin{display:flex;flex-direction:column;border-top:1px solid var(--accent-soft);border-bottom:1px solid var(--accent-soft);margin:10px 0 9px;padding:7px 0;}.kin .kg{display:grid;justify-content:center;column-gap:0;}.kin .k{text-align:center;padding:0 6px;}.kin .kl{font-size:9px;color:var(--ink2);}.kin .kv{font-size:12px;margin-top:3px;font-variant-numeric:tabular-nums;}.kin .krow.kb{border-bottom:.7px solid var(--hair-lt);padding-bottom:6px;}.kin .krow.kb + .krow{padding-top:6px;}' +
     '.sec-title,.st{font-size:12px;letter-spacing:.40em;color:var(--accent);padding-left:.40em;margin-bottom:2px;}' +
     '.pd{display:flex;gap:36px;align-items:stretch;}.p1{padding-top:72px;}.pd .col{flex:1;display:flex;flex-direction:column;}.pd .st{padding-bottom:8px;border-bottom:.7px solid var(--hair2);margin-bottom:3px;}' +
     '.p2{padding:24px;}.p2 .unit:first-child{border-bottom:1px dashed #d3d3d3;padding-bottom:24px;margin-bottom:0;}.p2 .unit:last-child{padding-top:24px;}' +
@@ -60,7 +60,9 @@
     return '<div class="'+cls+' sum"><span class="'+lc+'">'+label+'</span><span class="'+vc+'">'+fmt(value)+'</span></div>'; }
   // 勤怠の列数=1行最大max(縦/横並び6・横ストリップ3)。フル行は中央(ブロック中央寄せ)・端数行は左揃え(列が揃う)
   function kinCols(n, max){ return Math.max(1, Math.min(n||1, max)); }
-  function kinHTML(kintai){ var c=kinCols(kintai.length,12),last=(Math.ceil(kintai.length/c)-1)*c; return '<div class="kin" style="grid-template-columns:repeat('+c+',56px)">'+kintai.map(function(k,i){ return '<div class="k'+(i<last?' kb':'')+'"><div class="kl">'+esc(k.label)+'</div><div class="kv">'+esc(k.value)+'</div></div>'; }).join('')+'</div>'; }
+  // 勤怠=行ごとに全幅ラッパー(.krow)+中央グリッド(.kg)。行間の薄線は.krow.kbの全幅border=他の線と左右一致(全テンプレ共通)
+  function kinBuild(kintai, c, w){ var rows=[]; for(var i=0;i<kintai.length;i+=c) rows.push(kintai.slice(i,i+c)); return '<div class="kin">'+rows.map(function(row,ri){ var cells=row.map(function(k){ return '<div class="k"><div class="kl">'+esc(k.label)+'</div><div class="kv">'+esc(k.value)+'</div></div>'; }).join(''); return '<div class="krow'+(ri<rows.length-1?' kb':'')+'"><div class="kg" style="grid-template-columns:repeat('+c+','+w+'px)">'+cells+'</div></div>'; }).join('')+'</div>'; }
+  function kinHTML(kintai){ return kinBuild(kintai, kinCols(kintai.length,12), 56); }
   function metaHTML(p){ return '<div class="meta">支給日　'+esc(p.payDate||'')+'<br>'+esc(p.company||'')+'</div>'; }
   // 上部=会社名/氏名(左)と差引支給額/¥(中央)の2カラム(全テンプレ共通デフォルト)
   function heroHTML(p){ return '<div class="hero hero2"><div class="hg-l"><div class="h-co">'+esc(p.company||'')+'</div><div class="h-nm">'+esc(p.name||'')+'<span class="dono">殿</span></div></div><div class="hg-r"><div class="h-lab">差 引 支 給 額</div><div class="h-val">'+YEN+fmt(p.net)+'</div></div></div>'; }
@@ -107,7 +109,7 @@
     '.h-co{font-size:11px;color:var(--ink2);margin-bottom:5px;letter-spacing:.12em;}.h-nm{font-size:14px;letter-spacing:.1em;}.h-nm .dono{font-size:11.5px;color:var(--ink2);margin-left:.4em;}' +
     '.h-lab{font-size:11px;letter-spacing:.30em;color:var(--accent);}.h-val{display:inline-flex;align-items:baseline;gap:6px;font-size:36px;margin-top:3px;line-height:1.04;font-variant-numeric:tabular-nums;}.h-val .yen{font-size:18px;color:var(--accent);}' +
     '.sec-title{font-size:11px;letter-spacing:.40em;color:var(--accent);padding-left:.40em;margin-bottom:2px;}' +
-    '.kin{display:grid;justify-content:center;column-gap:0;row-gap:6px;border-top:1px solid var(--accent-soft);border-bottom:1px solid var(--accent-soft);margin:8px 0 9px;padding:6px 0;}.kin .k{text-align:center;padding:0 6px;}.kin .k .kl{font-size:9px;color:var(--ink2);}.kin .k .kv{font-size:11.5px;margin-top:3px;font-variant-numeric:tabular-nums;}.kin .k.kb{border-bottom:.7px solid var(--hair-lt);padding-bottom:6px;}' +
+    '.kin{display:flex;flex-direction:column;border-top:1px solid var(--accent-soft);border-bottom:1px solid var(--accent-soft);margin:8px 0 9px;padding:6px 0;}.kin .kg{display:grid;justify-content:center;column-gap:0;}.kin .k{text-align:center;padding:0 6px;}.kin .kl{font-size:9px;color:var(--ink2);}.kin .kv{font-size:11.5px;margin-top:3px;font-variant-numeric:tabular-nums;}.kin .krow.kb{border-bottom:.7px solid var(--hair-lt);padding-bottom:6px;}.kin .krow.kb + .krow{padding-top:6px;}' +
     '.pd{display:flex;flex-direction:column;gap:14px;}.pd .col{display:flex;flex-direction:column;}.pd .sec-title{padding-bottom:7px;border-bottom:.7px solid var(--hair2);margin-bottom:2px;}' +
     '.items2{display:grid;grid-template-columns:1fr 1fr;column-gap:0;}.items2 .ln:nth-child(odd){padding-right:23px;}.items2 .ln:nth-child(even){padding-left:23px;}' +
     '.ln{display:flex;justify-content:space-between;align-items:baseline;padding:5.5px 2px;border-bottom:.7px solid var(--hair-lt);}.ln .lab{font-size:12px;color:var(--ink2);}.ln .lab .hz{font-size:8.5px;color:var(--ink3);margin-left:4px;font-family:"Yu Gothic","Hiragino Sans",sans-serif;}.ln .amt{font-size:13px;font-variant-numeric:tabular-nums;}' +
@@ -116,7 +118,7 @@
     '@page{size:A4 portrait;margin:0;}@media print{body{background:#fff;}.sheet{box-shadow:none;}}';
 
   function lnHTML(items, minCells){ var h=items.map(function(it){ var hz=it.hikazei?'<span class="hz">非課税</span>':''; return '<div class="ln"><span class="lab">'+esc(it.label)+hz+'</span><span class="amt">'+fmt(it.value)+'</span></div>'; }).join(''); for(var n=items.length; (n%2===1)||(n<(minCells||0)); n++) h+='<div class="ln e"></div>'; return h; }
-  function kinHTMLv(kintai){ var c=kinCols(kintai.length,12),last=(Math.ceil(kintai.length/c)-1)*c; return '<div class="kin" style="grid-template-columns:repeat('+c+',56px)">'+kintai.map(function(k,i){ return '<div class="k'+(i<last?' kb':'')+'"><div class="kl">'+esc(k.label)+'</div><div class="kv">'+esc(k.value)+'</div></div>'; }).join('')+'</div>'; }
+  function kinHTMLv(kintai){ return kinBuild(kintai, kinCols(kintai.length,12), 56); }
 
   function vstackBody(p){
     return '<div class="sheet">' +
@@ -133,31 +135,44 @@
   // ============ ③ 横ストリップ strips (2-4人) ============
   var STRIPS_CSS = ROOT +
     '.page{width:1123px;height:794px;margin:0 auto;background:var(--paper);box-shadow:0 10px 36px rgba(0,0,0,.26);padding:24px 0;display:flex;}.page.one{justify-content:center;}' +
-    '.strip{flex:1;padding:0 24px;border-left:1px dashed var(--hair2);display:flex;flex-direction:column;}.strip:first-child{border-left:none;}.one .strip{flex:0 0 460px;}' +
-    '.s-title{font-size:11.5px;letter-spacing:.22em;text-align:center;font-weight:500;}.s-month{font-size:8.5px;letter-spacing:.14em;text-align:center;margin-top:4px;font-weight:500;}.s-rule{height:.8px;background:var(--accent-soft);margin:8px 0 5px;}' +
-    '.s-who{text-align:center;margin:5px 0 4px;}.s-co{font-size:8.5px;color:var(--ink2);letter-spacing:.08em;}.s-name{font-size:11px;margin-top:3px;letter-spacing:.06em;}.s-name .dono{font-size:9px;color:var(--ink3);margin-left:.3em;}' +
-    '.s-hl{font-size:8.5px;letter-spacing:.34em;color:var(--accent);text-align:center;margin-top:6px;}.s-val{text-align:center;font-size:21px;margin-top:2px;font-variant-numeric:tabular-nums;}.s-val .yen{font-size:12px;color:var(--accent);margin-right:1px;}' +
-    '.sl{font-size:8.5px;letter-spacing:.30em;color:var(--accent);padding-left:.30em;margin:9px 0 1px;padding-bottom:4px;border-bottom:.7px solid var(--hair2);}' +
-    '.r{display:flex;justify-content:space-between;align-items:baseline;padding:3.4px 1px;border-bottom:.6px solid var(--hair-lt);}.r .l{font-size:9px;color:var(--ink2);}.r .l .hz{font-size:6.5px;color:var(--ink3);margin-left:2px;font-family:"Yu Gothic","Hiragino Sans",sans-serif;}.r .v{font-size:9.5px;font-variant-numeric:tabular-nums;}' +
-    '.kintai{border-top:1px solid var(--accent-soft);border-bottom:1px solid var(--accent-soft);margin-top:5px;padding:2px 0;}.kintai .k3{display:grid;justify-content:center;column-gap:0;row-gap:3px;}.kintai .r{border-bottom:none;padding:3px 1px;}.kintai .k3 .r{padding:3px 9px;}.kintai .r.kb{border-bottom:.6px solid var(--hair-lt);padding-bottom:4px;}' +
-    '.items2{display:grid;grid-template-columns:1fr 1fr;column-gap:0;}.items2 .r:nth-child(odd){padding-right:8px;}.items2 .r:nth-child(even){padding-left:8px;}.items2 .r.e{height:17px;box-sizing:border-box;}.items2 .r:nth-last-child(-n+2){border-bottom:none;}' +
-    '.r.sum{border-bottom:none;border-top:1px solid var(--accent-soft);margin-top:5px;padding-top:6px;column-gap:14px;}.r.sum .l{color:var(--ink);letter-spacing:.1em;}.r.sum .v{font-size:10.5px;}' +
+    '.strip{flex:1;padding:0 22px;border-left:1px dashed var(--hair2);display:flex;flex-direction:column;}.strip:first-child{border-left:none;}.one .strip{flex:0 0 460px;}' +
+    // 表題=左 / 支給日=右(同じ行)+全幅細線 ※1人/2人版と同じ並び
+    '.tophd{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}.tophd .mh{text-align:left;}.mh-title{font-size:10px;letter-spacing:.08em;font-weight:500;}.mh-month{font-size:7.5px;letter-spacing:.1em;margin-top:1px;font-weight:500;color:var(--ink2);}.iss-date{font-size:7.5px;color:var(--ink2);text-align:right;line-height:1.5;}.mh-rule{height:.6px;background:var(--hair2);margin:3px 0 5px;}' +
+    // 会社名+氏名=左 / 差引支給額¥=中央
+    '.hero2{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:6px;}.hero2 .hg-l{text-align:left;}.hero2 .hg-r{text-align:center;}.h-co{font-size:8px;color:var(--ink2);letter-spacing:.06em;}.h-nm{font-size:10px;letter-spacing:.04em;}.h-nm .dono{font-size:7.5px;color:var(--ink3);margin-left:.2em;}.h-lab{font-size:7.5px;letter-spacing:.2em;color:var(--accent);}.h-val{display:inline-flex;align-items:baseline;gap:3px;font-size:17px;line-height:1.1;font-variant-numeric:tabular-nums;}.h-val .yen{font-size:9px;color:var(--accent);}' +
+    // 勤怠
+    '.sec-title{font-size:8px;letter-spacing:.2em;color:var(--accent);margin:6px 0 1px;}' +
+    '.kin{display:flex;flex-direction:column;border-top:1px solid var(--accent-soft);border-bottom:1px solid var(--accent-soft);margin:1px 0 5px;padding:3px 0;}.kin .kg{display:grid;justify-content:center;column-gap:0;}.kin .k{text-align:center;padding:0 4px;}.kin .kl{font-size:7px;color:var(--ink2);}.kin .kv{font-size:9px;margin-top:0;font-variant-numeric:tabular-nums;}.kin .krow.kb{border-bottom:.6px solid var(--hair-lt);padding-bottom:3px;}.kin .krow.kb + .krow{padding-top:3px;}' +
+    // 支給/控除(縦に積む=1カラム)・項目+空行罫線・薄線・緑線合計
+    '.pd{display:flex;flex-direction:column;gap:3px;}.pd .col{display:flex;flex-direction:column;}.pd.two{flex-direction:row;gap:14px;}.pd.two .col{flex:1;min-width:0;}.st{font-size:8px;letter-spacing:.2em;color:var(--accent);padding-bottom:3px;border-bottom:.7px solid var(--hair2);margin-bottom:1px;}' +
+    '.items1 .r:last-child{border-bottom:none;}.items1 .r.e{height:16px;box-sizing:border-box;}' +
+    '.r{display:flex;justify-content:space-between;align-items:baseline;padding:3px 1px;border-bottom:.6px solid var(--hair-lt);}.r .l{font-size:8.5px;color:var(--ink2);}.r .l .hz{font-size:6px;color:var(--ink3);margin-left:2px;font-family:"Yu Gothic","Hiragino Sans",sans-serif;}.r .v{font-size:9px;font-variant-numeric:tabular-nums;}' +
+    '.items2{display:grid;grid-template-columns:1fr 1fr;column-gap:0;}.items2 .r:nth-child(odd){padding-right:8px;}.items2 .r:nth-child(even){padding-left:8px;}.items2 .r.e{height:16px;box-sizing:border-box;}.items2 .r:nth-last-child(-n+2){border-bottom:none;}' +
+    '.r.sum{border-bottom:none;border-top:1px solid var(--accent-soft);margin-top:4px;padding-top:5px;column-gap:18px;}.r.sum .l{color:var(--ink);letter-spacing:.08em;}.r.sum .v{font-size:9.5px;}.r.sum .sgrp .l{letter-spacing:.06em;}' +
     '@page{size:A4 landscape;margin:0;}@media print{body{background:#fff;}.page{box-shadow:none;}}';
 
   function srowsHTML(items, minCells){ var h=items.map(function(it){ var hz=it.hikazei?'<span class="hz">非課税</span>':''; return '<div class="r"><span class="l">'+esc(it.label)+hz+'</span><span class="v">'+fmt(it.value)+'</span></div>'; }).join(''); for(var n=items.length; (n%2===1)||(n<(minCells||0)); n++) h+='<div class="r e"></div>'; return h; }
-  function skinHTML(kintai){ var c=kinCols(kintai.length,5),last=(Math.ceil(kintai.length/c)-1)*c; return kintai.map(function(k,i){ return '<div class="r'+(i<last?' kb':'')+'"><span class="l">'+esc(k.label)+'</span><span class="v">'+esc(k.value)+'</span></div>'; }).join(''); }
-  function strip(p){
-    return '<div class="strip">' +
-      '<div class="s-title">給 与 支 給 明 細 書</div><div class="s-month">'+esc(P.month||'令 和 八 年 六 月 分')+'</div><div class="s-rule"></div>' +
-      '<div class="s-who"><div class="s-co">'+esc(p.company||'')+'</div><div class="s-name">'+esc(p.name||'')+'<span class="dono">殿</span></div></div>' +
-      '<div class="s-hl">差 引 支 給 額</div><div class="s-val"><span class="yen">¥</span>'+fmt(p.net)+'</div>' +
-      '<div class="sl" style="border:none;padding-bottom:0;">勤 怠</div><div class="kintai"><div class="k3" style="grid-template-columns:repeat('+kinCols(p.kintai.length,5)+',62px)">'+skinHTML(p.kintai)+'</div></div>' +
-      '<div class="sl">支 給</div><div class="items2">'+srowsHTML(p.shikyu,10)+'</div>'+sumLine('r','支給合計',p.shikyuTotal!=null?p.shikyuTotal:sum(p.shikyu))+'' +
-      '<div class="sl">控 除</div><div class="items2">'+srowsHTML(p.kojo,10)+'</div>'+sumLine('r','控除合計',p.kojoTotal!=null?p.kojoTotal:sum(p.kojo))+'' +
+  // 横ストリップの勤怠(1人/2人版と同じルール=固定幅56px・中央寄せ・最大5列/行=内幅330÷56・2行は全幅薄線)
+  function skin(kintai){ return kinBuild(kintai, kinCols(kintai.length,5), 56); }
+  // 横ストリップ用の単列項目(2カラム=支給|控除を横並びにする時・幅が狭いので各セクション1列)
+  function srows1(items, minCells){ var h=items.map(function(it){ var hz=it.hikazei?'<span class="hz">非課税</span>':''; return '<div class="r"><span class="l">'+esc(it.label)+hz+'</span><span class="v">'+fmt(it.value)+'</span></div>'; }).join(''); for(var n=items.length; n<(minCells||0); n++) h+='<div class="r e"></div>'; return '<div class="items1">'+h+'</div>'; }
+  // 1人/2人版と同じ並び・形(表題左/支給日右・会社名+氏名左・差引¥中央)。two=true:2カラム(支給|控除 横並び・ラベル左) / false:1カラム(支給↓控除・緑線)。幅だけ狭い
+  function strip(p, two){
+    var sh=p.shikyuTotal!=null?p.shikyuTotal:sum(p.shikyu), ko=p.kojoTotal!=null?p.kojoTotal:sum(p.kojo);
+    var pd = two ?
+      '<div class="pd two">' +
+        '<div class="col"><div class="st">支 給</div>'+srows1(p.shikyu,20)+sumLine('r','支給合計',sh,false)+'</div>' +
+        '<div class="col"><div class="st">控 除</div>'+srows1(p.kojo,20)+sumLine('r','控除合計',ko,false)+'</div>' +
+      '</div>'
+      :
+      '<div class="pd">' +
+        '<div class="col"><div class="st">支 給</div><div class="items2">'+srowsHTML(p.shikyu,16)+'</div>'+sumLine('r','支給合計',sh,true)+'</div>' +
+        '<div class="col"><div class="st">控 除</div><div class="items2">'+srowsHTML(p.kojo,16)+'</div>'+sumLine('r','控除合計',ko,true)+'</div>' +
       '</div>';
+    return '<div class="strip">' + topHead(p) + heroHTML(p) + '<div class="sec-title">勤 怠</div>'+skin(p.kintai) + pd + '</div>';
   }
-  function stripsBody(people){ return '<div class="page'+(people.length===1?' one':'')+'">'+people.map(strip).join('')+'</div>'; }
-  function buildStrips(people, doc){ P=doc||{}; return wrap(STRIPS_CSS, stripsBody(people), 'landscape'); }
+  function stripsBody(people, two){ return '<div class="page'+(people.length===1?' one':'')+'">'+people.map(function(p){ return strip(p, two); }).join('')+'</div>'; }
+  function buildStrips(people, doc){ P=doc||{}; return wrap(STRIPS_CSS, stripsBody(people, false), 'landscape'); }
 
   function wrap(css, body, orientation){
     return '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><style>'+css+'</style></head><body data-orientation="'+orientation+'">'+body+'</body></html>';
@@ -188,7 +203,8 @@
       var css, orient, per, mk;
       if(prefer==='vstack'){ css=VSTACK_CSS; orient='portrait'; per=1; mk=function(ch){ return vstackBody(ch[0]); }; }
       else if(prefer==='vstack2'){ css=COLS_CSS; orient='portrait'; per=2; mk=function(ch){ return vstack2Body(ch); }; }
-      else if(prefer==='strips'){ css=STRIPS_CSS; orient='landscape'; per=3; mk=function(ch){ return stripsBody(ch); }; }
+      else if(prefer==='strips'){ css=STRIPS_CSS; orient='landscape'; per=3; mk=function(ch){ return stripsBody(ch, false); }; } // 1カラム3人(支給↓控除)
+      else if(prefer==='cols3'){ css=STRIPS_CSS; orient='landscape'; per=3; mk=function(ch){ return stripsBody(ch, true); }; } // 2カラム3人(支給|控除)
       else if(prefer==='cols2'){ css=COLS_CSS; orient='portrait'; per=2; mk=function(ch){ return colsBody(ch); }; }
       else { prefer='cols'; css=COLS_CSS; orient='portrait'; per=1; mk=function(ch){ return colsBody(ch); }; } // 2カラム1人(hero)
       var pages=[]; for(var i=0;i<people.length;i+=per) pages.push(people.slice(i,i+per)); if(!pages.length) pages=[[{name:'',company:'',kintai:[],shikyu:[],kojo:[],net:0}]];
