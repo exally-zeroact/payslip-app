@@ -74,7 +74,7 @@
       shaho:{ mode:'auto', months:[{pay:'',days:'30'},{pay:'',days:'30'},{pay:'',days:'30'}], mikomi:'', manual:'' } };
   }
   var WDAYS=['日','月','火','水','木','金','土'];
-  var RULE_ITEMS=[['teikyu','休みの日'],['shotei','1日の働く時間'],['annual','年間の休み'],['warimashiRate','割増の率'],['koyoGyoshu','雇用保険の業種'],['paymentDays','支払基礎日数の数え方'],['kyukei','休憩時間'],['minashi','固定残業（みなし）'],['shoyo','賞与の有無']];
+  var RULE_ITEMS=[['teikyu','休みの日'],['shotei','1日の働く時間'],['annual','年間の休み'],['warimashiRate','割増の率'],['koyoGyoshu','雇用保険の業種'],['paymentDays','支払基礎日数の数え方'],['kekkin','欠勤控除の計算'],['kyukei','休憩時間'],['minashi','固定残業（みなし）'],['shoyo','賞与の有無']];
   var state={ company:{name:'株式会社 ゼロアクト',addr:'',close:'末日',paydayRel:'next',paydayDay:'25',
       holidays:[0], dailyWorkH:'8', dailyWorkM:'0', annualHolidays:'120',
       ruleOn:{teikyu:true,shotei:true,annual:true,warimashiRate:true,koyoGyoshu:true},
@@ -146,6 +146,18 @@
     var w=warimashiOf(e); e._wari=w;
     var shikyu=(e.shikyu||[]).slice();
     if(w.total>0) shikyu=shikyu.concat([{label:'割増賃金',value:w.total}]); // 課税・総支給・雇用保険ベースに算入
+    // 欠勤控除(月給・日給月給制): 月給で欠勤があれば不就労分を控除(完全月給制はしない)。割増基礎/標準報酬は満額のまま(=このローカルshikyuにだけ負の行を足す)
+    var coK=state.company||{};
+    if(e.payType==='月給' && !(e.workStatus&&e.workStatus!=='normal') && !coK.kanzenGekkyu){
+      var kday=kintaiVal(e,/欠勤/);
+      if(kday>0){
+        var ahK=(e.annualHolidays!=null&&e.annualHolidays!=='')?e.annualHolidays:coK.annualHolidays;
+        var dhK=num((e.dailyWorkH!=null&&e.dailyWorkH!=='')?e.dailyWorkH:coK.dailyWorkH)+num((e.dailyWorkM!=null&&e.dailyWorkM!=='')?e.dailyWorkM:coK.dailyWorkM)/60;
+        var kgaku=PayrollCalc.calcKekkin({ base:num(e.base), ym:state.month, kekkinDays:kday, annualHolidays:ahK, dailyHours:dhK, method:coK.kekkinMethod });
+        kgaku=Math.min(kgaku, num(e.base)); // 基本給を超えて引かない
+        if(kgaku>0) shikyu=shikyu.concat([{label:'欠勤控除',value:-kgaku}]);
+      }
+    }
     return PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:num(e.fuyou), taxClass:e.taxClass, residentTax:num(e.residentTax), healthRate:prefRate(e.pref), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:e.apply, extraKojo:e.extraKojo });
   }
   function payDateObj(){
@@ -204,6 +216,10 @@
       var pmo=[['','自動（月給=暦日数 / 日給・時給=出勤日数）'],['calendar','暦日数（毎月その月の日数）'],['scheduled','所定労働日数（欠勤は差引）'],['worked','出勤日数']]
         .map(function(o){return '<option value="'+o[0]+'"'+(pm===o[0]?' selected':'')+'>'+esc(o[1])+'</option>';}).join('');
       h+=ruleItemHTML('paymentDays','支払基礎日数の数え方','定時決定の'+'17日判定','','<select class="cr-sel" data-cf="paymentDaysMethod">'+pmo+'</select><div class="ri-note">社会保険の定時決定(4〜6月)で<b>17日以上の月</b>を平均します。年金機構の一般扱いは<b>月給=暦日数 / 日給・時給=出勤日数</b>。会社の運用に合わせて変更できます。</div>'); }
+    if(on.kekkin){
+      var kmo=[['','月平均所定労働日数（既定）'],['calendar','当月の暦日数'],['scheduled','当月の所定労働日数']]
+        .map(function(o){return '<option value="'+o[0]+'"'+((c.kekkinMethod||'')===o[0]?' selected':'')+'>'+esc(o[1])+'</option>';}).join('');
+      h+=ruleItemHTML('kekkin','欠勤控除の計算','月給の欠勤・不就労','','<label class="cr-chk" style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" data-cf="kanzenGekkyu"'+(c.kanzenGekkyu?' checked':'')+'>完全月給制（欠勤しても控除しない）</label><div style="margin-top:6px;font-size:12px">1日あたりの分母：<select class="cr-sel" data-cf="kekkinMethod">'+kmo+'</select></div><div class="ri-note">月給は<b>日給月給制（欠勤分を控除）が標準</b>。10日欠勤すれば10日分減ります（民法624条 ノーワーク・ノーペイ）。1日あたり＝月給÷分母×欠勤日数。役員等で減額しない場合のみ「完全月給制」に。時給・日給は元々日数/時間で按分されます。</div>'); }
     if(on.kyukei){ h+=ruleItemHTML('kyukei','休憩時間','分','','<input class="cr-f cr-wide" data-cf="kyukei" inputmode="numeric" value="'+attr(c.kyukei)+'" placeholder="60">'); }
     if(on.minashi){ h+=ruleItemHTML('minashi','固定残業（みなし）','時間','','<input class="cr-f cr-wide" data-cf="minashiH" inputmode="numeric" value="'+attr(c.minashiH)+'" placeholder="0">'); }
     if(on.shoyo){ h+=ruleItemHTML('shoyo','賞与の有無','','','<div class="ri-note">賞与タブで個別に登録します。</div>'); }
@@ -539,7 +555,7 @@
       var x=ev.target.closest('[data-rule-x]'); if(x){ state.company.ruleOn[x.dataset.ruleX]=false; renderRuleChips(); renderCompanyRules(); return; }
     });
     rh.addEventListener('input',function(ev){ if(ev.target.tagName==='SELECT')return; var f=ev.target.dataset.cf; if(f) state.company[f]=ev.target.value.replace(/[^0-9]/g,''); });
-    rh.addEventListener('change',function(ev){ var f=ev.target.dataset.cf; if(f==='gyoshu'){ state.company.gyoshu=ev.target.value; return; } if(f==='paymentDaysMethod'){ state.company.paymentDaysMethod=ev.target.value; return; } if(f==='annualHolidays'||f==='dailyWorkH'||f==='dailyWorkM') renderCompanyRules(); });
+    rh.addEventListener('change',function(ev){ var f=ev.target.dataset.cf; if(f==='gyoshu'){ state.company.gyoshu=ev.target.value; return; } if(f==='paymentDaysMethod'){ state.company.paymentDaysMethod=ev.target.value; return; } if(f==='kekkinMethod'){ state.company.kekkinMethod=ev.target.value; return; } if(f==='kanzenGekkyu'){ state.company.kanzenGekkyu=ev.target.checked; renderCompanyRules(); return; } if(f==='annualHolidays'||f==='dailyWorkH'||f==='dailyWorkM') renderCompanyRules(); });
     $('#b-add-emp').addEventListener('click',function(){ var e=defEmp('従業員 '+(state.employees.length+1)); state.employees.push(e); state.open[e.id]=true; renderEmpMaster(); });
 
     // 従業員マスタ操作

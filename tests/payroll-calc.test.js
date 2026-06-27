@@ -46,3 +46,21 @@ T('支払基礎日数: method明示(calendar=30 / worked=出勤18)で会社カ�
 T('支払基礎日数: 役員は月給扱い(暦日数)', function () {
   eq(P.calcPaymentDays({ payType: '役員' }, '2026-05'), 31);
 });
+
+/* 欠勤控除(日給月給制・ノーワークノーペイ) */
+T('欠勤控除: 月給25万・年間休日120・欠勤10日(月平均所定日数)→約122,449', function () {
+  // 月平均所定日数=(365-120)/12=20.4167 → 1日12,244.9 ×10 = 122,449
+  eq(P.calcKekkin({ base: 250000, ym: '2026-06', kekkinDays: 10, annualHolidays: 120, dailyHours: 8 }), 122449);
+});
+T('欠勤控除: method=calendar は当月暦日数が分母(2026-06=30日)', function () {
+  eq(P.calcKekkin({ base: 250000, ym: '2026-06', kekkinDays: 10, annualHolidays: 120, dailyHours: 8, method: 'calendar' }), 83333);
+});
+T('欠勤控除: 欠勤0なら0 / base0なら0', function () {
+  eq(P.calcKekkin({ base: 250000, ym: '2026-06', kekkinDays: 0, annualHolidays: 120, dailyHours: 8 }), 0);
+  eq(P.calcKekkin({ base: 0, ym: '2026-06', kekkinDays: 10, annualHolidays: 120, dailyHours: 8 }), 0);
+});
+T('欠勤控除: 遅刻早退(分)も時間単価で控除(月平均所定時間ベース)', function () {
+  // 月平均所定時間=(365-120)*8/12=163.33h → 時給1530.6 ×1h(60分) ≈ 1531
+  var d = P.calcKekkin({ base: 250000, ym: '2026-06', kekkinDays: 0, lateMin: 60, annualHolidays: 120, dailyHours: 8 });
+  ok(d >= 1520 && d <= 1540, '遅刻1時間≈1,531 (' + d + ')');
+});
