@@ -145,7 +145,7 @@ T('直接入力→computePayslipまで標準報酬が届く', function () {
 T('hyojunBase固定: 社保は当月支給でなく標準報酬基礎で計算(残業でブレない)', function () {
   // 当月支給は残業で50万でも、確定した報酬月額34万で社保が決まる
   var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 500000 }], birthYmd: '1980-05-15', payYm: '2026-06', fuyou: 0, hyojunBase: 340000 });
-  eq(r.si.hyojunHealth, 340000); eq(r.si.health, 16847); eq(r.si.pension, 31110); eq(r.si.kaigo, 2703);
+  eq(r.si.hyojunHealth, 340000); eq(r.si.health, 16847); eq(r.si.pension, 31110); eq(r.si.kaigo, 2754); // 介護=令和8年度0.81%: 340000×0.0081
 });
 
 /* ---- 法定控除の従業員ごとオン/オフ（役員・非加入対応） ---- */
