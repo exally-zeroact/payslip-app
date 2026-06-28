@@ -373,6 +373,10 @@
     var retN=state.employees.filter(function(e){return e.retired;}).length;
     host.innerHTML=rows+'<p class="hint" style="margin-top:8px">退職者 '+retN+'名 / 在籍 '+(state.employees.length-retN)+'名</p>';
   }
+  // 表示順(部署グループ+退職表示の順)の従業員index配列
+  function visibleEmpIdx(){ var arr=[]; var showR=!!state.showRetired; var groups={},order=[]; state.employees.forEach(function(e,idx){ if(e.retired&&!showR)return; var g=e.dept||'未分類'; if(!groups[g]){groups[g]=[];order.push(g);} groups[g].push(idx); }); order.forEach(function(g){ groups[g].forEach(function(idx){ arr.push(idx); }); }); return arr; }
+  // 従業員を表示順で1つ上(dir=-1)/下(dir=+1)へ。配列の並びを入替=入力/一覧/印刷/Excel 全部に反映・永続(sort:i)
+  function moveEmp(i, dir){ var vis=visibleEmpIdx(); var p=vis.indexOf(i); var q=p+dir; if(p<0||q<0||q>=vis.length) return; var a=state.employees, j=vis[q]; var t=a[i]; a[i]=a[j]; a[j]=t; renderEmpMaster(); }
   function renderEmpMaster(){
     fillCompany();
     var host=$('#emp-list'); if(!host) return;
@@ -391,7 +395,9 @@
           +'<div class="mco-hd" data-toggle="'+i+'"><span class="mco-nm">'+esc(e.name||'（無名）')+'</span>'
             +'<span class="hd-chip'+(e.workStatus&&e.workStatus!=='normal'?' on':'')+'" data-goleave="'+i+'">'+(e.workStatus&&e.workStatus!=='normal'?esc(WS_LABEL(e.workStatus)):'休暇')+'</span>'
             +'<span class="hd-chip" data-goretire="'+i+'">退職</span>'
-            +'<span class="mco-sub">'+esc(e.payType)+(e.role?' / '+esc(e.role):'')+'</span><span class="mco-cv">▾</span></div>'
+            +'<span class="mco-sub">'+esc(e.payType)+(e.role?' / '+esc(e.role):'')+'</span>'
+            +(visibleEmpIdx().length>1?'<span class="mco-ord"><button class="ord-b" data-moveup="'+i+'" title="上へ">▲</button><button class="ord-b" data-movedn="'+i+'" title="下へ">▼</button></span>':'')
+            +'<span class="mco-cv">▾</span></div>'
           +(op?empCardBody(e,i):'')+'</div>';
       });
     });
@@ -600,6 +606,8 @@
     var el=$('#emp-list');
     el.addEventListener('click',function(ev){
       if(ev.target.dataset.showret){ state.showRetired=!state.showRetired; renderEmpMaster(); return; }
+      var mu=ev.target.closest('[data-moveup]'); if(mu){ moveEmp(+mu.dataset.moveup,-1); return; }
+      var md=ev.target.closest('[data-movedn]'); if(md){ moveEmp(+md.dataset.movedn,1); return; }
       if(ev.target.dataset.goleave!=null){ var gl=+ev.target.dataset.goleave; var ge=state.employees[gl]; if((ge.workStatus||'normal')==='normal'){ ge.workStatus='sankyu'; if(!ge.apply)ge.apply={}; ge.apply.health=false;ge.apply.pension=false;ge.apply.kaigo=false; } var lvb=$('#set-seg .seg-b[data-set="leave"]'); if(lvb)lvb.click(); return; }
       if(ev.target.dataset.goretire!=null){ var gr=+ev.target.dataset.goretire; if(activeEmps().length<=1){ alert('稼働中は最低1名必要です'); return; } if(!confirm((state.employees[gr].name||'この従業員')+' を退職にしますか？')) return; state.employees[gr].retired=true; state.employees[gr].retiredYmd=state.month; var rtb=$('#set-seg .seg-b[data-set="retire"]'); if(rtb)rtb.click(); return; }
       var card=ev.target.closest('.mco');
