@@ -197,6 +197,21 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .acc.open .acc-cv{transform:rotate(180deg);}
 .acc-body{display:none;padding:0 14px 14px;border-top:1px solid #EEF6F1;}
 .acc.open .acc-body{display:block;}
+/* コンパクト一括入力(毎月の勤怠を展開不要で全員ぶん) */
+.ic-top{display:flex;align-items:center;gap:10px;padding:12px 14px;}
+.icard .acc-nm{flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.icard .acc-net{margin-left:auto;}
+.ic-detail{flex:0 0 auto;border:1.5px solid #d4eae0;border-radius:8px;background:#fff;color:#3D6B53;font-size:12px;font-weight:700;padding:7px 11px;cursor:pointer;display:flex;align-items:center;gap:3px;white-space:nowrap;}
+.ic-detail:hover{background:#F0FAF4;}
+.ic-kin{display:flex;flex-wrap:wrap;gap:8px;padding:0 14px 12px;}
+.ic-f{display:flex;flex-direction:column;gap:3px;flex:1 1 64px;min-width:58px;}
+.ic-f>span{font-size:10px;color:#7AA08C;font-weight:700;padding-left:1px;}
+.ic-f .ic-in{width:100%;padding:9px 8px;border:1.5px solid #d4eae0;border-radius:8px;font-size:15px;font-family:'DM Mono',monospace;text-align:right;color:#1a4a2e;-webkit-appearance:none;box-sizing:border-box;}
+.ic-f .ic-in:focus{outline:none;border-color:#52B788;}
+.ic-f2{flex:1.4 1 128px;}
+.ic-hm{display:flex;align-items:center;gap:4px;}
+.ic-hm .ic-in{flex:1;width:auto;min-width:0;text-align:center;padding:9px 4px;}
+.ic-hm i{color:#7aa08c;font-style:normal;font-family:'DM Mono',monospace;}
 
 /* rows in editor */
 .grp{margin-top:12px;}

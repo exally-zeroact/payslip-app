@@ -457,17 +457,37 @@
       return '<div class="hint" style="margin:-4px 2px 8px;color:#3D6B53">基本給（自動）＝ 日給 '+fmtN(e.base)+'円 × 出勤日数 '+d+'日 ＝ <b>'+yen(Math.round(num(e.base)*d))+'</b>（出勤日数は上の勤怠で）</div>'; }
     return '';
   }
+  // 標準勤怠(出勤/欠勤/有給)。毎月の入力を展開不要で全員ぶん見せるため上段に常時表示する
+  var KIN_STD=[['出勤日数',/出勤/],['欠勤日数',/欠勤/],['有給取得',/有給/]];
+  function ensureKintai(e){ if(!e.kintai)e.kintai=[]; KIN_STD.forEach(function(s){ if(!e.kintai.some(function(k){return s[1].test(k.label||'');})) e.kintai.push({label:s[0],value:''}); }); }
+  function kinIdx(e,re){ var a=e.kintai||[]; for(var i=0;i<a.length;i++){ if(re.test(a[i].label||'')) return i; } return -1; }
+  // 常時表示のコンパクト勤怠(出勤/欠勤/有給+労働時間)。✕なし・数値右揃え。1人ずつ展開せず全員ぶん一画面で入れられる
+  function compactKinHTML(e){
+    function cell(lab,re){ var idx=kinIdx(e,re); var v=idx>=0?e.kintai[idx].value:''; return '<label class="ic-f"><span>'+lab+'</span><input class="finput num ic-in" data-g="kintai" data-ri="'+idx+'" data-f="value" inputmode="numeric" value="'+attr(v)+'"></label>'; }
+    var work='<label class="ic-f ic-f2"><span>労働(時:分)</span><span class="ic-hm"><input class="wk-f ic-in" data-wkf="workedH" inputmode="numeric" placeholder="0" value="'+attr(e.workedH)+'"><i>:</i><input class="wk-f ic-in" data-wkf="workedM" inputmode="numeric" placeholder="0" value="'+attr(e.workedM)+'"></span></label>';
+    return '<div class="ic-kin">'+cell('出勤',/出勤/)+cell('欠勤',/欠勤/)+cell('有給',/有給/)+work+'</div>';
+  }
+  // 標準勤怠以外の勤怠行を“真のindex”で(詳細側・✕/＋で自由編集)
+  function otherKinRows(e){
+    return (e.kintai||[]).map(function(it,ri){
+      if(/出勤|欠勤|有給/.test(it.label||'')) return '';
+      return '<div class="row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px"><input class="finput" data-g="kintai" data-ri="'+ri+'" data-f="label" value="'+attr(it.label)+'" style="flex:1.3" placeholder="項目"><input class="finput num" data-g="kintai" data-ri="'+ri+'" data-f="value" value="'+attr(it.value)+'" style="flex:1" placeholder="値"><button class="b-del m-del" data-g="kintai" data-ri="'+ri+'">×</button></div>';
+    }).join('');
+  }
   function renderInput(){
     var host=$('#input-list'); if(!host) return;
     host.innerHTML=state.employees.map(function(e,i){
       if(e.retired) return '';
-      var r=compute(e), open=state.open['I'+e.id];
-      return '<div class="acc'+(open?' open':'')+'" data-i="'+i+'">'
-        +'<div class="acc-h" data-toggle="'+i+'"><span class="acc-nm">'+esc(e.name)+wsBadge(e)+'</span><span class="acc-net">'+yen(r.net)+'</span><span class="acc-cv">▾</span></div>'
+      ensureKintai(e);
+      var r=compute(e), open=state.open['I'+e.id], mw=minWageInfo(e);
+      return '<div class="acc icard'+(open?' open':'')+'" data-i="'+i+'">'
+        +'<div class="ic-top"><span class="acc-nm">'+esc(e.name)+wsBadge(e)+'</span><span class="acc-net">'+yen(r.net)+'</span><button class="ic-detail" data-toggle="'+i+'">詳細<span class="acc-cv">▾</span></button></div>'
+        +compactKinHTML(e)
+        +((mw&&!mw.ok)?'<div class="cr-warn" style="margin:0 12px 10px">⚠ 最低賃金（'+esc(mw.prefName)+'：時給'+fmtN(mw.minWage)+'円）を下回っています（約'+fmtN(mw.hourly)+'円）。設定▸従業員マスタで'+(e.payType==='時給'?'時給':'基本給')+'を上げてください。</div>':'')
         +'<div class="acc-body">'
-          +'<div class="grp"><div class="grp-h">勤怠<button class="mini add" data-add="kintai" data-i="'+i+'">＋</button></div><div class="rows">'+rowsHTML('kintai',e.kintai)+'</div>'+workedRowHTML(e,i)+'</div>'
           +basePayInputHTML(e,i)
           +(e.payType==='役員'?'':warimashiInputHTML(e))
+          +'<div class="grp"><div class="grp-h">その他の勤怠<button class="mini add" data-add="kintai" data-i="'+i+'">＋</button></div><div class="rows">'+otherKinRows(e)+'</div></div>'
           +'<div class="grp"><div class="grp-h">支給<button class="mini add" data-add="shikyu" data-i="'+i+'">＋</button></div><div class="rows">'+rowsHTML('shikyu',e.shikyu)+'</div></div>'
           +'<div class="grp"><div class="grp-h">法定外控除<button class="mini add" data-add="extraKojo" data-i="'+i+'">＋</button></div><div class="rows">'+rowsHTML('extraKojo',e.extraKojo)+'</div></div>'
           +'<div class="calc-wrap">'+calcBoxHTML(e)+'</div></div></div>';
