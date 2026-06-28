@@ -54,6 +54,22 @@
 
   // ライブラリは const SHAKAIHOKEN_HYO 定義で window に付かない→bare参照で取得
   function SHH(){ try{ if(typeof SHAKAIHOKEN_HYO!=='undefined'&&SHAKAIHOKEN_HYO) return SHAKAIHOKEN_HYO; }catch(e){} return (typeof window!=='undefined'&&window.SHAKAIHOKEN_HYO)||null; }
+  function SAI(){ try{ if(typeof SAITEI_CHINGIN!=='undefined'&&SAITEI_CHINGIN) return SAITEI_CHINGIN; }catch(e){} return (typeof window!=='undefined'&&window.SAITEI_CHINGIN)||null; }
+  // 最低賃金チェック(事業所所在地=従業員prefの地域別最賃と時間額を比較)。役員/休業中は対象外。返り{hourly,minWage,prefName,ok}
+  function minWageInfo(e){
+    if(!e||e.payType==='役員'||(e.workStatus&&e.workStatus!=='normal')) return null;
+    var S=SAI(); if(!S||!S.getChingin) return null;
+    var mw=S.getChingin(e.pref); if(!mw) return null;
+    var co=state.company||{};
+    var ah=(e.annualHolidays!=null&&e.annualHolidays!=='')?e.annualHolidays:co.annualHolidays;
+    var dwh=num((e.dailyWorkH!=null&&e.dailyWorkH!=='')?e.dailyWorkH:co.dailyWorkH)+num((e.dailyWorkM!=null&&e.dailyWorkM!=='')?e.dailyWorkM:co.dailyWorkM)/60;
+    var hourly=0;
+    if(e.payType==='時給') hourly=num(e.hourly);
+    else if(e.payType==='日給') hourly= dwh>0? num(e.base)/dwh : 0;
+    else { var ly=parseInt(String(state.month||'').slice(0,4),10)||0; var leap=(ly%4===0&&ly%100!==0)||(ly%400===0); var stdH=window.Warimashi?Warimashi.monthlyStdHours(ah,dwh,leap):0; hourly= stdH>0? num(e.base)/stdH : 0; }
+    hourly=Math.floor(hourly);
+    return { hourly:hourly, minWage:mw, prefName:((S.todofuken||{})[e.pref]||{}).name||'', ok:(hourly===0||hourly>=mw) };
+  }
   function prefOptions(sel){
     var S=SHH(); var K=(S&&S.KENKO_RITSU)||{tokyo:{name:'東京都'}};
     return Object.keys(K).map(function(code){return '<option value="'+code+'"'+(code===sel?' selected':'')+'>'+esc(K[code].name)+'</option>';}).join('');
@@ -243,7 +259,8 @@
       kaigokyu:'介護休：社保は継続(無給でも本人負担あり)。介護休業給付金は雇用保険(給与でない)。',
       byoukyu:'病気休職：社保は継続(本人負担あり)。傷病手当金は健保(給与でない)。',
       kyugyo:'会社都合の休業：休業手当=平均賃金の60%以上を支給に入れる(課税・社保対象)。' }[s];
-    return '<div class="ri-note" style="margin-top:6px">'+msg+'<br>※自動の社保オフは下の「法定控除」で個別に戻せます。</div>';
+    var warn=(s==='kyugyo'&&num(e.leavePay)<=0)?'<div class="cr-warn">⚠ 休業手当が未入力(0)です。会社都合の休業は<b>平均賃金の60%以上</b>の支払いが必要(労基法26条)。「休暇中の金額」に入れてください。</div>':'';
+    return warn+'<div class="ri-note" style="margin-top:6px">'+msg+'<br>※自動の社保オフは下の「法定控除」で個別に戻せます。</div>';
   }
   function chips(e,pool,key){
     var have=e[key].map(function(x){return x.label;});
@@ -263,6 +280,7 @@
         +'<div class="frow"><div class="flabel">役職</div>'+roleSelect(e)+'</div></div>'
       +'<div class="frow2"><div class="frow"><div class="flabel">給与形態</div><select class="finput m-f" data-f="payType">'+PAYTYPES.map(function(p){return '<option'+(p===e.payType?' selected':'')+'>'+p+'</option>';}).join('')+'</select></div>'
         +'<div class="frow"><div class="flabel">'+(e.payType==='時給'?'時給単価':e.payType==='日給'?'日給額':e.payType==='役員'?'役員報酬':'基本給')+'<span class="hint2">円</span></div><input class="finput num m-f" data-f="'+(e.payType==='時給'?'hourly':'base')+'" inputmode="numeric" value="'+attr(fmtN(e.payType==='時給'?e.hourly:e.base))+'"></div></div>'
+      +(function(){ var mw=minWageInfo(e); if(!mw||mw.ok) return ''; return '<div class="cr-warn">⚠ 最低賃金（'+esc(mw.prefName)+'：時給'+fmtN(mw.minWage)+'円）を下回っています。時給換算 約'+fmtN(mw.hourly)+'円。'+(e.payType==='時給'?'時給単価':'基本給')+'を上げてください（最低賃金法4条）。</div>'; })()
       +'<div class="frow"><div class="flabel">就業状況<span class="hint2">産休/育休/休職等</span><span class="help-i" data-help="workstatus">💡</span></div><select class="finput m-f" data-f="workStatus">'+WORK_STATUS.map(function(w){return '<option value="'+w[0]+'"'+((e.workStatus||'normal')===w[0]?' selected':'')+'>'+w[1]+'</option>';}).join('')+'</select>'+wsNoteHTML(e)+'</div>'
       +'<div class="frow2"><div class="frow"><div class="flabel">年間所定休日<span class="hint2">日/年</span><span class="help-i" data-help="shoteibase">💡</span></div><input class="finput num m-f" data-f="annualHolidays" value="'+attr(e.annualHolidays)+'"></div>'
         +'<div class="frow"><div class="flabel">1日の所定労働</div><span class="dur"><input class="finput m-f dur-in" data-f="dailyWorkH" inputmode="numeric" value="'+attr(e.dailyWorkH)+'"><i>時</i><input class="finput m-f dur-in" data-f="dailyWorkM" inputmode="numeric" value="'+attr(e.dailyWorkM)+'"><i>分</i></span></div></div>'

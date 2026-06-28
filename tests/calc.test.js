@@ -192,3 +192,14 @@ T('産休育休は apply で社保オフ(=0)になる(免除・継続徴収と�
   var r = PayslipCalc.computePayslip({ shikyu: [], birthYmd: '1980-01-01', payYm: '2026-06', hyojunBase: 300000, apply: { health: false, pension: false, kaigo: false } });
   ok(!r.kojo.some(function (k) { return k.label === '健康保険' || k.label === '厚生年金'; }), '免除で控除に出ない');
 });
+
+/* 最低賃金テーブル(配線=index.htmlに読込・dead code解消の回帰防止) */
+var Saitei = require('../lib/saitei-chingin.js');
+var W2 = require('../lib/warimashi.js');
+T('最低賃金: getChingin(tokyo)=1226 / 未知prefはnull', function () {
+  eq(Saitei.getChingin('tokyo'), 1226); eq(Saitei.getChingin('osaka'), 1177); eq(Saitei.getChingin('xxx'), null);
+});
+T('最低賃金チェック: 時給<最賃で割れ判定(warimashi.minWageOk)', function () {
+  ok(W2 && W2.minWageOk(1100 * 160, 160 * 60, 1226) === false, '時給1100は東京1226を下回る=NG');
+  ok(W2.minWageOk(1300 * 160, 160 * 60, 1226) === true, '時給1300はOK');
+});
