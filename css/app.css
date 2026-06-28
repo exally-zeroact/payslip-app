@@ -196,6 +196,10 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .acc-h:hover{background:#F0FAF4;}
 .acc-nm{font-size:15px;font-weight:500;color:#1a4a2e;}
 .acc-net{margin-left:auto;font-family:'DM Mono',monospace;font-size:15px;color:#2E7D54;}
+.diffb{font-size:10px;font-weight:700;margin-left:6px;padding:1px 5px;border-radius:6px;white-space:nowrap;font-family:'DM Mono',monospace;}
+.diffb.up{color:#2E7D54;background:#E2F4EA;}
+.diffb.dn{color:#C0392B;background:#FDF1F0;}
+.diffb.sm{color:#7AA08C;background:#F0FAF4;}
 .acc-cv{font-size:14px;color:#7aa08c;transition:transform .2s;}
 .acc.open .acc-cv{transform:rotate(180deg);}
 .acc-body{display:none;padding:0 14px 14px;border-top:1px solid #EEF6F1;}
