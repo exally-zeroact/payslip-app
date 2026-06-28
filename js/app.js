@@ -131,13 +131,14 @@
     var pctRate=function(v){ return (v!=null&&v!=='')?num(v)/100:undefined; };
     var rates={ ot:pctRate(co.rateOt), holiday:pctRate(co.rateHoliday), night:pctRate(co.rateNight), over60Add:pctRate(co.rateOver60) };
     var ly=parseInt(String(state.month||'').slice(0,4),10)||0; var leap=(ly%4===0&&ly%100!==0)||(ly%400===0); // 対象月の年が閏年なら年間日数366(月平均所定の分母)
+    var mh=(e.minashiH!=null&&e.minashiH!=='')?e.minashiH:co.minashiH; var minashiMin=num(mh)*60; // 固定残業(みなし)時間=会社規定・従業員で上書き可。時間外の基本割増から控除
     var w=e.warimashi||{}, common={ base:warimashiBasis(e), annualHolidays:ah, dailyHours:num(dwh)+num(dwm)/60, rates:rates, leap:leap };
     if(w.mode==='detail'){
       var d=w.detail||{}; var seg={}; ['ot','otNight','over60','over60Night','night','holiday','holidayNight'].forEach(function(k){ seg[k]=dmin(d[k]); });
-      return Warimashi.detail({ base:common.base, annualHolidays:common.annualHolidays, dailyHours:common.dailyHours, rates:common.rates, leap:common.leap, seg:seg });
+      return Warimashi.detail({ base:common.base, annualHolidays:common.annualHolidays, dailyHours:common.dailyHours, rates:common.rates, leap:common.leap, seg:seg, minashiMin:minashiMin });
     }
     return Warimashi.easy({ base:common.base, annualHolidays:common.annualHolidays, dailyHours:common.dailyHours, rates:common.rates, leap:common.leap,
-      otH:w.otH, otM:w.otM, nightH:w.nightH, nightM:w.nightM, holidayH:w.holidayH, holidayM:w.holidayM });
+      otH:w.otH, otM:w.otM, nightH:w.nightH, nightM:w.nightM, holidayH:w.holidayH, holidayM:w.holidayM, minashiMin:minashiMin });
   }
   function kintaiVal(e,re){ var r=(e.kintai||[]).find(function(x){return re.test(x.label||'');}); return r?num(r.value):0; }
   function workedMin(e){ return num(e.workedH)*60+num(e.workedM); }
@@ -440,8 +441,10 @@
     var labels=(e.shikyu||[]).map(function(x){return x.label;}).filter(function(l){return !/割増/.test(l);});
     var wiz=labels.map(function(l){ var on=isInBasis(e,l); return '<span class="wb-chip'+(on?' on':'')+'" data-wb="'+attr(l)+'">'+(on?'✓ ':'')+esc(l)+'</span>'; }).join('');
     var basisBox='<div class="wb-box"><div class="wb-h">割増の基礎に入れる手当<span class="help-i" data-help="warimashiBasis">💡</span></div><div class="wb-chips">'+wiz+'</div><div class="wb-note">通勤・家族手当は既定で外す。住宅手当などは「全員一律」なら入れる（手当の名前でなく実態・労基法37条5項）。</div></div>';
+    var co=state.company||{}; var mh=(e.minashiH!=null&&e.minashiH!=='')?e.minashiH:co.minashiH; var minashiH=num(mh);
+    var minashiNote=minashiH>0?'<div class="wi-note2">⚠ 固定残業（みなし）<b>'+minashiH+'時間</b>を時間外の割増から控除して計算中（超過分のみ支給）。固定残業代の<b>金額</b>は基本給か手当に含めてください（深夜・休日・60h超の割増は別途支給）。</div>':'';
     return '<div class="grp"><div class="grp-h">割増（残業・深夜・休日）<span class="help-i" data-help="warimashi">💡</span></div>'
-      +seg+body+'<div class="wi-resw">'+wiResHTML(e)+'</div>'+basisBox+'</div>';
+      +seg+body+minashiNote+'<div class="wi-resw">'+wiResHTML(e)+'</div>'+basisBox+'</div>';
   }
   function calcBoxHTML(e){
     var r=compute(e);

@@ -160,6 +160,35 @@ T('最低賃金チェック: 賃金÷総時間 ≧ 地域別最賃', function ()
   eq(W.minWageOk(170000, 160 * 60, 1163), false); // 1062.5<1163
 });
 
+/* ── 固定残業(みなし): みなし時間は時間外(ot)の基本割増から控除・超過分のみ支払う ── */
+T('みなし: 残業45h・みなし20h → 時間外は25h分のみ(深夜はみなし控除しない)', function () {
+  var r = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, otH: 45, otM: 0, nightH: 2, nightM: 0, minashiMin: 20 * 60 });
+  var ot = r.lines.find(function (l) { return l.key === 'ot'; });
+  var ni = r.lines.find(function (l) { return l.key === 'night'; });
+  eq(ot.minutes, 25 * 60, '45-20=25hのみ時間外割増');
+  eq(ni.minutes, 2 * 60, '深夜はみなし対象外');
+});
+T('みなし≥残業 → 時間外割増0(固定残業代が充当)', function () {
+  var r = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, otH: 15, minashiMin: 20 * 60 });
+  eq(r.lines.filter(function (l) { return l.key === 'ot'; }).length, 0, '時間外0');
+});
+T('みなし: 60h超増分は実残業で計算(固定残業代は60h超割増を充当不可)', function () {
+  // 残業70h・みなし45h → 時間外25h@1.25 + 60h超10h@0.25(実70hベース)
+  var r = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, otH: 70, minashiMin: 45 * 60 });
+  var ot = r.lines.find(function (l) { return l.key === 'ot'; });
+  var o60 = r.lines.find(function (l) { return l.key === 'over60inc'; });
+  eq(ot.minutes, 25 * 60, '70-45=25h'); eq(o60.minutes, 10 * 60, '60h超は実残業70hで10h');
+  eq(r.total, W.han50Up(1592 * 1.25 * 25) + W.han50Up(1592 * 0.25 * 10));
+});
+T('みなし0/未指定は従来どおり全額(回帰)', function () {
+  eq(W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, otH: 45, nightH: 2, minashiMin: 0 }).total, 90346);
+  eq(W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, otH: 45, nightH: 2 }).total, 90346);
+});
+T('詳細モードでもみなしは時間外(ot)区分から控除', function () {
+  var r = W.detail({ base: 260000, annualHolidays: 120, dailyHours: 8, seg: { ot: 45 * 60 }, minashiMin: 20 * 60 });
+  eq(r.lines.find(function (l) { return l.key === 'ot'; }).minutes, 25 * 60);
+});
+
 /* 空入力は0 */
 T('空入力 → 割増0', function () {
   var r = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8 });
