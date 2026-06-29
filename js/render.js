@@ -67,13 +67,15 @@
   // 上部=会社名/氏名(左)と差引支給額/¥(中央)の2カラム(全テンプレ共通デフォルト)
   function heroHTML(p){ return '<div class="hero hero2"><div class="hg-l"><div class="h-co">'+esc(p.company||'')+'</div><div class="h-nm">'+esc(p.name||'')+'<span class="dono">殿</span></div></div><div class="hg-r"><div class="h-lab">差 引 支 給 額</div><div class="h-val">'+YEN+fmt(p.net)+'</div></div></div>'; }
   // 表題=左寄せ・支給日=右(同じ行)+全幅の細線(全テンプレ共通)
-  function topHead(p){ return '<div class="tophd"><div class="mh"><div class="mh-title">給 与 支 給 明 細 書</div><div class="mh-month">令 和 八 年 六 月 分</div></div><div class="iss-date">支給日　'+esc(p.payDate||'')+'</div></div><div class="mh-rule"></div>'; }
+  function topHead(p){ var ttl=P.kind==='bonus'?'賞 与 支 給 明 細 書':'給 与 支 給 明 細 書'; return '<div class="tophd"><div class="mh"><div class="mh-title">'+ttl+'</div><div class="mh-month">'+esc(P.month||'令 和 八 年 六 月 分')+'</div></div><div class="iss-date">支給日　'+esc(p.payDate||'')+'</div></div><div class="mh-rule"></div>'; }
+  // 勤怠セクション(賞与明細では描かない)
+  function kinSection(html){ return P.kind==='bonus' ? '' : html; }
 
   function colsUnitHero(p){
     return '<div class="unit">' +
       topHead(p) +
       heroHTML(p) +
-      '<div class="sec-title" style="margin-top:6px">勤 怠</div>'+kinHTML(p.kintai) +
+      kinSection('<div class="sec-title" style="margin-top:6px">勤 怠</div>'+kinHTML(p.kintai)) +
       '<div class="pd">' +
         '<div class="col"><div class="st">支 給</div><div class="items2">'+rowsHTML(p.shikyu,22)+'</div>'+sumLine('r','支給合計',p.shikyuTotal!=null?p.shikyuTotal:sum(p.shikyu))+'</div>' +
         '<div class="col"><div class="st">控 除</div><div class="items2">'+rowsHTML(p.kojo,22)+'</div>'+sumLine('r','控除合計',p.kojoTotal!=null?p.kojoTotal:sum(p.kojo))+'</div>' +
@@ -84,7 +86,7 @@
     return '<div class="unit unit-c'+(extraCls?' '+extraCls:'')+'">' +
       topHead(p) +
       heroHTML(p) +
-      '<div class="sec-title" style="margin-top:6px">勤 怠</div>'+kinHTML(p.kintai) +
+      kinSection('<div class="sec-title" style="margin-top:6px">勤 怠</div>'+kinHTML(p.kintai)) +
       '<div class="pd">' +
         '<div class="col"><div class="st">支 給</div><div class="items2">'+rowsHTML(p.shikyu,minCells)+'</div>'+sumLine('r','支給合計',p.shikyuTotal!=null?p.shikyuTotal:sum(p.shikyu),green)+'</div>' +
         (extraCls==='vu'?'<div class="vsp"></div>':'') +
@@ -124,7 +126,7 @@
     return '<div class="sheet">' +
       topHead(p) +
       heroHTML(p) +
-      '<div class="sec-title" style="margin-top:6px">勤 怠</div>'+kinHTMLv(p.kintai) +
+      kinSection('<div class="sec-title" style="margin-top:6px">勤 怠</div>'+kinHTMLv(p.kintai)) +
       '<div class="pd">' +
         '<div class="col"><div class="sec-title">支 給</div><div class="items2">'+lnHTML(p.shikyu,14)+'</div>'+sumLine('ln','支給合計',p.shikyuTotal!=null?p.shikyuTotal:sum(p.shikyu))+'</div>' +
         '<div class="col"><div class="sec-title">控 除</div><div class="items2">'+lnHTML(p.kojo,10)+'</div>'+sumLine('ln','控除合計',p.kojoTotal!=null?p.kojoTotal:sum(p.kojo))+'</div>' +
@@ -149,6 +151,8 @@
     '.r{display:flex;justify-content:space-between;align-items:baseline;padding:3px 1px;border-bottom:.6px solid var(--hair-lt);}.r .l{font-size:8.5px;color:var(--ink2);}.r .l .hz{font-size:6px;color:var(--ink3);margin-left:2px;font-family:"Yu Gothic","Hiragino Sans",sans-serif;}.r .v{font-size:9px;font-variant-numeric:tabular-nums;}' +
     '.items2{display:grid;grid-template-columns:1fr 1fr;column-gap:0;}.items2 .r:nth-child(odd){padding-right:8px;}.items2 .r:nth-child(even){padding-left:8px;}.items2 .r.e{height:16px;box-sizing:border-box;}.items2 .r:nth-last-child(-n+2){border-bottom:none;}' +
     '.r.sum{border-bottom:none;border-top:1px solid var(--accent-soft);margin-top:4px;padding-top:5px;column-gap:18px;}.r.sum .l{color:var(--ink);letter-spacing:.08em;}.r.sum .v{font-size:9.5px;}.r.sum .sgrp .l{letter-spacing:.06em;}' +
+    // 2カラム(支給|控除 横並び)は列を等高にし、合計を下端へ固定=支給合計と控除合計を必ず同じ高さに揃える
+    '.pd.two{align-items:stretch;}.pd.two .col .r.sum{margin-top:auto;}' +
     '@page{size:A4 landscape;margin:0;}@media print{body{background:#fff;}.page{box-shadow:none;}}';
 
   function srowsHTML(items, minCells){ var h=items.map(function(it){ var hz=it.hikazei?'<span class="hz">非課税</span>':''; return '<div class="r"><span class="l">'+esc(it.label)+hz+'</span><span class="v">'+fmt(it.value)+'</span></div>'; }).join(''); for(var n=items.length; (n%2===1)||(n<(minCells||0)); n++) h+='<div class="r e"></div>'; return h; }
@@ -169,7 +173,7 @@
         '<div class="col"><div class="st">支 給</div><div class="items2">'+srowsHTML(p.shikyu,16)+'</div>'+sumLine('r','支給合計',sh,true)+'</div>' +
         '<div class="col"><div class="st">控 除</div><div class="items2">'+srowsHTML(p.kojo,16)+'</div>'+sumLine('r','控除合計',ko,true)+'</div>' +
       '</div>';
-    return '<div class="strip">' + topHead(p) + heroHTML(p) + '<div class="sec-title">勤 怠</div>'+skin(p.kintai) + pd + '</div>';
+    return '<div class="strip">' + topHead(p) + heroHTML(p) + kinSection('<div class="sec-title">勤 怠</div>'+skin(p.kintai)) + pd + '</div>';
   }
   function stripsBody(people, two){ return '<div class="page'+(people.length===1?' one':'')+'">'+people.map(function(p){ return strip(p, two); }).join('')+'</div>'; }
   function buildStrips(people, doc){ P=doc||{}; return wrap(STRIPS_CSS, stripsBody(people, false), 'landscape'); }
@@ -198,15 +202,17 @@
   }
   var Render = {
     // テンプレ(prefer)で固定。全員を1枚ずつ/2人ずつ/横3人ずつに自動ページ分割(誰も欠けない)
+    // prefer名は実体準拠: col2_X=2カラム(支給|控除 横並び)/col1_X=1カラム(支給↓控除 縦積み)・X=1人/2人/3人。
+    //   col2_1=A4縦1人(hero) col2_2=A4縦2人 col2_3=A4横3人 / col1_1=A4縦1人 col1_2=A4縦2人 col1_3=A4横3人
     build: function(people, doc, prefer, theme){
-      P=doc||{}; people=people||[]; prefer=(prefer&&prefer!=='auto')?prefer:'cols';
+      P=doc||{}; people=people||[]; prefer=(prefer&&prefer!=='auto')?prefer:'col2_1';
       var css, orient, per, mk;
-      if(prefer==='vstack'){ css=VSTACK_CSS; orient='portrait'; per=1; mk=function(ch){ return vstackBody(ch[0]); }; }
-      else if(prefer==='vstack2'){ css=COLS_CSS; orient='portrait'; per=2; mk=function(ch){ return vstack2Body(ch); }; }
-      else if(prefer==='strips'){ css=STRIPS_CSS; orient='landscape'; per=3; mk=function(ch){ return stripsBody(ch, false); }; } // 1カラム3人(支給↓控除)
-      else if(prefer==='cols3'){ css=STRIPS_CSS; orient='landscape'; per=3; mk=function(ch){ return stripsBody(ch, true); }; } // 2カラム3人(支給|控除)
-      else if(prefer==='cols2'){ css=COLS_CSS; orient='portrait'; per=2; mk=function(ch){ return colsBody(ch); }; }
-      else { prefer='cols'; css=COLS_CSS; orient='portrait'; per=1; mk=function(ch){ return colsBody(ch); }; } // 2カラム1人(hero)
+      if(prefer==='col1_1'){ css=VSTACK_CSS; orient='portrait'; per=1; mk=function(ch){ return vstackBody(ch[0]); }; }      // 1カラム1人
+      else if(prefer==='col1_2'){ css=COLS_CSS; orient='portrait'; per=2; mk=function(ch){ return vstack2Body(ch); }; }      // 1カラム2人
+      else if(prefer==='col1_3'){ css=STRIPS_CSS; orient='landscape'; per=3; mk=function(ch){ return stripsBody(ch, false); }; } // 1カラム3人(支給↓控除)
+      else if(prefer==='col2_3'){ css=STRIPS_CSS; orient='landscape'; per=3; mk=function(ch){ return stripsBody(ch, true); }; }  // 2カラム3人(支給|控除)
+      else if(prefer==='col2_2'){ css=COLS_CSS; orient='portrait'; per=2; mk=function(ch){ return colsBody(ch); }; }          // 2カラム2人
+      else { prefer='col2_1'; css=COLS_CSS; orient='portrait'; per=1; mk=function(ch){ return colsBody(ch); }; }              // 2カラム1人(hero)
       var pages=[]; for(var i=0;i<people.length;i+=per) pages.push(people.slice(i,i+per)); if(!pages.length) pages=[[{name:'',company:'',kintai:[],shikyu:[],kojo:[],net:0}]];
       var body=pages.map(function(ch){ P=doc||{}; return mk(ch); }).join('<div class="pgbreak"></div>');
       var html=wrap(css, body, orient).replace(/:root\{[^}]*\}/, rootFor(theme));

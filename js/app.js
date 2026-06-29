@@ -96,9 +96,9 @@
       holidays:[0], dailyWorkH:'8', dailyWorkM:'0', annualHolidays:'120',
       ruleOn:{teikyu:true,shotei:true,annual:true,warimashiRate:true,koyoGyoshu:true},
       rateOt:'', rateHoliday:'', rateNight:'', rateOver60:'', gyoshu:'ippan' },
-    month:'2026-06', prefer:'cols', theme:{accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}, depts:['営業部'], roles:['課長','主任','一般'],
+    month:'2026-06', prefer:'col2_1', theme:{accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}, depts:['営業部'], roles:['課長','主任','一般'],
     employees:[defEmp('山田 太郎')], open:{},
-    inputMode:'monthly', bonus:{ payYm:'', payDay:'', byEmp:{} } };
+    inputMode:'monthly', printMode:'monthly', bonus:{ payYm:'', payDay:'', byEmp:{} } };
 
   // マイカー通勤 1か月非課税限度(片道km・国税庁No.2585 令和8年4月〜)
   function carCommuteNonTax(km){ km=num(km);
@@ -606,15 +606,18 @@
 
   /* ---------- 印刷 / PDF ---------- */
   function buildPeople(emps){ return emps.map(function(e){ var r=compute(e); var k=(e.kintai||[]).slice(); var oi=k.findIndex(function(x){return /出勤/.test(x.label||'');}); var wt={label:'労働時間',value:workedLabel(e)}; if(oi>=0)k.splice(oi+1,0,wt); else k.unshift(wt); return { name:e.name, company:state.company.name, payDate:payDateStr(), kintai:k, shikyu:r.shikyu, kojo:r.kojo, net:r.net, shikyuTotal:r.shikyuTotal, kojoTotal:r.kojoTotal }; }); }
+  // 賞与明細用: 月次明細と同じテンプレ/テーマ(ユーザー選択)で 勤怠なし・支給=賞与/控除=賞与社保+源泉
+  function bonusMonthLabel(){ var ym=bonusYmOf(); var y=Number(ym.slice(0,4)), m=Number(ym.slice(5,7)); var k=['','一','二','三','四','五','六','七','八','九','十','十一','十二']; return '令 和 '+(y-2018)+' 年 '+(k[m]||m)+' 月 賞 与'; }
+  function buildBonusPeople(emps){ return emps.map(function(e){ var c=computeBonus(e); var kojo=[{label:'健康保険',value:c.si.health}]; if(c.si.kaigo>0) kojo.push({label:'介護保険',value:c.si.kaigo}); kojo.push({label:'厚生年金',value:c.si.pension}); kojo.push({label:'雇用保険',value:c.si.employ}); kojo.push({label:'源泉所得税',value:c.taxAmt}); return { name:e.name, company:state.company.name, payDate:(state.bonus&&state.bonus.payDay)||payDateStr(), kintai:[], shikyu:[{label:'賞与',value:c.bonus}], kojo:kojo, net:c.net, shikyuTotal:c.bonus, kojoTotal:c.si.total+c.taxAmt }; }); }
   // 明細デザイン(レイアウト+色)＝設定タブに表示。自動は廃止(全員ページ分割で対応)
   // テンプレの種類(縦並び/2カラム/横ストリップ)。複数人は自動でページ分割
   var TPL_OPTS=[
-    ['cols','2カラム（1人）','tpl_cols','支給と控除を横に・大きく（A4たて）',0],
-    ['cols2','2カラム（2人）','tpl_cols2','支給と控除を横に・1枚に2人（A4たて）',0],
-    ['cols3','2カラム（3人）','tpl_cols3','横向きに3人・支給と控除を横に（A4よこ）',1],
-    ['vstack','1カラム（1人）','tpl_vstack','支給の下に控除・大きく（A4たて）',0],
-    ['vstack2','1カラム（2人）','tpl_vstack2','支給の下に控除・1枚に2人（A4たて）',0],
-    ['strips','1カラム（3人）','tpl_strips','横向きに3人・支給の下に控除（A4よこ）',1]
+    ['col2_1','2カラム（1人）','tpl_cols','支給と控除を横に・大きく（A4たて）',0],
+    ['col2_2','2カラム（2人）','tpl_cols2','支給と控除を横に・1枚に2人（A4たて）',0],
+    ['col2_3','2カラム（3人）','tpl_cols3','横向きに3人・支給と控除を横に（A4よこ）',1],
+    ['col1_1','1カラム（1人）','tpl_vstack','支給の下に控除・大きく（A4たて）',0],
+    ['col1_2','1カラム（2人）','tpl_vstack2','支給の下に控除・1枚に2人（A4たて）',0],
+    ['col1_3','1カラム（3人）','tpl_strips','横向きに3人・支給の下に控除（A4よこ）',1]
   ];
   function renderDesign(){
     // 色(上)
@@ -624,17 +627,21 @@
       cp.innerHTML='<div class="cp-bar">'+bar+'<button class="cp-toggle cp-reset" data-reset="1">↺ 色を初期に戻す</button></div>'+pal;
     }
     // テンプレの種類ギャラリー(横ストリップは横長カード=full幅)
-    var tr=$('#tpl-row'); if(tr){ tr.innerHTML=TPL_OPTS.map(function(t){ var on=(state.prefer||'cols')===t[0];
+    var tr=$('#tpl-row'); if(tr){ tr.innerHTML=TPL_OPTS.map(function(t){ var on=(state.prefer||'col2_1')===t[0];
       return '<button type="button" class="tpl-card'+(on?' on':'')+(t[4]?' land':'')+'" data-tpl="'+t[0]+'"><span class="tpl-badge">✓</span><img class="tpl-thumb" src="img/'+t[2]+'.png" alt="'+t[1]+'"><div class="tpl-meta"><div class="tpl-name">'+t[1]+'</div><div class="tpl-desc">'+t[3]+'</div></div></button>'; }).join(''); }
   }
   function renderPrint(){
     $('#p-month').value=state.month;
+    $$('.pmode').forEach(function(x){ x.classList.toggle('on', x.dataset.pmode===(state.printMode||'monthly')); });
     var sel=$('#p-emp'); sel.innerHTML='<option value="__all">全員</option>'+state.employees.map(function(e,i){return e.retired?'':'<option value="'+i+'">'+esc(e.name)+'</option>';}).join('');
     doPreview();
   }
   function doPreview(){
     var v=$('#p-emp').value; var emps=v==='__all'?activeEmps():[state.employees[+v]];
-    var out=Render.build(buildPeople(emps), {month:monthLabel()}, state.prefer, state.theme);
+    var isBonus=state.printMode==='bonus';
+    var people=isBonus?buildBonusPeople(emps):buildPeople(emps);
+    var doc=isBonus?{month:bonusMonthLabel(),kind:'bonus'}:{month:monthLabel()};
+    var out=Render.build(people, doc, state.prefer, state.theme);
     var f=$('#frame'); f.srcdoc=out.html;
     var pw=out.orientation==='landscape'?1123:794, ph=out.orientation==='landscape'?794:1123;
     var wrap=$('.preview-wrap'); var s=Math.min(1,(wrap.clientWidth-32)/pw);
@@ -769,6 +776,7 @@
     // 印刷
     $('#p-emp').addEventListener('change',doPreview);
     $('#p-month').addEventListener('change',function(){ state.month=this.value||state.month; doPreview(); });
+    $('#print-mode-seg').addEventListener('click',function(e){ var b=e.target.closest('.pmode'); if(!b)return; state.printMode=b.dataset.pmode==='bonus'?'bonus':'monthly'; $$('.pmode').forEach(function(x){ x.classList.toggle('on', x.dataset.pmode===state.printMode); }); doPreview(); });
     function afterDesign(){ renderDesign(); if($('#scr-print')&&$('#scr-print').classList.contains('active')) doPreview(); }
     $('#tpl-row').addEventListener('click',function(e){ var b=e.target.closest('[data-tpl]'); if(!b)return; state.prefer=b.dataset.tpl; afterDesign(); });
     $('#color-pickers').addEventListener('click',function(e){
@@ -810,11 +818,14 @@
   var _saveT=null;
   function persistSave(){ try{ localStorage.setItem(PKEY, JSON.stringify(snapshot())); }catch(e){} if(window.Store&&Store.cloudSaveState){ try{ Store.cloudSaveState(snapshot()); }catch(e){} } try{ saveMonthlyPayslips(); }catch(e){} }
   function persistSaveDebounced(){ if(_saveT)clearTimeout(_saveT); _saveT=setTimeout(persistSave, 500); }
+  // 旧テンプレ名→新テンプレ名(実体準拠)への移行。保存済みstate.preferを吸収
+  var PREFER_MIGRATE={cols:'col2_1',cols2:'col2_2',cols3:'col2_3',vstack:'col1_1',vstack2:'col1_2',strips:'col1_3'};
+  function migPrefer(p){ return PREFER_MIGRATE[p]||p||'col2_1'; }
   function persistLoad(){
     var s=null; try{ s=JSON.parse(localStorage.getItem(PKEY)||'null'); }catch(e){}
     if(s&&s.employees&&s.employees.length){
       if(s.company) state.company=s.company; state.employees=s.employees;
-      if(s.month) state.month=s.month; if(s.theme) state.theme=s.theme; if(s.prefer) state.prefer=s.prefer;
+      if(s.month) state.month=s.month; if(s.theme) state.theme=s.theme; if(s.prefer) state.prefer=migPrefer(s.prefer);
       if(s.depts) state.depts=s.depts; if(s.roles) state.roles=s.roles; if(s.showRetired!=null) state.showRetired=s.showRetired;
       if(s.bonus) state.bonus=s.bonus;
     }
@@ -823,7 +834,7 @@
   }
   function applyCloudState(cs){ if(!(cs&&cs.employees&&cs.employees.length)) return false;
     state.company=cs.company||state.company; state.employees=cs.employees;
-    if(cs.month)state.month=cs.month; if(cs.theme)state.theme=cs.theme; if(cs.prefer)state.prefer=cs.prefer;
+    if(cs.month)state.month=cs.month; if(cs.theme)state.theme=cs.theme; if(cs.prefer)state.prefer=migPrefer(cs.prefer);
     if(cs.depts)state.depts=cs.depts; if(cs.roles)state.roles=cs.roles; if(cs.showRetired!=null)state.showRetired=cs.showRetired;
     if(cs.bonus)state.bonus=cs.bonus;
     $$('.scr-month').forEach(function(m){ m.value=state.month; }); fillCompany(); var act=$('.screen.active'); if(act)showScreen(act.id); return true; }
