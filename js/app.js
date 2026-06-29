@@ -36,7 +36,11 @@
     taxclass:{ t:'💡 所得税の区分（甲・乙）', b:'所得税の源泉徴収の区分です。\n\n● <b>甲欄</b>…「扶養控除等申告書」を提出している人（＝メインの勤務先）。扶養を加味して計算。通常はこちら。\n● <b>乙欄</b>…申告書を未提出の人（副業・掛け持ちの2か所目など）。税率が高め・扶養は加味しません。\n\n※日雇い（丙欄）は近日対応。年度（令和7/令和8）は給与の対象月から自動で正しい税額表を選びます。' },
     commute:{ t:'💡 通勤手当（非課税）', b:'通勤手当は一定額まで所得税が<b>非課税</b>です。\n\n● <b>公共交通（電車・バス）</b>…月15万円まで非課税。\n● <b>マイカー等</b>…片道距離で月額が決まる（2km未満は全額課税〜95km以上66,400円・国税庁No.2585 令和8年4月〜）。\n\n限度を超えた分は課税されます。※所得税の非課税であって、社会保険・雇用保険では全額が算定基礎に入ります。' },
     legalkojo:{ t:'💡 法定控除（健保・厚年・雇用・所得税・住民税）', b:'給料から天引きする法律上の控除です。原則はかかりますが、<b>使わないものは外せます</b>（タップでオフ）。\n\n● 役員（労働者でない）→ <b>雇用保険は対象外</b>＝外す\n● 社会保険に未加入のパート → 健保・厚年を外す\n● 乙欄/別途納付など → 所得税を外す\n\n外すとその控除は計算しません（課税のもとからも引きません）。最終判断は会社で。' },
-    warimashiBasis:{ t:'💡 割増の「基礎」に入れる手当', b:'残業代の単価を計算する“もとの賃金”です。手当の<b>名前でなく実態</b>で決めます（労基法37条5項・規則21条）。\n\n<b>外せる手当（限定列挙の7種）</b>…家族・通勤・別居・子女教育・住宅・臨時・1か月超ごとの手当。ただし<b>実態が伴う場合だけ</b>。\n● 例：住宅手当が「全員に一律定額」→ 住宅費用に応じていない＝<b>基礎に入れる</b>。\n● 例：通勤手当・扶養人数で変わる家族手当→ <b>外せる</b>。\n\n上記以外の手当は原則すべて基礎に入ります。タップで含む/外すを切替えできます。' }
+    warimashiBasis:{ t:'💡 割増の「基礎」に入れる手当', b:'残業代の単価を計算する“もとの賃金”です。手当の<b>名前でなく実態</b>で決めます（労基法37条5項・規則21条）。\n\n<b>外せる手当（限定列挙の7種）</b>…家族・通勤・別居・子女教育・住宅・臨時・1か月超ごとの手当。ただし<b>実態が伴う場合だけ</b>。\n● 例：住宅手当が「全員に一律定額」→ 住宅費用に応じていない＝<b>基礎に入れる</b>。\n● 例：通勤手当・扶養人数で変わる家族手当→ <b>外せる</b>。\n\n上記以外の手当は原則すべて基礎に入ります。タップで含む/外すを切替えできます。' },
+    koyoGyoshu:{ t:'💡 雇用保険の業種', b:'業種で雇用保険の料率が変わります。\n\n● 一般の事業／建設・農林水産・清酒製造（高め）。\n● 雇用保険は<b>通勤手当も含む賃金総額</b>に料率を掛けます。\n● <b>料率は対象月の年度で自動</b>（令和8は引下げ：一般0.50%・建設/農林0.60%）。' },
+    paymentDays:{ t:'💡 支払基礎日数の数え方', b:'社会保険の<b>定時決定（毎年4〜6月）</b>で「支払基礎日数17日以上の月」を平均して標準報酬を決めます。その日数の数え方です。\n\n● 年金機構の一般扱い＝<b>月給は暦日数／日給・時給は出勤日数</b>。\n● 会社の運用に合わせて変更できます（暦日数／所定労働日数／出勤日数）。' },
+    kekkin:{ t:'💡 欠勤控除の計算', b:'月給は<b>日給月給制（欠勤分を控除）が標準</b>です（民法624条 ノーワーク・ノーペイ）。\n\n● 10日欠勤すれば10日分減ります。1日あたり＝<b>月給÷分母×欠勤日数</b>。\n● 分母＝月平均所定労働日数（既定）／当月の暦日数／当月の所定労働日数 から選べます。\n● 役員等で減額しない場合のみ「<b>完全月給制</b>」に。\n● 時給・日給は元々 日数・時間で按分されます。' },
+    daikyu:{ t:'💡 代休・振替休日の使い分け', b:'<b>振替休日</b>＝事前に休日と労働日を入れ替え。その出勤は<b>通常労働（割増なし）</b>。割増の「法定休日」に入れず、ふつうの労働時間に入れてください（週40時間を超えた分だけ時間外1.25倍）。\n\n<b>代休</b>＝先に休日労働→後で別の日に休む。休日労働は<b>割増あり</b>（法定休日1.35倍／所定休日は時間外1.25倍）。休む日は入力の「代休取得」へ。\n\n代休で休む日を無給にするか（日給制向け）有給にするか（月給は相殺）は会社規程によります。「代休で休んだ日を出勤から差し引く」をオンにすると出勤から控除します。' }
   };
   function openHelp(k){ var h=HELP[k]; if(!h)return; var t=document.getElementById('help-t'),b=document.getElementById('help-b'); t.textContent=h.t; b.innerHTML=h.b; document.getElementById('help-ov').classList.add('on'); }
   // 支給/控除(法定外) のチップ候補
@@ -121,6 +125,13 @@
     return !/通勤|家族/.test(label);
   }
   function warimashiBasis(e){ return (e.shikyu||[]).filter(function(x){ return isInBasis(e,x.label); }).reduce(function(a,x){return a+num(x.value);},0); }
+  // 割増の基礎に入れる手当チップ(従業員マスタの詳細に表示。毎月でなく一度決める設定)
+  function basisBoxHTML(e){
+    var labels=(e.shikyu||[]).map(function(x){return x.label;}).filter(function(l){return l && !/割増/.test(l);});
+    if(!labels.length) return '';
+    var wiz=labels.map(function(l){ var on=isInBasis(e,l); return '<span class="wb-chip'+(on?' on':'')+'" data-wb="'+attr(l)+'">'+(on?'✓ ':'')+esc(l)+'</span>'; }).join('');
+    return '<div class="wb-box"><div class="wb-h">割増の基礎に入れる手当<span class="help-i" data-help="warimashiBasis">💡</span></div><div class="wb-chips">'+wiz+'</div><div class="wb-note">通勤・家族手当は既定で外す。住宅手当などは全員一律なら入れる（実態で・詳しくは💡）。</div></div>';
+  }
   function dmin(o){ return num(o&&o.h)*60+num(o&&o.m); }
   function warimashiOf(e){
     if(!window.Warimashi) return {total:0,lines:[],unit:0};
@@ -242,7 +253,7 @@
         +'<div><div class="mini-l">法定休日</div><span class="dur"><input class="cr-f cr-rate" data-cf="rateHoliday" inputmode="numeric" value="'+attr(c.rateHoliday)+'" placeholder="135"><i>%</i></span></div>'
         +'<div><div class="mini-l">深夜（上乗せ）</div><span class="dur"><input class="cr-f cr-rate" data-cf="rateNight" inputmode="numeric" value="'+attr(c.rateNight)+'" placeholder="25"><i>+%</i></span></div>'
         +'<div><div class="mini-l">月60時間超（上乗せ）</div><span class="dur"><input class="cr-f cr-rate" data-cf="rateOver60" inputmode="numeric" value="'+attr(c.rateOver60)+'" placeholder="25"><i>+%</i></span></div>'
-        +'</div><div class="ri-note"><b>空欄＝法定どおり自動</b>（残業125%・法定休日135%・深夜+25%・月60h超+25%）。<b>会社はこれ以上に上げられます</b>。逆に<b>100%と入れれば割増なし</b>（＝設定どおり計算。法令の責任は会社側）。深夜帯は法律で<b>22:00〜5:00</b>固定。</div>';
+        +'</div><div class="ri-note">空欄＝法定どおり自動（残業125%・休日135%・深夜+25%）。会社は上げられます（詳しくは💡）。</div>';
       h+=ruleItemHTML('warimashiRate','割増の率','残業・休日・深夜','warimashi',rr); }
     if(on.koyoGyoshu){
       var gopts=EMPLOY_GYOSHU.map(function(g){return '<option value="'+g[0]+'"'+(c.gyoshu===g[0]?' selected':'')+'>'+esc(g[1])+'（労'+(employRateOf(g[0])*100).toFixed(2)+'%）</option>';}).join('');
@@ -251,16 +262,15 @@
       var pm=c.paymentDaysMethod||'';
       var pmo=[['','自動（月給=暦日数 / 日給・時給=出勤日数）'],['calendar','暦日数（毎月その月の日数）'],['scheduled','所定労働日数（欠勤は差引）'],['worked','出勤日数']]
         .map(function(o){return '<option value="'+o[0]+'"'+(pm===o[0]?' selected':'')+'>'+esc(o[1])+'</option>';}).join('');
-      h+=ruleItemHTML('paymentDays','支払基礎日数の数え方','定時決定の'+'17日判定','','<select class="cr-sel" data-cf="paymentDaysMethod">'+pmo+'</select><div class="ri-note">社会保険の定時決定(4〜6月)で<b>17日以上の月</b>を平均します。年金機構の一般扱いは<b>月給=暦日数 / 日給・時給=出勤日数</b>。会社の運用に合わせて変更できます。</div>'); }
+      h+=ruleItemHTML('paymentDays','支払基礎日数の数え方','定時決定の'+'17日判定','paymentDays','<select class="cr-sel" data-cf="paymentDaysMethod">'+pmo+'</select><div class="ri-note">定時決定(4〜6月)の17日判定の数え方。既定＝月給は暦日数/日給時給は出勤日数（詳しくは💡）。</div>'); }
     if(on.kekkin){
       var kmo=[['','月平均所定労働日数（既定）'],['calendar','当月の暦日数'],['scheduled','当月の所定労働日数']]
         .map(function(o){return '<option value="'+o[0]+'"'+((c.kekkinMethod||'')===o[0]?' selected':'')+'>'+esc(o[1])+'</option>';}).join('');
-      h+=ruleItemHTML('kekkin','欠勤控除の計算','月給の欠勤・不就労','','<label class="cr-chk" style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" data-cf="kanzenGekkyu"'+(c.kanzenGekkyu?' checked':'')+'>完全月給制（欠勤しても控除しない）</label><div style="margin-top:6px;font-size:12px">1日あたりの分母：<select class="cr-sel" data-cf="kekkinMethod">'+kmo+'</select></div><div class="ri-note">月給は<b>日給月給制（欠勤分を控除）が標準</b>。10日欠勤すれば10日分減ります（民法624条 ノーワーク・ノーペイ）。1日あたり＝月給÷分母×欠勤日数。役員等で減額しない場合のみ「完全月給制」に。時給・日給は元々日数/時間で按分されます。</div>'); }
+      h+=ruleItemHTML('kekkin','欠勤控除の計算','月給の欠勤・不就労','kekkin','<label class="cr-chk" style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" data-cf="kanzenGekkyu"'+(c.kanzenGekkyu?' checked':'')+'>完全月給制（欠勤しても控除しない）</label><div style="margin-top:6px;font-size:12px">1日あたりの分母：<select class="cr-sel" data-cf="kekkinMethod">'+kmo+'</select></div><div class="ri-note">月給は欠勤分を控除（日給月給制）が標準。役員等のみ完全月給制に（詳しくは💡）。</div>'); }
     if(on.minashi){ h+=ruleItemHTML('minashi','固定残業（みなし）','時間','','<input class="cr-f cr-wide" data-cf="minashiH" inputmode="numeric" value="'+attr(c.minashiH)+'" placeholder="0">'); }
-    if(on.daikyu){ h+=ruleItemHTML('daikyu','代休・振替休日','使い分け','',
-      '<div class="ri-note" style="background:#fff8e1;border:1px solid #F4D8A8;border-radius:8px;padding:8px 10px;color:#7A3F00"><b>振替休日</b>＝事前に休みと労働日を入替→その出勤は<b>通常労働（割増なし）</b>。割増の「法定休日」に入れず、<b>ふつうの労働時間</b>に入れてください。<br><b>代休</b>＝先に休日労働→後で休む。休日労働は<b>割増あり</b>（割増の「法定休日/所定休日」に入れる）。休む日は入力の<b>「代休取得」</b>へ。</div>'
-      +'<label class="cr-chk" style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:8px"><input type="checkbox" data-cf="daikyuDeduct"'+(c.daikyuDeduct?' checked':'')+'>代休で休んだ日を出勤から差し引く（無給代休・日給制向け）</label>'
-      +'<div class="ri-note">既定（チェックなし）＝有給代休／月給は相殺前提で<b>記録のみ・賃金は変えません</b>。チェックすると代休取得日数を出勤から引きます（日給・出勤連動の手当に反映）。賃金は既存の割増で正確に出ます。</div>'); }
+    if(on.daikyu){ h+=ruleItemHTML('daikyu','代休・振替休日','使い分け','daikyu',
+      '<div class="ri-note">振替休日＝割増なし（通常の労働時間へ）／代休＝割増あり＋休む日は入力の「代休取得」へ（詳しくは💡）。</div>'
+      +'<label class="cr-chk" style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:8px"><input type="checkbox" data-cf="daikyuDeduct"'+(c.daikyuDeduct?' checked':'')+'>代休で休んだ日を出勤から差し引く（無給代休・日給制向け）</label>'); }
     if(on.shoyo){ h+=ruleItemHTML('shoyo','賞与の有無','','','<div class="ri-note">賞与（ボーナス）は<b>入力タブの「賞与」</b>に切り替えて計算できます（社保＝標準賞与額・源泉＝算出率表で自動／明細・Excelも賞与用）。</div>'); }
     host.innerHTML=h;
   }
@@ -331,6 +341,7 @@
         }).join('')+'</div>'
       +'<div class="sec-lb">支給項目（タップでON/OFF・通勤は上の欄）</div><div class="chip-row">'+chips(e,SUP_POOL,'shikyu')+'</div>'
       +'<div class="addcustom"><input class="finput ac-inp" data-g="shikyu" placeholder="自由な項目名（例：特別手当）"><button class="btn-ghost ac-btn" data-g="shikyu" style="padding:10px 12px">＋追加</button></div>'
+      +basisBoxHTML(e)
       +'<div class="sec-lb">控除項目（法定は自動・任意分のみ）</div><div class="chip-row">'+chips(e,KOJO_POOL,'extraKojo')+'</div>'
       +'<div class="addcustom"><input class="finput ac-inp" data-g="extraKojo" placeholder="自由な項目名（例：寮費）"><button class="btn-ghost ac-btn" data-g="extraKojo" style="padding:10px 12px">＋追加</button></div>'
       +'<div style="display:flex;justify-content:space-between;margin-top:10px">'
@@ -470,13 +481,10 @@
         +'<input class="wi-df" data-wd="'+key+'" data-dp="m" inputmode="numeric" placeholder="0" value="'+attr(o.m)+'"><i>分</i></span></div>'; }).join('')
         +'<div class="wi-note2">残業のうち深夜は「時間外×深夜」、休日の深夜は「法定休日×深夜」に入れてください（重複は区分で表現）。</div>';
     }
-    var labels=(e.shikyu||[]).map(function(x){return x.label;}).filter(function(l){return !/割増/.test(l);});
-    var wiz=labels.map(function(l){ var on=isInBasis(e,l); return '<span class="wb-chip'+(on?' on':'')+'" data-wb="'+attr(l)+'">'+(on?'✓ ':'')+esc(l)+'</span>'; }).join('');
-    var basisBox='<div class="wb-box"><div class="wb-h">割増の基礎に入れる手当<span class="help-i" data-help="warimashiBasis">💡</span></div><div class="wb-chips">'+wiz+'</div><div class="wb-note">通勤・家族手当は既定で外す。住宅手当などは「全員一律」なら入れる（手当の名前でなく実態・労基法37条5項）。</div></div>';
     var co=state.company||{}; var mh=(e.minashiH!=null&&e.minashiH!=='')?e.minashiH:co.minashiH; var minashiH=num(mh);
-    var minashiNote=minashiH>0?'<div class="wi-note2">⚠ 固定残業（みなし）<b>'+minashiH+'時間</b>を時間外の割増から控除して計算中（超過分のみ支給）。固定残業代の<b>金額</b>は基本給か手当に含めてください（深夜・休日・60h超の割増は別途支給）。</div>':'';
+    var minashiNote=minashiH>0?'<div class="wi-note2">⚠ 固定残業（みなし）<b>'+minashiH+'時間</b>を控除して計算中（超過分のみ）。固定残業代の金額は基本給/手当に含めて。</div>':'';
     return '<div class="grp"><div class="grp-h">割増（残業・深夜・休日）<span class="help-i" data-help="warimashi">💡</span></div>'
-      +seg+body+minashiNote+'<div class="wi-resw">'+wiResHTML(e)+'</div>'+basisBox+'</div>';
+      +seg+body+minashiNote+'<div class="wi-resw">'+wiResHTML(e)+'</div></div>';
   }
   function calcBoxHTML(e){
     var r=compute(e);
@@ -787,6 +795,10 @@
       if(ev.target.dataset.apply){ var ak=ev.target.dataset.apply; if(!emp.apply)emp.apply={}; emp.apply[ak]=(emp.apply[ak]===false)?true:false; renderEmpMaster(); return; }
       if(ev.target.dataset.short){ emp.shortTime=!emp.shortTime; renderEmpMaster(); return; }
       if(ev.target.dataset.tax){ emp.taxClass=(emp.taxClass==='otsu')?'ko':'otsu'; renderEmpMaster(); return; }
+      if(ev.target.classList.contains('wb-chip')){ var wlab=ev.target.dataset.wb; emp.wbInclude=emp.wbInclude||[]; emp.wbExclude=emp.wbExclude||[];
+        if(isInBasis(emp,wlab)){ emp.wbInclude=emp.wbInclude.filter(function(x){return x!==wlab;}); if(emp.wbExclude.indexOf(wlab)<0)emp.wbExclude.push(wlab); }
+        else { emp.wbExclude=emp.wbExclude.filter(function(x){return x!==wlab;}); if(emp.wbInclude.indexOf(wlab)<0)emp.wbInclude.push(wlab); }
+        renderEmpMaster(); return; }
       if(ev.target.classList.contains('chip')){ var key=ev.target.dataset.chip, lab=ev.target.dataset.lab; var arr=emp[key]; var idx=arr.findIndex(function(x){return x.label===lab;}); if(idx>=0)arr.splice(idx,1); else arr.push({label:lab,value:'0'}); renderEmpMaster(); return; }
       if(ev.target.classList.contains('ac-btn')){ var g=ev.target.dataset.g; var inp=ev.target.previousElementSibling; var val=(inp.value||'').trim(); if(val){ emp[g].push({label:val,value:'0'}); renderEmpMaster(); } return; }
       if(ev.target.classList.contains('m-retire')){ if(!emp.retired){ if(confirm((emp.name||'この従業員')+' を退職にします。給与計算・印刷の対象から外れます（データは残ります）。')){ emp.retired=true; emp.retiredYmd=state.month; state.open[emp.id]=false; renderEmpMaster(); } } else { emp.retired=false; renderEmpMaster(); } return; }
@@ -821,10 +833,6 @@
       var tg=e.target.closest('[data-toggle]');
       if(tg){ var i=+tg.dataset.toggle; var emp=state.employees[i]; state.open['I'+emp.id]=!state.open['I'+emp.id]; il.querySelector('.acc[data-i="'+i+'"]').classList.toggle('open'); return; }
       var wm=e.target.closest('.wi-mode'); if(wm){ var c1=e.target.closest('.acc'); var ci1=+c1.dataset.i; var em1=state.employees[ci1]; if(!em1.warimashi)em1.warimashi={}; em1.warimashi.mode=wm.dataset.wm; renderInput(); return; }
-      if(e.target.classList.contains('wb-chip')){ var c2=e.target.closest('.acc'); var ci2=+c2.dataset.i; var em2=state.employees[ci2]; var lab=e.target.dataset.wb; em2.wbInclude=em2.wbInclude||[]; em2.wbExclude=em2.wbExclude||[];
-        if(isInBasis(em2,lab)){ em2.wbInclude=em2.wbInclude.filter(function(x){return x!==lab;}); if(em2.wbExclude.indexOf(lab)<0)em2.wbExclude.push(lab); }
-        else { em2.wbExclude=em2.wbExclude.filter(function(x){return x!==lab;}); if(em2.wbInclude.indexOf(lab)<0)em2.wbInclude.push(lab); }
-        renderInput(); return; }
       if(e.target.dataset.add){ var ai=+e.target.dataset.i, g=e.target.dataset.add; state.employees[ai][g].push({label:'',value:''}); renderInput(); return; }
       if(e.target.classList.contains('m-del')&&e.target.closest('#input-list')){ var card=e.target.closest('.acc'); var ci=+card.dataset.i; var g=e.target.dataset.g, ri=+e.target.dataset.ri; state.employees[ci][g].splice(ri,1); renderInput(); return; }
     });
