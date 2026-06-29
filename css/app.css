@@ -90,7 +90,6 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .wi-res .wi-sub{display:block;font-size:10px;color:#7aa08c;font-weight:400;margin-top:1px;}
 .wi-res.wi-zero{color:#7aa08c;font-weight:400;font-size:11px;}
 /* 会社の決まり */
-.chip-add{color:#2E7D54;font-weight:700;border-style:dashed!important;}
 .rule-item{position:relative;border:1px solid #EEF6F1;border-radius:10px;padding:10px 11px;margin-bottom:9px;}
 .rule-item .ri-x{position:absolute;top:8px;right:9px;font-size:11px;color:#C0392B;cursor:pointer;}
 .ri-note{font-size:10px;color:#7aa08c;line-height:1.5;margin-top:5px;}
@@ -181,7 +180,6 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .btn-ghost:hover{background:#F0FAF4;}
 .chip{font-size:12px;padding:5px 10px;border:1px solid #C8ECD8;border-radius:14px;background:#fff;color:#1A4A2E;cursor:pointer;}
 .chip.on{background:#52B788;border-color:#52B788;color:#fff;font-weight:700;}
-.chip-add{margin-left:auto;color:#2E7D54;font-weight:700;}
 .mini{font-size:11px;padding:3px 8px;border:1px solid #e3ede8;border-radius:8px;background:#fff;cursor:pointer;color:#4A6B5A;}
 .mini.del{color:#C62828;}
 

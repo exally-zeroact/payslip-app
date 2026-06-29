@@ -91,7 +91,7 @@
       shaho:{ mode:'auto', months:[{pay:'',days:'30'},{pay:'',days:'30'},{pay:'',days:'30'}], mikomi:'', manual:'' } };
   }
   var WDAYS=['日','月','火','水','木','金','土'];
-  var RULE_ITEMS=[['teikyu','休みの日'],['shotei','1日の働く時間'],['annual','年間の休み'],['warimashiRate','割増の率'],['koyoGyoshu','雇用保険の業種'],['paymentDays','支払基礎日数の数え方'],['kekkin','欠勤控除の計算'],['kyukei','休憩時間'],['minashi','固定残業（みなし）'],['shoyo','賞与の有無']];
+  var RULE_ITEMS=[['teikyu','休みの日'],['shotei','1日の働く時間'],['annual','年間の休み'],['warimashiRate','割増の率'],['koyoGyoshu','雇用保険の業種'],['paymentDays','支払基礎日数の数え方'],['kekkin','欠勤控除の計算'],['minashi','固定残業（みなし）'],['shoyo','賞与の有無']];
   var state={ company:{name:'株式会社 ゼロアクト',addr:'',close:'末日',paydayRel:'next',paydayDay:'25',
       holidays:[0], dailyWorkH:'8', dailyWorkM:'0', annualHolidays:'120',
       ruleOn:{teikyu:true,shotei:true,annual:true,warimashiRate:true,koyoGyoshu:true},
@@ -205,7 +205,7 @@
   function fillCompany(){ $('#c-name').value=state.company.name; $('#c-addr').value=state.company.addr; $('#c-close').value=state.company.close; $('#c-payrel').value=state.company.paydayRel||'next'; $('#c-payday-day').value=state.company.paydayDay||''; updatePaydayPreview(); renderRuleChips(); renderCompanyRules(); renderDesign(); }
   function renderRuleChips(){
     var host=$('#rule-chips'); if(!host)return; var on=state.company.ruleOn||{};
-    host.innerHTML=RULE_ITEMS.map(function(it){var o=!!on[it[0]];return '<span class="chip'+(o?' on':'')+'" data-rule="'+it[0]+'">'+(o?'✓ ':'')+it[1]+'</span>';}).join('')+'<span class="chip chip-add" data-rule-add="1">＋自由に追加</span>';
+    host.innerHTML=RULE_ITEMS.map(function(it){var o=!!on[it[0]];return '<span class="chip'+(o?' on':'')+'" data-rule="'+it[0]+'">'+(o?'✓ ':'')+it[1]+'</span>';}).join('');
   }
   function ruleItemHTML(key,title,sub,helpKey,inner){
     return '<div class="rule-item"><span class="ri-x" data-rule-x="'+key+'">× 外す</span><div class="flabel">'+title+(sub?'<span class="hint2">（'+sub+'）</span>':'')+(helpKey?'<span class="help-i" data-help="'+helpKey+'">💡</span>':'')+'</div>'+inner+'</div>';
@@ -238,9 +238,8 @@
       var kmo=[['','月平均所定労働日数（既定）'],['calendar','当月の暦日数'],['scheduled','当月の所定労働日数']]
         .map(function(o){return '<option value="'+o[0]+'"'+((c.kekkinMethod||'')===o[0]?' selected':'')+'>'+esc(o[1])+'</option>';}).join('');
       h+=ruleItemHTML('kekkin','欠勤控除の計算','月給の欠勤・不就労','','<label class="cr-chk" style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" data-cf="kanzenGekkyu"'+(c.kanzenGekkyu?' checked':'')+'>完全月給制（欠勤しても控除しない）</label><div style="margin-top:6px;font-size:12px">1日あたりの分母：<select class="cr-sel" data-cf="kekkinMethod">'+kmo+'</select></div><div class="ri-note">月給は<b>日給月給制（欠勤分を控除）が標準</b>。10日欠勤すれば10日分減ります（民法624条 ノーワーク・ノーペイ）。1日あたり＝月給÷分母×欠勤日数。役員等で減額しない場合のみ「完全月給制」に。時給・日給は元々日数/時間で按分されます。</div>'); }
-    if(on.kyukei){ h+=ruleItemHTML('kyukei','休憩時間','分','','<input class="cr-f cr-wide" data-cf="kyukei" inputmode="numeric" value="'+attr(c.kyukei)+'" placeholder="60">'); }
     if(on.minashi){ h+=ruleItemHTML('minashi','固定残業（みなし）','時間','','<input class="cr-f cr-wide" data-cf="minashiH" inputmode="numeric" value="'+attr(c.minashiH)+'" placeholder="0">'); }
-    if(on.shoyo){ h+=ruleItemHTML('shoyo','賞与の有無','','','<div class="ri-note">賞与タブで個別に登録します。</div>'); }
+    if(on.shoyo){ h+=ruleItemHTML('shoyo','賞与の有無','','','<div class="ri-note">賞与（ボーナス）の計算は<b>対応予定</b>です（近日）。今は支給欄に金額を手入力できます（社保・源泉の賞与専用計算は準備中）。</div>'); }
     host.innerHTML=h;
   }
 
@@ -602,7 +601,6 @@
     // 会社の決まり：項目チップ
     $('#rule-chips').addEventListener('click',function(ev){
       var ch=ev.target.closest('[data-rule]'); if(ch){ var k=ch.dataset.rule; if(!state.company.ruleOn)state.company.ruleOn={}; state.company.ruleOn[k]=!state.company.ruleOn[k]; renderRuleChips(); renderCompanyRules(); return; }
-      if(ev.target.closest('[data-rule-add]')){ var nm=(prompt('追加する項目名','')||'').trim(); if(nm)alert('「'+nm+'」は自由項目として追加予定（次の増分で対応）'); }
     });
     // 会社の決まり：曜日・外す・数値
     var rh=$('#rule-host');
@@ -690,7 +688,6 @@
       var tg=e.target.closest('.cp-toggle:not(.cp-reset)'); if(tg){ state._oc=(state._oc===tg.dataset.cpk)?null:tg.dataset.cpk; renderDesign(); return; }
       var w=e.target.closest('.cw'); if(w){ state.theme[w.dataset.ck]=w.dataset.col; state._oc=null; afterDesign(); } });
     $('#b-print').addEventListener('click',function(){ var f=$('#frame'); try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} });
-    $('#b-pdf').addEventListener('click',function(){ alert('PDF保存/送付はSTEP5でpdf-lib配線します（今は印刷からPDF保存可）'); });
     $('#b-xlsx').addEventListener('click',function(){ if(!window.PayslipXlsx)return; var v=$('#p-emp').value; var emps=(v==='__all')?activeEmps():[state.employees[+v]]; PayslipXlsx.download(buildPeople(emps), {company:state.company.name, monthLabel:monthLabel().replace(/ /g,''), filename:'給与明細_'+state.month+'.xlsx'}); });
     window.addEventListener('resize',function(){ if($('#scr-print').classList.contains('active'))doPreview(); });
   }
