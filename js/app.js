@@ -439,8 +439,14 @@
   /* ---------- 入力（自動計算） ---------- */
   function rowsHTML(g,arr){
     return arr.map(function(it,ri){
-      var isNT=(it.hikazei||/通勤|出張|旅費|宿泊|日当/.test(it.label||''));
-      var hz=(g==='shikyu'&&isNT)?'<span class="row-hz" title="項目名から自動で非課税扱い" style="font-size:10px;color:#3D9E72;white-space:nowrap;font-weight:700">非課税</span>':'';
+      var labelAuto=/通勤|出張|旅費|宿泊|日当/.test(it.label||'');
+      // 支給行は非課税を“トグル”に(任意の手当を非課税にできる)。項目名で自動判定される通勤等はON固定(自動)
+      var hz='';
+      if(g==='shikyu'){
+        hz = labelAuto
+          ? '<label class="row-hz" title="項目名から自動で非課税" style="font-size:10px;color:#3D9E72;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:2px"><input type="checkbox" checked disabled style="width:13px;height:13px">非課税</label>'
+          : '<label title="チェックで所得税の非課税にする(社保は対象)" style="font-size:10px;color:'+(it.hikazei?'#3D9E72':'#A9C4B6')+';font-weight:'+(it.hikazei?'700':'400')+';white-space:nowrap;display:inline-flex;align-items:center;gap:2px"><input type="checkbox" class="ck" data-g="shikyu" data-ri="'+ri+'"'+(it.hikazei?' checked':'')+' style="width:13px;height:13px">非課税</label>';
+      }
       return '<div class="row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px"><input class="finput" data-g="'+g+'" data-ri="'+ri+'" data-f="label" value="'+attr(it.label)+'" style="flex:1.3" placeholder="項目"><input class="finput num" data-g="'+g+'" data-ri="'+ri+'" data-f="value" value="'+attr(it.value)+'" style="flex:1" placeholder="'+(g==='kintai'?'値':'金額')+'">'+hz+'<button class="b-del m-del" data-g="'+g+'" data-ri="'+ri+'">×</button></div>';
     }).join('');
   }
