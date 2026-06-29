@@ -544,7 +544,8 @@
       +'<label style="font-size:12px;color:#2E7D54;font-weight:700">賞与支給月 <input type="month" class="finput finput-sm" data-bn="payYm" value="'+attr(ym)+'"></label>'
       +'<label style="font-size:12px;color:#2E7D54;font-weight:700">支給日 <input class="finput finput-sm" data-bn="payDay" value="'+attr(b.payDay)+'" placeholder="例 12月10日" style="width:110px"></label>'
       +'</div>'
-      +'<div class="hint" style="margin:8px 0 0">賞与の所得税は<b>前月（'+esc(pm)+'）の給与（社保控除後）</b>と扶養人数で率が決まります（国税庁 算出率表）。前月を計算・保存していれば自動、無ければ各行で手入力してください。</div></div>';
+      +'<div class="hint" style="margin:8px 0 0">賞与の所得税は<b>前月（'+esc(pm)+'）の給与（社保控除後）</b>と扶養人数で率が決まります（国税庁 算出率表）。前月を計算・保存していれば自動、無ければ各行で手入力してください。</div>'
+      +'<div class="hint" style="margin:4px 0 0;color:#92500A">⚠ 健康保険は<b>年度累計573万円</b>まで（厚年は1回150万円まで）。本アプリは<b>この1回分</b>で計算します。年内に複数回の賞与があり累計が573万円を超える場合は、超過分の健保がかからない点をご確認ください。</div></div>';
     var cards=activeEmps().map(function(e){
       var c=computeBonus(e), en=bonusEntry(e);
       var prevBox = c.noPrev
@@ -555,9 +556,8 @@
       if(hyojun>0&&c.si.koseiBase<hyojun) caps+='<span class="cap-badge">厚年 1回150万上限</span>';
       var taxLine, warn='';
       if(c.noPrev){ taxLine='<div class="calc-line"><span>源泉所得税</span><span class="v">前月給与の入力待ち</span></div>'; }
-      else if(c.tax.otsu){ taxLine='<div class="calc-line"><span>源泉所得税</span><span class="v">乙欄＝手入力</span></div>'; warn='<div class="cr-warn" style="margin:6px 0">⚠ 乙欄の賞与率は未収録です。源泉税は手入力してください（近日対応）。</div>'; }
       else if(c.tax.special){ taxLine='<div class="calc-line"><span>源泉所得税</span><span class="v">月額表で要計算</span></div>'; warn='<div class="cr-warn" style="margin:6px 0">⚠ 前月給与なし／賞与が前月給与(社保後)の10倍超のため、この賞与は月額表で計算する特例です。源泉税は手計算してください。</div>'; }
-      else { taxLine='<div class="calc-line"><span>源泉所得税（率 '+c.tax.rate+'%）</span><span class="v">'+yen(c.taxAmt)+'</span></div>'; }
+      else { taxLine='<div class="calc-line"><span>源泉所得税（率 '+c.tax.rate+'%'+(c.tax.otsu?'・乙欄':'')+'）</span><span class="v">'+yen(c.taxAmt)+'</span></div>'; }
       return '<div class="acc icard'+(num(en.amount)>0?' open':'')+'">'
         +'<div class="ic-top"><span class="acc-nm">'+esc(e.name)+'</span><span class="acc-net">'+yen(c.net)+'</span></div>'
         +'<div style="padding:0 12px 12px">'

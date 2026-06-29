@@ -19,7 +19,12 @@ T('賞与率 甲: 扶養>7は7人扱い・しきい境界(扶養7・前月317千
   eq(SZ.bonusRate(317000, 9, { year: 2026 }).rate, 2.042); // 9→7扱い・317千円以上
   eq(SZ.bonusRate(316999, 7, { year: 2026 }).rate, 0);     // 317千円未満は0%
 });
-T('賞与率 乙はotsuフラグ(本実装は手入力)', function () {
+T('賞与率 乙(令和8・公式PDF): 前月課税で5段階', function () {
+  eq(SZ.bonusRate(100000, 0, { taxClass: 'otsu', year: 2026 }).rate, 10.210); // <224千円
+  eq(SZ.bonusRate(290000, 0, { taxClass: 'otsu', year: 2026 }).rate, 20.420); // 224〜295
+  eq(SZ.bonusRate(400000, 0, { taxClass: 'otsu', year: 2026 }).rate, 30.630); // 295〜527
+  eq(SZ.bonusRate(800000, 0, { taxClass: 'otsu', year: 2026 }).rate, 38.798); // 527〜1118
+  eq(SZ.bonusRate(1200000, 0, { taxClass: 'otsu', year: 2026 }).rate, 45.945); // ≥1118
   ok(SZ.bonusRate(290000, 0, { taxClass: 'otsu', year: 2026 }).otsu === true);
 });
 T('範囲外年は直近年+stale', function () {
@@ -48,9 +53,14 @@ T('特例: 賞与(社保後)が前月課税の10倍超 → special', function ()
   // ちょうど10倍(290万)は特例でない
   ok(SZ.calcBonusTax({ bonus: 2900000, bonusSI: 0, prevSalary: 350000, prevSI: 60000, fuyou: 0, payYm: '2026-12' }).special === false);
 });
-T('乙欄は otsu フラグ・税0(手入力)', function () {
-  var r = SZ.calcBonusTax({ bonus: 500000, prevSalary: 350000, prevSI: 60000, taxClass: 'otsu', payYm: '2026-12' });
-  eq(r.otsu, true); eq(r.tax, 0);
+T('乙欄も自動計算: 賞与50万・前月課税29万 → 乙20.420% → floor(500000×20.42%)=102,100', function () {
+  var r = SZ.calcBonusTax({ bonus: 500000, bonusSI: 0, prevSalary: 350000, prevSI: 60000, taxClass: 'otsu', payYm: '2026-12' });
+  eq(r.otsu, true); eq(r.rate, 20.420); eq(r.tax, Math.floor(500000 * 0.2042)); eq(r.tax, 102100);
+  // 乙は甲より高い(扶養0甲6.126% < 乙20.42%)
+  ok(r.tax > SZ.calcBonusTax({ bonus: 500000, prevSalary: 350000, prevSI: 60000, fuyou: 0, payYm: '2026-12' }).tax);
+});
+T('乙でも特例(前月給与なし)はspecial', function () {
+  eq(SZ.calcBonusTax({ bonus: 500000, prevSalary: 0, taxClass: 'otsu', payYm: '2026-12' }).special, true);
 });
 
 /* ── 賞与の社会保険料(年金機構) ── */
