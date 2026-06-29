@@ -51,6 +51,9 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .mco.open .mco-cv{transform:rotate(180deg);}
 .mco-body{display:none;padding:12px;border-top:1px solid #d4eae0;}
 .mco.open .mco-body{display:block;}
+.emp-dtgl{display:flex;align-items:center;font-size:12px;font-weight:700;color:#2E7D54;cursor:pointer;padding:10px 2px 8px;margin-top:8px;border-top:1px dashed #d4eae0;}
+.emp-dtgl .mco-cv{color:#A9C4B6;transition:transform .2s;}
+.emp-detail{padding-top:4px;}
 .sec-lb{font-size:11px;font-weight:700;color:#2E7D54;margin:14px 0 6px;padding-top:10px;border-top:1px dashed #d4eae0;}
 .chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
 .chip.on{border-color:#52B788;background:#F0FAF4;color:#2E7D54;font-weight:700;}
