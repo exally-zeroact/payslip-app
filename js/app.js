@@ -91,7 +91,7 @@
       shaho:{ mode:'auto', months:[{pay:'',days:'30'},{pay:'',days:'30'},{pay:'',days:'30'}], mikomi:'', manual:'' } };
   }
   var WDAYS=['日','月','火','水','木','金','土'];
-  var RULE_ITEMS=[['teikyu','休みの日'],['shotei','1日の働く時間'],['annual','年間の休み'],['warimashiRate','割増の率'],['koyoGyoshu','雇用保険の業種'],['paymentDays','支払基礎日数の数え方'],['kekkin','欠勤控除の計算'],['minashi','固定残業（みなし）'],['shoyo','賞与の有無']];
+  var RULE_ITEMS=[['teikyu','休みの日'],['companyHol','会社独自の休日'],['shotei','1日の働く時間'],['annual','年間の休み'],['warimashiRate','割増の率'],['koyoGyoshu','雇用保険の業種'],['paymentDays','支払基礎日数の数え方'],['kekkin','欠勤控除の計算'],['minashi','固定残業（みなし）'],['shoyo','賞与の有無']];
   var state={ company:{name:'株式会社 ゼロアクト',addr:'',close:'末日',paydayRel:'next',paydayDay:'25',
       holidays:[0], dailyWorkH:'8', dailyWorkM:'0', annualHolidays:'120',
       ruleOn:{teikyu:true,shotei:true,annual:true,warimashiRate:true,koyoGyoshu:true},
@@ -160,6 +160,9 @@
   function ZK(){ return (typeof Zaiseki!=='undefined')?Zaiseki:(window&&window.Zaiseki); }
   function isActiveInMonth(e, ym){ var z=ZK(); return z?z.isActiveInMonth(e,ym):!(e.retired&&!e.taishokuYmd); }
   function prorateInfo(e, ym){ var z=ZK(); return z?z.prorateInfo(e,ym):{prorate:false,factor:1,shahoMonth:true,isJoin:false,isLeave:false,zd:0,dim:0,mid:false}; }
+  // 勤怠カレンダー: その月の所定労働日数(暦日−休みの曜日−祝日−会社独自休)。祝日エンジン未読込ならnull
+  function HD(){ return (typeof Holidays!=='undefined')?Holidays:(window&&window.Holidays); }
+  function scheduledDaysOf(ym){ var H=HD(); if(!H)return null; return H.scheduledWorkdays(ym, (state.company&&state.company.holidays)||[], (state.company&&state.company.companyHolidays)||[]); }
   function compute(e){
     syncCommute(e); syncBasePay(e);
     var pr=prorateInfo(e, state.month); e._prorate=pr;
@@ -223,6 +226,10 @@
     var host=$('#rule-host'); if(!host)return; var c=state.company, on=c.ruleOn||{}, h='';
     if(on.teikyu){ h+=ruleItemHTML('teikyu','休みの日は？','法定休日','teikyu',
       '<div class="wdays">'+WDAYS.map(function(d,i){return '<span class="wday'+((c.holidays||[]).indexOf(i)>=0?' on':'')+'" data-wd="'+i+'">'+d+'</span>';}).join('')+'</div><div class="ri-note">複数えらべます。法律上の休み(法定休日)は自動で特定。例：日曜だけ＝週休1日(現場系OK)。</div>'); }
+    if(on.companyHol){
+      var coh=(c.companyHolidays||[]);
+      var cohRows=coh.map(function(d,di){ return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:5px"><input type="date" class="finput" data-coh="'+di+'" value="'+attr(d)+'" style="flex:1"><button class="b-del" data-coh-del="'+di+'" style="width:30px">×</button></div>'; }).join('');
+      h+=ruleItemHTML('companyHol','会社独自の休日','年末年始・夏季休暇など','','<div>'+cohRows+'</div><button class="mini add" data-coh-add="1" style="margin-top:4px">＋ 休日を追加</button><div class="ri-note">国民の祝日は<b>自動</b>です。ここは会社が独自に決めた休み（創立記念日・年末年始・夏季休暇など）だけ。当月の所定労働日数に反映します。</div>'); }
     if(on.shotei){ h+=ruleItemHTML('shotei','1日の働く時間','所定労働','shotei',
       '<span class="dur"><input class="cr-f cr-dur" data-cf="dailyWorkH" inputmode="numeric" value="'+attr(c.dailyWorkH)+'"><i>時間</i><input class="cr-f cr-dur" data-cf="dailyWorkM" inputmode="numeric" value="'+attr(c.dailyWorkM)+'"><i>分</i></span>'); }
     if(on.annual){
@@ -510,9 +517,23 @@
     return msg.length?'<div class="cr-warn" style="margin:0 12px 10px">⚠ '+msg.join('。')+'。</div>':''; }
   function renderInput(){
     var host=$('#input-list'); if(!host) return; loadPrev();
-    host.innerHTML=state.employees.map(function(e,i){
+    var sche=scheduledDaysOf(state.month), H=HD();
+    var hols=H?H.holidaysInMonth(state.month):[];
+    var holStr=hols.length?hols.map(function(x){return x.day+'日 '+x.name;}).join('・'):'なし';
+    var calHTML = sche==null ? '' :
+      '<div class="cal-box" style="background:#F0FAF4;border:1px solid #C8ECD8;border-radius:12px;padding:10px 12px;margin-bottom:12px">'
+      +'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">'
+        +'<b style="color:#2E7D54;font-size:13px">当月の所定労働日数 '+sche+'日</b>'
+        +'<span style="font-size:10.5px;color:#7aa08c">（休みの曜日・祝日・会社休を除く）</span>'
+        +'<button class="cal-fill" data-fillsche="'+sche+'" style="margin-left:auto;padding:7px 12px;border:1px solid #3D9E72;background:#fff;color:#2E7D54;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer">全員の出勤を所定('+sche+'日)で埋める</button>'
+      +'</div>'
+      +'<div style="font-size:10.5px;color:#3D6B53;margin-top:5px">祝日: '+esc(holStr)+'</div>'
+      +'<div style="font-size:10px;color:#7aa08c;margin-top:3px">出勤日数は所定を初期表示。各自で手修正できます（赤で止めません）。会社独自の休みは「設定▸会社の決まり」で追加できます。</div>'
+      +'</div>';
+    host.innerHTML=calHTML+state.employees.map(function(e,i){
       if(!isActiveInMonth(e,state.month)) return '';
       ensureKintai(e);
+      if(sche!=null){ var soi=kinIdx(e,/出勤/); if(soi>=0 && (e.kintai[soi].value===''||e.kintai[soi].value==null)) e.kintai[soi].value=String(sche); }
       var r=compute(e), open=state.open['I'+e.id], mw=minWageInfo(e);
       return '<div class="acc icard'+(open?' open':'')+'" data-i="'+i+'">'
         +'<div class="ic-top"><span class="acc-nm">'+esc(e.name)+wsBadge(e)+'</span><span class="acc-net">'+yen(r.net)+'</span><span class="diffb-wrap">'+diffBadge(e,r)+'</span><button class="ic-detail" data-toggle="'+i+'">詳細<span class="acc-cv">▾</span></button></div>'
@@ -717,10 +738,12 @@
     var rh=$('#rule-host');
     rh.addEventListener('click',function(ev){
       var wd=ev.target.closest('.wday'); if(wd){ var i=+wd.dataset.wd; var hs=state.company.holidays||[]; var p=hs.indexOf(i); if(p>=0)hs.splice(p,1); else hs.push(i); state.company.holidays=hs; renderCompanyRules(); return; }
+      if(ev.target.closest('[data-coh-add]')){ state.company.companyHolidays=(state.company.companyHolidays||[]); state.company.companyHolidays.push(''); renderCompanyRules(); return; }
+      var cd=ev.target.closest('[data-coh-del]'); if(cd){ (state.company.companyHolidays||[]).splice(+cd.dataset.cohDel,1); renderCompanyRules(); return; }
       var x=ev.target.closest('[data-rule-x]'); if(x){ state.company.ruleOn[x.dataset.ruleX]=false; renderRuleChips(); renderCompanyRules(); return; }
     });
     rh.addEventListener('input',function(ev){ if(ev.target.tagName==='SELECT')return; var f=ev.target.dataset.cf; if(f) state.company[f]=ev.target.value.replace(/[^0-9]/g,''); });
-    rh.addEventListener('change',function(ev){ var f=ev.target.dataset.cf; if(f==='gyoshu'){ state.company.gyoshu=ev.target.value; return; } if(f==='paymentDaysMethod'){ state.company.paymentDaysMethod=ev.target.value; return; } if(f==='kekkinMethod'){ state.company.kekkinMethod=ev.target.value; return; } if(f==='kanzenGekkyu'){ state.company.kanzenGekkyu=ev.target.checked; renderCompanyRules(); return; } if(f==='annualHolidays'||f==='dailyWorkH'||f==='dailyWorkM') renderCompanyRules(); });
+    rh.addEventListener('change',function(ev){ if(ev.target.dataset.coh!=null){ state.company.companyHolidays=(state.company.companyHolidays||[]); state.company.companyHolidays[+ev.target.dataset.coh]=ev.target.value; return; } var f=ev.target.dataset.cf; if(f==='gyoshu'){ state.company.gyoshu=ev.target.value; return; } if(f==='paymentDaysMethod'){ state.company.paymentDaysMethod=ev.target.value; return; } if(f==='kekkinMethod'){ state.company.kekkinMethod=ev.target.value; return; } if(f==='kanzenGekkyu'){ state.company.kanzenGekkyu=ev.target.checked; renderCompanyRules(); return; } if(f==='annualHolidays'||f==='dailyWorkH'||f==='dailyWorkM') renderCompanyRules(); });
     $('#b-add-emp').addEventListener('click',function(){ var e=defEmp('従業員 '+(state.employees.length+1)); state.employees.push(e); state.open[e.id]=true; renderEmpMaster(); });
 
     // 従業員マスタ操作
@@ -769,6 +792,8 @@
     // 入力 accordion
     var il=$('#input-list');
     il.addEventListener('click',function(e){
+      var fs=e.target.closest('[data-fillsche]');
+      if(fs){ var sd=fs.dataset.fillsche; state.employees.forEach(function(emp){ if(!isActiveInMonth(emp,state.month))return; ensureKintai(emp); var oi=kinIdx(emp,/出勤/); if(oi>=0) emp.kintai[oi].value=sd; }); renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
       var tg=e.target.closest('[data-toggle]');
       if(tg){ var i=+tg.dataset.toggle; var emp=state.employees[i]; state.open['I'+emp.id]=!state.open['I'+emp.id]; il.querySelector('.acc[data-i="'+i+'"]').classList.toggle('open'); return; }
       var wm=e.target.closest('.wi-mode'); if(wm){ var c1=e.target.closest('.acc'); var ci1=+c1.dataset.i; var em1=state.employees[ci1]; if(!em1.warimashi)em1.warimashi={}; em1.warimashi.mode=wm.dataset.wm; renderInput(); return; }
