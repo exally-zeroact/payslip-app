@@ -156,18 +156,26 @@
     var idx=e.shikyu.findIndex(function(x){return /基本給/.test(x.label||'');});
     if(idx<0) e.shikyu.unshift({label:'基本給',value:String(amt)}); else e.shikyu[idx].value=String(amt);
   }
+  // 在籍判定・入社/退職月の日割は lib/zaiseki.js(純関数・テスト可能)に集約。bare参照で解決。
+  function ZK(){ return (typeof Zaiseki!=='undefined')?Zaiseki:(window&&window.Zaiseki); }
+  function isActiveInMonth(e, ym){ var z=ZK(); return z?z.isActiveInMonth(e,ym):!(e.retired&&!e.taishokuYmd); }
+  function prorateInfo(e, ym){ var z=ZK(); return z?z.prorateInfo(e,ym):{prorate:false,factor:1,shahoMonth:true,isJoin:false,isLeave:false,zd:0,dim:0,mid:false}; }
   function compute(e){
     syncCommute(e); syncBasePay(e);
+    var pr=prorateInfo(e, state.month); e._prorate=pr;
     var sb=shahoBasisOf(e);
     // 標準報酬未確定時の暫定基礎は「割増を除く固定支給(通勤含む)」。割増(残業)で社保が膨らまないように。
     var fb=(e.shikyu||[]).reduce(function(a,x){return a+num(x.value);},0);
     e.hyojunBase = sb.hoshu>0 ? sb.hoshu : fb;
-    var w=warimashiOf(e); e._wari=w;
+    var w=warimashiOf(e); e._wari=w; // 割増は満額base(=e.shikyu)で算定済→日割の影響を受けない
     var shikyu=(e.shikyu||[]).slice();
-    if(w.total>0) shikyu=shikyu.concat([{label:'割増賃金',value:w.total}]); // 課税・総支給・雇用保険ベースに算入
+    // 入社月/退職月の日割: 基本給＋課税手当を在籍日数で日割(通勤/非課税/割増は除外)。標準報酬(hyojunBase)・割増は満額のまま。
+    if(pr.prorate && pr.factor<1){ shikyu=shikyu.map(function(x){ if(x.hikazei||/通勤|割増/.test(x.label||'')) return x; return {label:x.label, value:Math.round(num(x.value)*pr.factor), hikazei:x.hikazei, nonTaxLimit:x.nonTaxLimit}; }); }
+    if(w.total>0) shikyu=shikyu.concat([{label:'割増賃金',value:w.total}]); // 課税・総支給・雇用保険ベースに算入(日割しない)
     // 欠勤控除(月給・日給月給制): 月給で欠勤があれば不就労分を控除(完全月給制はしない)。割増基礎/標準報酬は満額のまま(=このローカルshikyuにだけ負の行を足す)
+    // ★日割する月(入社月/退職月)は欠勤控除を併用しない(二重控除防止)
     var coK=state.company||{};
-    if(e.payType==='月給' && !(e.workStatus&&e.workStatus!=='normal') && !coK.kanzenGekkyu){
+    if(!pr.prorate && e.payType==='月給' && !(e.workStatus&&e.workStatus!=='normal') && !coK.kanzenGekkyu){
       var kday=kintaiVal(e,/欠勤/);
       if(kday>0){
         var ahK=(e.annualHolidays!=null&&e.annualHolidays!=='')?e.annualHolidays:coK.annualHolidays;
@@ -177,7 +185,7 @@
         if(kgaku>0) shikyu=shikyu.concat([{label:'欠勤控除',value:-kgaku}]);
       }
     }
-    return PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:num(e.fuyou), taxClass:e.taxClass, residentTax:num(e.residentTax), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:e.apply, extraKojo:e.extraKojo });
+    return PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:num(e.fuyou), taxClass:e.taxClass, residentTax:num(e.residentTax), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:e.apply, extraKojo:e.extraKojo, shahoMonth:pr.shahoMonth });
   }
   function payDateObj(){
     var ym=state.month||'2026-06', y=Number(ym.slice(0,4)), m=Number(ym.slice(5,7)), c=state.company||{};
@@ -278,6 +286,9 @@
       +'<div class="frow"><div class="flabel">氏名</div><input class="finput m-f" data-f="name" value="'+attr(e.name)+'"></div>'
       +'<div class="frow2"><div class="frow"><div class="flabel">従業員番号<span class="hint2">任意</span></div><input class="finput m-f" data-f="no" value="'+attr(e.no)+'"></div>'
         +'<div class="frow"><div class="flabel">生年月日</div><input class="finput m-f" data-f="birthYmd" type="date" value="'+attr(e.birthYmd)+'"></div></div>'
+      +'<div class="frow2"><div class="frow"><div class="flabel">入社日<span class="hint2">任意</span></div><input class="finput m-f" data-f="joinYmd" type="date" value="'+attr(e.joinYmd)+'"></div>'
+        +'<div class="frow"><div class="flabel">退職日<span class="hint2">任意</span></div><input class="finput m-f" data-f="taishokuYmd" type="date" value="'+attr(e.taishokuYmd)+'"></div></div>'
+      +'<div class="ri-note" style="margin:-4px 2px 8px">入社日・退職日を入れると、その月は<b>在籍日数で日割</b>・退職月の社保は<b>退職日が月末か否か</b>で自動判定。退職月の翌月以降は給与計算の対象から自動で外れます（日割は就業規則の定めに合わせて確認）。</div>'
       +'<div class="frow2"><div class="frow"><div class="flabel">部署</div>'+deptSelect(e)+'</div>'
         +'<div class="frow"><div class="flabel">役職</div>'+roleSelect(e)+'</div></div>'
       +'<div class="frow2"><div class="frow"><div class="flabel">給与形態</div><select class="finput m-f" data-f="payType">'+PAYTYPES.map(function(p){return '<option'+(p===e.payType?' selected':'')+'>'+p+'</option>';}).join('')+'</select></div>'
@@ -492,15 +503,20 @@
       if($('#scr-list')&&$('#scr-list').classList.contains('active')) renderListView(); }).catch(function(){});
   }
   function diffBadge(e,r){ var pv=state._prev||{}; if(!(e.id in pv)) return ''; var d=r.net-pv[e.id]; if(d===0) return ''; var cls=d>0?'up':'dn'; var t=d>0?'▲+'+fmtN(d):'▼'+fmtN(-d); return '<span class="diffb '+cls+'" title="前月比('+state._prevYm+')">'+t+'</span>'; }
+  // 入社月/退職月の日割・社保の注記(黄・ブロックしない)
+  function prorateNote(e){ var pr=e._prorate; if(!pr||(!pr.prorate&&pr.shahoMonth)) return ''; var msg=[];
+    if(pr.prorate&&pr.factor<1) msg.push((pr.isJoin&&!pr.isLeave?'入社月':pr.isLeave&&!pr.isJoin?'退職月':'入社/退職月')+'につき在籍'+pr.zd+'日で日割（'+pr.zd+'/'+pr.dim+'日）');
+    if(pr.mid) msg.push('月中退職のため当月の社保（健保・厚年・介護）は徴収しません（資格喪失=退職日翌日・前月分まで／雇用保険は実支払分）');
+    return msg.length?'<div class="cr-warn" style="margin:0 12px 10px">⚠ '+msg.join('。')+'。</div>':''; }
   function renderInput(){
     var host=$('#input-list'); if(!host) return; loadPrev();
     host.innerHTML=state.employees.map(function(e,i){
-      if(e.retired) return '';
+      if(!isActiveInMonth(e,state.month)) return '';
       ensureKintai(e);
       var r=compute(e), open=state.open['I'+e.id], mw=minWageInfo(e);
       return '<div class="acc icard'+(open?' open':'')+'" data-i="'+i+'">'
         +'<div class="ic-top"><span class="acc-nm">'+esc(e.name)+wsBadge(e)+'</span><span class="acc-net">'+yen(r.net)+'</span><span class="diffb-wrap">'+diffBadge(e,r)+'</span><button class="ic-detail" data-toggle="'+i+'">詳細<span class="acc-cv">▾</span></button></div>'
-        +compactKinHTML(e)
+        +compactKinHTML(e)+prorateNote(e)
         +((mw&&!mw.ok)?'<div class="cr-warn" style="margin:0 12px 10px">⚠ 最低賃金（'+esc(mw.prefName)+'：時給'+fmtN(mw.minWage)+'円）を下回っています（約'+fmtN(mw.hourly)+'円）。設定▸従業員マスタで'+(e.payType==='時給'?'時給':'基本給')+'を上げてください。</div>':'')
         +'<div class="acc-body">'
           +basePayInputHTML(e,i)
@@ -546,7 +562,7 @@
       +'</div>'
       +'<div class="hint" style="margin:8px 0 0">賞与の所得税は<b>前月（'+esc(pm)+'）の給与（社保控除後）</b>と扶養人数で率が決まります（国税庁 算出率表）。前月を計算・保存していれば自動、無ければ各行で手入力してください。</div>'
       +'<div class="hint" style="margin:4px 0 0;color:#92500A">⚠ 健康保険は<b>年度累計573万円</b>まで（厚年は1回150万円まで）。本アプリは<b>この1回分</b>で計算します。年内に複数回の賞与があり累計が573万円を超える場合は、超過分の健保がかからない点をご確認ください。</div></div>';
-    var cards=activeEmps().map(function(e){
+    var cards=state.employees.filter(function(e){return isActiveInMonth(e,ym);}).map(function(e){
       var c=computeBonus(e), en=bonusEntry(e);
       var prevBox = c.noPrev
         ? '<div class="cr-warn" style="margin:6px 0">⚠ 前月（'+esc(pm)+'）の給与（社保控除後）が未取得です。前月を計算・保存するか、ここに手入力してください（赤で止めません）。<div style="margin-top:5px">前月給与(社保控除後) <input class="finput num" data-bp="'+e.id+'" inputmode="numeric" value="'+attr(en.prevAfter)+'" placeholder="円" style="width:130px"></div></div>'
@@ -585,7 +601,7 @@
   /* ---------- 一覧 / 集計 ---------- */
   function renderListView(){
     var host=$('#view-list'); if(!host) return; loadPrev();
-    host.innerHTML=activeEmps().map(function(e){
+    host.innerHTML=state.employees.filter(function(e){return isActiveInMonth(e,state.month);}).map(function(e){
       var r=compute(e), open=state.open['L'+e.id];
       var pay=r.shikyu.map(function(s){return '<div class="dl"><span>'+esc(s.label)+'</span><span class="v">'+yen(s.value)+'</span></div>';}).join('');
       var ded=r.kojo.map(function(k){return '<div class="dl"><span>'+esc(k.label)+'</span><span class="v">'+yen(k.value)+'</span></div>';}).join('');
@@ -633,11 +649,11 @@
   function renderPrint(){
     $('#p-month').value=state.month;
     $$('.pmode').forEach(function(x){ x.classList.toggle('on', x.dataset.pmode===(state.printMode||'monthly')); });
-    var sel=$('#p-emp'); sel.innerHTML='<option value="__all">全員</option>'+state.employees.map(function(e,i){return e.retired?'':'<option value="'+i+'">'+esc(e.name)+'</option>';}).join('');
+    var sel=$('#p-emp'); sel.innerHTML='<option value="__all">全員</option>'+state.employees.map(function(e,i){return isActiveInMonth(e,state.month)?'<option value="'+i+'">'+esc(e.name)+'</option>':'';}).join('');
     doPreview();
   }
   function doPreview(){
-    var v=$('#p-emp').value; var emps=v==='__all'?activeEmps():[state.employees[+v]];
+    var v=$('#p-emp').value; var emps=v==='__all'?state.employees.filter(function(e){return isActiveInMonth(e,state.month);}):[state.employees[+v]];
     var isBonus=state.printMode==='bonus';
     var people=isBonus?buildBonusPeople(emps):buildPeople(emps);
     var doc=isBonus?{month:bonusMonthLabel(),kind:'bonus'}:{month:monthLabel()};
@@ -784,7 +800,7 @@
       var tg=e.target.closest('.cp-toggle:not(.cp-reset)'); if(tg){ state._oc=(state._oc===tg.dataset.cpk)?null:tg.dataset.cpk; renderDesign(); return; }
       var w=e.target.closest('.cw'); if(w){ state.theme[w.dataset.ck]=w.dataset.col; state._oc=null; afterDesign(); } });
     $('#b-print').addEventListener('click',function(){ var f=$('#frame'); try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} });
-    $('#b-xlsx').addEventListener('click',function(){ if(!window.PayslipXlsx)return; var v=$('#p-emp').value; var emps=(v==='__all')?activeEmps():[state.employees[+v]]; PayslipXlsx.download(buildPeople(emps), {company:state.company.name, monthLabel:monthLabel().replace(/ /g,''), filename:'給与明細_'+state.month+'.xlsx'}); });
+    $('#b-xlsx').addEventListener('click',function(){ if(!window.PayslipXlsx)return; var v=$('#p-emp').value; var emps=(v==='__all')?state.employees.filter(function(e){return isActiveInMonth(e,state.month);}):[state.employees[+v]]; PayslipXlsx.download(buildPeople(emps), {company:state.company.name, monthLabel:monthLabel().replace(/ /g,''), filename:'給与明細_'+state.month+'.xlsx'}); });
     window.addEventListener('resize',function(){ if($('#scr-print').classList.contains('active'))doPreview(); });
   }
 
