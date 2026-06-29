@@ -54,6 +54,12 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .emp-dtgl{display:flex;align-items:center;font-size:12px;font-weight:700;color:#2E7D54;cursor:pointer;padding:10px 2px 8px;margin-top:8px;border-top:1px dashed #d4eae0;}
 .emp-dtgl .mco-cv{color:#A9C4B6;transition:transform .2s;}
 .emp-detail{padding-top:4px;}
+/* 従業員マスタ 絞り込み(在籍中/休暇中/退職者/全員) */
+.emp-filter{display:flex;gap:6px;margin:0 0 10px;flex-wrap:wrap;}
+.emp-filter .ef-b{flex:1;min-width:64px;text-align:center;border:1.5px solid #d4eae0;border-radius:9px;padding:7px 4px;font-size:12px;font-weight:700;color:#7aa08c;background:#fff;cursor:pointer;}
+.emp-filter .ef-b.on{border-color:#52B788;background:#F0FAF4;color:#2E7D54;}
+.emp-filter .ef-b .ef-n{display:inline-block;margin-left:4px;font-size:11px;color:#A9C4B6;font-family:'DM Mono',monospace;}
+.emp-filter .ef-b.on .ef-n{color:#3D9E72;}
 .sec-lb{font-size:11px;font-weight:700;color:#2E7D54;margin:14px 0 6px;padding-top:10px;border-top:1px dashed #d4eae0;}
 .chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
 .chip.on{border-color:#52B788;background:#F0FAF4;color:#2E7D54;font-weight:700;}
