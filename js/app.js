@@ -91,7 +91,7 @@
       shaho:{ mode:'auto', months:[{pay:'',days:'30'},{pay:'',days:'30'},{pay:'',days:'30'}], mikomi:'', manual:'' } };
   }
   var WDAYS=['日','月','火','水','木','金','土'];
-  var RULE_ITEMS=[['teikyu','休みの日'],['companyHol','会社独自の休日'],['shotei','1日の働く時間'],['annual','年間の休み'],['warimashiRate','割増の率'],['koyoGyoshu','雇用保険の業種'],['paymentDays','支払基礎日数の数え方'],['kekkin','欠勤控除の計算'],['minashi','固定残業（みなし）'],['shoyo','賞与の有無']];
+  var RULE_ITEMS=[['teikyu','休みの日'],['companyHol','会社独自の休日'],['shotei','1日の働く時間'],['annual','年間の休み'],['warimashiRate','割増の率'],['koyoGyoshu','雇用保険の業種'],['paymentDays','支払基礎日数の数え方'],['kekkin','欠勤控除の計算'],['minashi','固定残業（みなし）'],['daikyu','代休・振替休日'],['shoyo','賞与の有無']];
   var state={ company:{name:'株式会社 ゼロアクト',addr:'',close:'末日',paydayRel:'next',paydayDay:'25',
       holidays:[0], dailyWorkH:'8', dailyWorkM:'0', annualHolidays:'120',
       ruleOn:{teikyu:true,shotei:true,annual:true,warimashiRate:true,koyoGyoshu:true},
@@ -144,6 +144,8 @@
   function kintaiVal(e,re){ var r=(e.kintai||[]).find(function(x){return re.test(x.label||'');}); return r?num(r.value):0; }
   function workedMin(e){ return num(e.workedH)*60+num(e.workedM); }
   function workedLabel(e){ var m=workedMin(e); return Math.floor(m/60)+':'+('0'+(m%60)).slice(-2); }
+  // 実出勤日数(日給の基本給用)。無給代休(daikyuDeduct)なら代休取得を出勤から控除
+  function effShukkin(e){ var s=kintaiVal(e,/出勤/); if((state.company.ruleOn||{}).daikyu && state.company.daikyuDeduct) s=Math.max(0, s-kintaiVal(e,/代休取得/)); return s; }
   // 時給=時給単価×労働時間 / 日給=日給額×出勤日数 で基本給を自動算出(月給は手入力のまま)
   // 基本給を状態から導出(単一ソース)。休暇中=休暇中の金額・時給=時給×労働時間・日給=日給×出勤・月給/役員=基本給。復職/再就職で自動的に元へ戻る
   function syncBasePay(e){
@@ -151,7 +153,7 @@
     var amt;
     if(e.workStatus && e.workStatus!=='normal') amt=num(e.leavePay);
     else if(e.payType==='時給') amt=Math.round(num(e.hourly)*workedMin(e)/60);
-    else if(e.payType==='日給') amt=Math.round(num(e.base)*kintaiVal(e,/出勤/));
+    else if(e.payType==='日給') amt=Math.round(num(e.base)*effShukkin(e));
     else amt=num(e.base);
     var idx=e.shikyu.findIndex(function(x){return /基本給/.test(x.label||'');});
     if(idx<0) e.shikyu.unshift({label:'基本給',value:String(amt)}); else e.shikyu[idx].value=String(amt);
@@ -255,7 +257,11 @@
         .map(function(o){return '<option value="'+o[0]+'"'+((c.kekkinMethod||'')===o[0]?' selected':'')+'>'+esc(o[1])+'</option>';}).join('');
       h+=ruleItemHTML('kekkin','欠勤控除の計算','月給の欠勤・不就労','','<label class="cr-chk" style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" data-cf="kanzenGekkyu"'+(c.kanzenGekkyu?' checked':'')+'>完全月給制（欠勤しても控除しない）</label><div style="margin-top:6px;font-size:12px">1日あたりの分母：<select class="cr-sel" data-cf="kekkinMethod">'+kmo+'</select></div><div class="ri-note">月給は<b>日給月給制（欠勤分を控除）が標準</b>。10日欠勤すれば10日分減ります（民法624条 ノーワーク・ノーペイ）。1日あたり＝月給÷分母×欠勤日数。役員等で減額しない場合のみ「完全月給制」に。時給・日給は元々日数/時間で按分されます。</div>'); }
     if(on.minashi){ h+=ruleItemHTML('minashi','固定残業（みなし）','時間','','<input class="cr-f cr-wide" data-cf="minashiH" inputmode="numeric" value="'+attr(c.minashiH)+'" placeholder="0">'); }
-    if(on.shoyo){ h+=ruleItemHTML('shoyo','賞与の有無','','','<div class="ri-note">賞与（ボーナス）の計算は<b>対応予定</b>です（近日）。今は支給欄に金額を手入力できます（社保・源泉の賞与専用計算は準備中）。</div>'); }
+    if(on.daikyu){ h+=ruleItemHTML('daikyu','代休・振替休日','使い分け','',
+      '<div class="ri-note" style="background:#fff8e1;border:1px solid #F4D8A8;border-radius:8px;padding:8px 10px;color:#7A3F00"><b>振替休日</b>＝事前に休みと労働日を入替→その出勤は<b>通常労働（割増なし）</b>。割増の「法定休日」に入れず、<b>ふつうの労働時間</b>に入れてください。<br><b>代休</b>＝先に休日労働→後で休む。休日労働は<b>割増あり</b>（割増の「法定休日/所定休日」に入れる）。休む日は入力の<b>「代休取得」</b>へ。</div>'
+      +'<label class="cr-chk" style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:8px"><input type="checkbox" data-cf="daikyuDeduct"'+(c.daikyuDeduct?' checked':'')+'>代休で休んだ日を出勤から差し引く（無給代休・日給制向け）</label>'
+      +'<div class="ri-note">既定（チェックなし）＝有給代休／月給は相殺前提で<b>記録のみ・賃金は変えません</b>。チェックすると代休取得日数を出勤から引きます（日給・出勤連動の手当に反映）。賃金は既存の割増で正確に出ます。</div>'); }
+    if(on.shoyo){ h+=ruleItemHTML('shoyo','賞与の有無','','','<div class="ri-note">賞与（ボーナス）は<b>入力タブの「賞与」</b>に切り替えて計算できます（社保＝標準賞与額・源泉＝算出率表で自動／明細・Excelも賞与用）。</div>'); }
     host.innerHTML=h;
   }
 
@@ -300,7 +306,7 @@
         +'<div class="frow"><div class="flabel">役職</div>'+roleSelect(e)+'</div></div>'
       +'<div class="frow2"><div class="frow"><div class="flabel">給与形態</div><select class="finput m-f" data-f="payType">'+PAYTYPES.map(function(p){return '<option'+(p===e.payType?' selected':'')+'>'+p+'</option>';}).join('')+'</select></div>'
         +'<div class="frow"><div class="flabel">'+(e.payType==='時給'?'時給単価':e.payType==='日給'?'日給額':e.payType==='役員'?'役員報酬':'基本給')+'<span class="hint2">円</span></div><input class="finput num m-f" data-f="'+(e.payType==='時給'?'hourly':'base')+'" inputmode="numeric" value="'+attr(fmtN(e.payType==='時給'?e.hourly:e.base))+'"></div></div>'
-      +(function(){ var mw=minWageInfo(e); if(!mw||mw.ok) return ''; return '<div class="cr-warn">⚠ 最低賃金（'+esc(mw.prefName)+'：時給'+fmtN(mw.minWage)+'円）を下回っています。時給換算 約'+fmtN(mw.hourly)+'円。'+(e.payType==='時給'?'時給単価':'基本給')+'を上げてください（最低賃金法4条）。</div>'; })()
+      +(function(){ var mw=minWageInfo(e); if(!mw||mw.ok) return ''; return '<div style="font-size:10.5px;color:#C0392B;margin:-4px 2px 8px">⚠ 最低賃金（'+esc(mw.prefName)+' 時給'+fmtN(mw.minWage)+'円）未満（約'+fmtN(mw.hourly)+'円）</div>'; })()
       +'<div class="frow"><div class="flabel">就業状況<span class="hint2">産休/育休/休職等</span><span class="help-i" data-help="workstatus">💡</span></div><select class="finput m-f" data-f="workStatus">'+WORK_STATUS.map(function(w){return '<option value="'+w[0]+'"'+((e.workStatus||'normal')===w[0]?' selected':'')+'>'+w[1]+'</option>';}).join('')+'</select>'+wsNoteHTML(e)+'</div>'
       +'<div class="frow2"><div class="frow"><div class="flabel">年間所定休日<span class="hint2">日/年</span><span class="help-i" data-help="shoteibase">💡</span></div><input class="finput num m-f" data-f="annualHolidays" value="'+attr(e.annualHolidays)+'"></div>'
         +'<div class="frow"><div class="flabel">1日の所定労働</div><span class="dur"><input class="finput m-f dur-in" data-f="dailyWorkH" inputmode="numeric" value="'+attr(e.dailyWorkH)+'"><i>時</i><input class="finput m-f dur-in" data-f="dailyWorkM" inputmode="numeric" value="'+attr(e.dailyWorkM)+'"><i>分</i></span></div></div>'
@@ -481,13 +487,21 @@
   function basePayInputHTML(e,i){
     if(e.payType==='時給'){ var hrs=workedMin(e)/60;
       return '<div class="hint" style="margin:-4px 2px 8px;color:#3D6B53">基本給（自動）＝ 時給 '+fmtN(e.hourly)+'円 × 労働時間 '+(Math.round(hrs*100)/100)+'h ＝ <b>'+yen(Math.round(num(e.hourly)*hrs))+'</b></div>'; }
-    if(e.payType==='日給'){ var d=kintaiVal(e,/出勤/);
-      return '<div class="hint" style="margin:-4px 2px 8px;color:#3D6B53">基本給（自動）＝ 日給 '+fmtN(e.base)+'円 × 出勤日数 '+d+'日 ＝ <b>'+yen(Math.round(num(e.base)*d))+'</b>（出勤日数は上の勤怠で）</div>'; }
+    if(e.payType==='日給'){ var d=effShukkin(e); var dd=((state.company.ruleOn||{}).daikyu&&state.company.daikyuDeduct&&kintaiVal(e,/代休取得/)>0);
+      return '<div class="hint" style="margin:-4px 2px 8px;color:#3D6B53">基本給（自動）＝ 日給 '+fmtN(e.base)+'円 × 出勤日数 '+d+'日'+(dd?'（代休控除後）':'')+' ＝ <b>'+yen(Math.round(num(e.base)*d))+'</b>（出勤日数は上の勤怠で）</div>'; }
     return '';
   }
   // 標準勤怠(出勤/欠勤/有給)。毎月の入力を展開不要で全員ぶん見せるため上段に常時表示する
   var KIN_STD=[['出勤日数',/出勤/],['欠勤日数',/欠勤/],['有給取得',/有給/]];
-  function ensureKintai(e){ if(!e.kintai)e.kintai=[]; KIN_STD.forEach(function(s){ if(!e.kintai.some(function(k){return s[1].test(k.label||'');})) e.kintai.push({label:s[0],value:''}); }); }
+  function ensureKintai(e){ if(!e.kintai)e.kintai=[]; KIN_STD.forEach(function(s){ if(!e.kintai.some(function(k){return s[1].test(k.label||'');})) e.kintai.push({label:s[0],value:''}); });
+    if((state.company.ruleOn||{}).daikyu){ [['代休取得',/代休取得/],['振替休日',/振替休日/]].forEach(function(s){ if(!e.kintai.some(function(k){return s[1].test(k.label||'');})) e.kintai.push({label:s[0],value:''}); }); } }
+  // 代休・振替休日の入力(会社の決まりで有効時のみ・詳細側)
+  function daikyuInputHTML(e){ if(!((state.company.ruleOn||{}).daikyu)) return '';
+    function cell(lab,re){ var idx=kinIdx(e,re); var v=idx>=0?e.kintai[idx].value:''; return '<label class="ic-f"><span>'+lab+'(日)</span><input class="finput num ic-in" data-g="kintai" data-ri="'+idx+'" data-f="value" inputmode="numeric" value="'+attr(v)+'"></label>'; }
+    var dd=state.company.daikyuDeduct;
+    return '<div class="grp"><div class="grp-h">代休・振替休日</div>'
+      +'<div class="ic-kin">'+cell('代休取得',/代休取得/)+cell('振替休日',/振替休日/)+'</div>'
+      +'<div class="wi-note2">振替休日は<b>通常労働（割増なし）</b>＝割増の法定休日でなく労働時間へ。代休は<b>休日労働に割増あり</b>＋休む日をここへ。'+(dd?'代休取得は出勤から差し引きます（無給代休）。':'記録のみ・賃金は変えません（有給代休／月給相殺）。')+'</div></div>'; }
   function kinIdx(e,re){ var a=e.kintai||[]; for(var i=0;i<a.length;i++){ if(re.test(a[i].label||'')) return i; } return -1; }
   // 常時表示のコンパクト勤怠(出勤/欠勤/有給+労働時間)。✕なし・数値右揃え。1人ずつ展開せず全員ぶん一画面で入れられる
   function compactKinHTML(e){
@@ -498,7 +512,7 @@
   // 標準勤怠以外の勤怠行を“真のindex”で(詳細側・✕/＋で自由編集)
   function otherKinRows(e){
     return (e.kintai||[]).map(function(it,ri){
-      if(/出勤|欠勤|有給/.test(it.label||'')) return '';
+      if(/出勤|欠勤|有給|代休取得|振替休日/.test(it.label||'')) return '';
       return '<div class="row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px"><input class="finput" data-g="kintai" data-ri="'+ri+'" data-f="label" value="'+attr(it.label)+'" style="flex:1.3" placeholder="項目"><input class="finput num" data-g="kintai" data-ri="'+ri+'" data-f="value" value="'+attr(it.value)+'" style="flex:1" placeholder="値"><button class="b-del m-del" data-g="kintai" data-ri="'+ri+'">×</button></div>';
     }).join('');
   }
@@ -542,6 +556,7 @@
         +'<div class="acc-body">'
           +basePayInputHTML(e,i)
           +(e.payType==='役員'?'':warimashiInputHTML(e))
+          +daikyuInputHTML(e)
           +'<div class="grp"><div class="grp-h">その他の勤怠<button class="mini add" data-add="kintai" data-i="'+i+'">＋</button></div><div class="rows">'+otherKinRows(e)+'</div></div>'
           +'<div class="grp"><div class="grp-h">支給<button class="mini add" data-add="shikyu" data-i="'+i+'">＋</button></div><div class="rows">'+rowsHTML('shikyu',e.shikyu)+'</div></div>'
           +'<div class="grp"><div class="grp-h">法定外控除<button class="mini add" data-add="extraKojo" data-i="'+i+'">＋</button></div><div class="rows">'+rowsHTML('extraKojo',e.extraKojo)+'</div></div>'
@@ -642,7 +657,7 @@
   }
 
   /* ---------- 印刷 / PDF ---------- */
-  function buildPeople(emps){ return emps.map(function(e){ var r=compute(e); var k=(e.kintai||[]).slice(); var oi=k.findIndex(function(x){return /出勤/.test(x.label||'');}); var wt={label:'労働時間',value:workedLabel(e)}; if(oi>=0)k.splice(oi+1,0,wt); else k.unshift(wt); return { name:e.name, company:state.company.name, payDate:payDateStr(), kintai:k, shikyu:r.shikyu, kojo:r.kojo, net:r.net, shikyuTotal:r.shikyuTotal, kojoTotal:r.kojoTotal }; }); }
+  function buildPeople(emps){ return emps.map(function(e){ var r=compute(e); var k=(e.kintai||[]).filter(function(x){ if(/代休取得|振替休日/.test(x.label||'')) return num(x.value)>0; return true; }); var oi=k.findIndex(function(x){return /出勤/.test(x.label||'');}); var wt={label:'労働時間',value:workedLabel(e)}; if(oi>=0)k.splice(oi+1,0,wt); else k.unshift(wt); return { name:e.name, company:state.company.name, payDate:payDateStr(), kintai:k, shikyu:r.shikyu, kojo:r.kojo, net:r.net, shikyuTotal:r.shikyuTotal, kojoTotal:r.kojoTotal }; }); }
   // 賞与明細用: 月次明細と同じテンプレ/テーマ(ユーザー選択)で 勤怠なし・支給=賞与/控除=賞与社保+源泉
   function bonusMonthLabel(){ var ym=bonusYmOf(); var y=Number(ym.slice(0,4)), m=Number(ym.slice(5,7)); var k=['','一','二','三','四','五','六','七','八','九','十','十一','十二']; return '令 和 '+(y-2018)+' 年 '+(k[m]||m)+' 月 賞 与'; }
   function buildBonusPeople(emps){ return emps.map(function(e){ var c=computeBonus(e); var kojo=[{label:'健康保険',value:c.si.health}]; if(c.si.kaigo>0) kojo.push({label:'介護保険',value:c.si.kaigo}); kojo.push({label:'厚生年金',value:c.si.pension}); kojo.push({label:'雇用保険',value:c.si.employ}); kojo.push({label:'源泉所得税',value:c.taxAmt}); return { name:e.name, company:state.company.name, payDate:(state.bonus&&state.bonus.payDay)||payDateStr(), kintai:[], shikyu:[{label:'賞与',value:c.bonus}], kojo:kojo, net:c.net, shikyuTotal:c.bonus, kojoTotal:c.si.total+c.taxAmt }; }); }
@@ -743,7 +758,7 @@
       var x=ev.target.closest('[data-rule-x]'); if(x){ state.company.ruleOn[x.dataset.ruleX]=false; renderRuleChips(); renderCompanyRules(); return; }
     });
     rh.addEventListener('input',function(ev){ if(ev.target.tagName==='SELECT')return; var f=ev.target.dataset.cf; if(f) state.company[f]=ev.target.value.replace(/[^0-9]/g,''); });
-    rh.addEventListener('change',function(ev){ if(ev.target.dataset.coh!=null){ state.company.companyHolidays=(state.company.companyHolidays||[]); state.company.companyHolidays[+ev.target.dataset.coh]=ev.target.value; return; } var f=ev.target.dataset.cf; if(f==='gyoshu'){ state.company.gyoshu=ev.target.value; return; } if(f==='paymentDaysMethod'){ state.company.paymentDaysMethod=ev.target.value; return; } if(f==='kekkinMethod'){ state.company.kekkinMethod=ev.target.value; return; } if(f==='kanzenGekkyu'){ state.company.kanzenGekkyu=ev.target.checked; renderCompanyRules(); return; } if(f==='annualHolidays'||f==='dailyWorkH'||f==='dailyWorkM') renderCompanyRules(); });
+    rh.addEventListener('change',function(ev){ if(ev.target.dataset.coh!=null){ state.company.companyHolidays=(state.company.companyHolidays||[]); state.company.companyHolidays[+ev.target.dataset.coh]=ev.target.value; return; } var f=ev.target.dataset.cf; if(f==='gyoshu'){ state.company.gyoshu=ev.target.value; return; } if(f==='paymentDaysMethod'){ state.company.paymentDaysMethod=ev.target.value; return; } if(f==='kekkinMethod'){ state.company.kekkinMethod=ev.target.value; return; } if(f==='kanzenGekkyu'){ state.company.kanzenGekkyu=ev.target.checked; renderCompanyRules(); return; } if(f==='daikyuDeduct'){ state.company.daikyuDeduct=ev.target.checked; return; } if(f==='annualHolidays'||f==='dailyWorkH'||f==='dailyWorkM') renderCompanyRules(); });
     $('#b-add-emp').addEventListener('click',function(){ var e=defEmp('従業員 '+(state.employees.length+1)); state.employees.push(e); state.open[e.id]=true; renderEmpMaster(); });
 
     // 従業員マスタ操作
@@ -825,7 +840,12 @@
       var tg=e.target.closest('.cp-toggle:not(.cp-reset)'); if(tg){ state._oc=(state._oc===tg.dataset.cpk)?null:tg.dataset.cpk; renderDesign(); return; }
       var w=e.target.closest('.cw'); if(w){ state.theme[w.dataset.ck]=w.dataset.col; state._oc=null; afterDesign(); } });
     $('#b-print').addEventListener('click',function(){ var f=$('#frame'); try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} });
-    $('#b-xlsx').addEventListener('click',function(){ if(!window.PayslipXlsx)return; var v=$('#p-emp').value; var emps=(v==='__all')?state.employees.filter(function(e){return isActiveInMonth(e,state.month);}):[state.employees[+v]]; PayslipXlsx.download(buildPeople(emps), {company:state.company.name, monthLabel:monthLabel().replace(/ /g,''), filename:'給与明細_'+state.month+'.xlsx'}); });
+    $('#b-xlsx').addEventListener('click',function(){ if(!window.PayslipXlsx)return; var v=$('#p-emp').value; var emps=(v==='__all')?state.employees.filter(function(e){return isActiveInMonth(e,state.month);}):[state.employees[+v]];
+      var isBonus=state.printMode==='bonus'; // 印刷の月次/賞与トグルに合わせる(賞与で月次が出る不具合を修正)
+      var people=isBonus?buildBonusPeople(emps):buildPeople(emps);
+      var lbl=(isBonus?bonusMonthLabel():monthLabel()).replace(/ /g,'');
+      var fn=isBonus?('賞与明細_'+bonusYmOf()+'.xlsx'):('給与明細_'+state.month+'.xlsx');
+      PayslipXlsx.download(people, {company:state.company.name, monthLabel:lbl, filename:fn}); });
     window.addEventListener('resize',function(){ if($('#scr-print').classList.contains('active'))doPreview(); });
   }
 
