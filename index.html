@@ -83,8 +83,10 @@
   <!-- ② 入力 -->
   <section class="screen" id="scr-input">
     <div class="scr-head"><span class="scr-sub scr-period" id="in-month"></span><div class="scr-month-wrap"><label>対象月</label><input type="month" class="finput finput-sm scr-month"></div></div>
-    <p class="hint">従業員をタップすると当月の変動値（勤怠・時数・変動手当）を入力できます。法定控除（健保/厚年/介護/雇用/所得税）は自動計算されます。</p>
+    <div class="imode-seg"><b class="imode on" data-imode="monthly">月次給与</b><b class="imode" data-imode="bonus">賞与</b></div>
+    <p class="hint" id="in-hint">従業員をタップすると当月の変動値（勤怠・時数・変動手当）を入力できます。法定控除（健保/厚年/介護/雇用/所得税）は自動計算されます。</p>
     <div id="input-list"></div>
+    <div id="bonus-view" style="display:none"></div>
   </section>
 
   <!-- ③ 一覧/集計 -->
@@ -134,6 +136,7 @@
 <script src="lib/payroll-calc.js"></script>
 <script src="lib/shotokuzei-densan.js"></script>
 <script src="lib/calc.js"></script>
+<script src="lib/shoyo-zei.js"></script>
 <script src="lib/warimashi.js"></script>
 <script src="lib/saitei-chingin.js"></script>
 <script src="lib/select.js"></script>

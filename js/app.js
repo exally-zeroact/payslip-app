@@ -97,7 +97,8 @@
       ruleOn:{teikyu:true,shotei:true,annual:true,warimashiRate:true,koyoGyoshu:true},
       rateOt:'', rateHoliday:'', rateNight:'', rateOver60:'', gyoshu:'ippan' },
     month:'2026-06', prefer:'cols', theme:{accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}, depts:['営業部'], roles:['課長','主任','一般'],
-    employees:[defEmp('山田 太郎')], open:{} };
+    employees:[defEmp('山田 太郎')], open:{},
+    inputMode:'monthly', bonus:{ payYm:'', payDay:'', byEmp:{} } };
 
   // マイカー通勤 1か月非課税限度(片道km・国税庁No.2585 令和8年4月〜)
   function carCommuteNonTax(km){ km=num(km);
@@ -196,7 +197,7 @@
     var TABN={'scr-settings':'設定','scr-input':'入力','scr-list':'一覧 / 集計','scr-print':'印刷'}; var at=$('#appbar-tab'); if(at) at.textContent=TABN[id]||''; // ヘッダー右はタブ名
     $$('.scr-month').forEach(function(m){ m.value=state.month; }); // 対象月はタイトル行(入力/一覧)に表示
     if(id==='scr-settings') renderEmpMaster();
-    if(id==='scr-input'){ $('#in-month').textContent=monthLabel(); renderInput(); }
+    if(id==='scr-input'){ $('#in-month').textContent=monthLabel(); renderInputArea(); }
     if(id==='scr-list') renderListView();
     if(id==='scr-print') renderPrint();
   }
@@ -512,6 +513,75 @@
   }
   function refreshCard(i){ var e=state.employees[i]; var card=$('#input-list .acc[data-i="'+i+'"]'); if(!card) return; var r=compute(e); card.querySelector('.acc-net').textContent=yen(r.net); var dw=card.querySelector('.diffb-wrap'); if(dw) dw.innerHTML=diffBadge(e,r); var cw=card.querySelector('.calc-wrap'); if(cw) cw.innerHTML=calcBoxHTML(e); var wr=card.querySelector('.wi-resw'); if(wr) wr.innerHTML=wiResHTML(e); }
 
+  // ───────── 賞与(ボーナス)モード ─────────
+  function SZ(){ try{ if(typeof ShoyoZei!=='undefined'&&ShoyoZei) return ShoyoZei; }catch(e){} return (typeof window!=='undefined'&&window.ShoyoZei)||null; }
+  function bonusYmOf(){ return (state.bonus&&state.bonus.payYm)||state.month; }
+  function employYearOfYm(ym){ var y=parseInt(String(ym||'').slice(0,4),10)||2026, m=parseInt(String(ym||'').slice(5,7),10)||1; var fy=(m>=4)?y:y-1; return fy>=2026?2026:2025; }
+  // 賞与支給月の前月の「社保控除後給与(kazei)」を履歴(pay_payslips)から取得
+  function loadBonusPrev(){ if(!(window.Store&&Store.getPayslipsByYm)) return; var pm=prevYmOf(bonusYmOf()); if(state._bonusPrevYm===pm) return; state._bonusPrevYm=pm;
+    Store.getPayslipsByYm(pm,pm).then(function(rows){ var m={}; (rows||[]).forEach(function(r){ if(r&&r.data&&r.data.kazei!=null) m[r.employee_id]=num(r.data.kazei); }); state._bonusPrev=m;
+      if($('#scr-input')&&$('#scr-input').classList.contains('active')&&state.inputMode==='bonus') renderBonus(); }).catch(function(){});
+  }
+  function bonusEntry(e){ var b=state.bonus||(state.bonus={payYm:'',payDay:'',byEmp:{}}); if(!b.byEmp)b.byEmp={}; if(!b.byEmp[e.id])b.byEmp[e.id]={amount:'',prevAfter:''}; return b.byEmp[e.id]; }
+  function computeBonus(e){
+    var SZl=SZ(), S=SHH(), ym=bonusYmOf(), en=bonusEntry(e);
+    var bonus=num(en.amount), prevMap=state._bonusPrev||{};
+    var manualPrev=(en.prevAfter!=null&&en.prevAfter!==''), histPrev=(e.id in prevMap);
+    var prevAfter=manualPrev?num(en.prevAfter):(histPrev?prevMap[e.id]:null);
+    var hasKaigo=(window.PayrollCalc&&PayrollCalc.isKaigoTarget)?PayrollCalc.isKaigoTarget(e.birthYmd,ym):false;
+    var si=SZl?SZl.calcBonusSI({ bonus:bonus, healthRate:prefRate(e.pref,ym), kaigoRate:(S&&S.getKaigo)?S.getKaigo(ym).jugyoin:0.00795, hasKaigo:hasKaigo, employRate:employRateOf((state.company||{}).gyoshu, employYearOfYm(ym)), ytdKenpoBonus:0 }):{total:0,health:0,pension:0,kaigo:0,employ:0,hyojun:0,kenpoBase:0,koseiBase:0};
+    var tax={tax:0}, noPrev=false;
+    if(prevAfter==null) noPrev=true;
+    else if(SZl) tax=SZl.calcBonusTax({ bonus:bonus, bonusSI:si.total, prevSalary:prevAfter, prevSI:0, fuyou:num(e.fuyou), taxClass:e.taxClass, payYm:ym });
+    var taxAmt=noPrev?0:(tax.tax||0);
+    return { bonus:bonus, prevAfter:prevAfter, fromHistory:(!manualPrev&&histPrev), noPrev:noPrev, si:si, tax:tax, taxAmt:taxAmt, net:bonus-si.total-taxAmt };
+  }
+  function renderBonus(){
+    var host=$('#bonus-view'); if(!host) return; loadBonusPrev();
+    var b=state.bonus||{}, ym=bonusYmOf(), pm=prevYmOf(ym);
+    var head='<div class="card" style="padding:12px;margin-bottom:10px">'
+      +'<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">'
+      +'<label style="font-size:12px;color:#2E7D54;font-weight:700">賞与支給月 <input type="month" class="finput finput-sm" data-bn="payYm" value="'+attr(ym)+'"></label>'
+      +'<label style="font-size:12px;color:#2E7D54;font-weight:700">支給日 <input class="finput finput-sm" data-bn="payDay" value="'+attr(b.payDay)+'" placeholder="例 12月10日" style="width:110px"></label>'
+      +'</div>'
+      +'<div class="hint" style="margin:8px 0 0">賞与の所得税は<b>前月（'+esc(pm)+'）の給与（社保控除後）</b>と扶養人数で率が決まります（国税庁 算出率表）。前月を計算・保存していれば自動、無ければ各行で手入力してください。</div></div>';
+    var cards=activeEmps().map(function(e){
+      var c=computeBonus(e), en=bonusEntry(e);
+      var prevBox = c.noPrev
+        ? '<div class="cr-warn" style="margin:6px 0">⚠ 前月（'+esc(pm)+'）の給与（社保控除後）が未取得です。前月を計算・保存するか、ここに手入力してください（赤で止めません）。<div style="margin-top:5px">前月給与(社保控除後) <input class="finput num" data-bp="'+e.id+'" inputmode="numeric" value="'+attr(en.prevAfter)+'" placeholder="円" style="width:130px"></div></div>'
+        : '<div style="font-size:11px;color:#4b6b58;margin:5px 0">前月給与(社保控除後): <b>'+yen(c.prevAfter)+'</b> '+(c.fromHistory?'（前月'+esc(pm)+'から自動）':'（手入力）')+' <input class="finput num" data-bp="'+e.id+'" inputmode="numeric" value="'+attr(en.prevAfter)+'" placeholder="上書き" style="width:100px;margin-left:6px"></div>';
+      var hyojun=c.si.hyojun||0, caps='';
+      if(hyojun>0&&c.si.kenpoBase<hyojun) caps+='<span class="cap-badge">健保 年573万上限</span>';
+      if(hyojun>0&&c.si.koseiBase<hyojun) caps+='<span class="cap-badge">厚年 1回150万上限</span>';
+      var taxLine, warn='';
+      if(c.noPrev){ taxLine='<div class="calc-line"><span>源泉所得税</span><span class="v">前月給与の入力待ち</span></div>'; }
+      else if(c.tax.otsu){ taxLine='<div class="calc-line"><span>源泉所得税</span><span class="v">乙欄＝手入力</span></div>'; warn='<div class="cr-warn" style="margin:6px 0">⚠ 乙欄の賞与率は未収録です。源泉税は手入力してください（近日対応）。</div>'; }
+      else if(c.tax.special){ taxLine='<div class="calc-line"><span>源泉所得税</span><span class="v">月額表で要計算</span></div>'; warn='<div class="cr-warn" style="margin:6px 0">⚠ 前月給与なし／賞与が前月給与(社保後)の10倍超のため、この賞与は月額表で計算する特例です。源泉税は手計算してください。</div>'; }
+      else { taxLine='<div class="calc-line"><span>源泉所得税（率 '+c.tax.rate+'%）</span><span class="v">'+yen(c.taxAmt)+'</span></div>'; }
+      return '<div class="acc icard'+(num(en.amount)>0?' open':'')+'">'
+        +'<div class="ic-top"><span class="acc-nm">'+esc(e.name)+'</span><span class="acc-net">'+yen(c.net)+'</span></div>'
+        +'<div style="padding:0 12px 12px">'
+        +'<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><span style="font-size:12px;color:#2E7D54;font-weight:700;min-width:54px">賞与額</span><input class="finput num" data-ba="'+e.id+'" inputmode="numeric" value="'+attr(en.amount)+'" placeholder="円" style="flex:1"></div>'
+        +prevBox+(caps?'<div style="margin:4px 0">'+caps+'</div>':'')+warn
+        +'<div class="calc-box"><div class="ch">賞与の自動計算（標準賞与額 '+yen(hyojun)+'）</div>'
+          +'<div class="calc-line"><span>賞与額</span><span class="v">'+yen(c.bonus)+'</span></div>'
+          +'<div class="calc-line"><span>健康保険</span><span class="v">'+yen(c.si.health)+'</span></div>'
+          +(c.si.kaigo>0?'<div class="calc-line"><span>介護保険</span><span class="v">'+yen(c.si.kaigo)+'</span></div>':'')
+          +'<div class="calc-line"><span>厚生年金</span><span class="v">'+yen(c.si.pension)+'</span></div>'
+          +'<div class="calc-line"><span>雇用保険</span><span class="v">'+yen(c.si.employ)+'</span></div>'
+          +taxLine
+          +'<div class="calc-line net tot"><span>差引支給額（手取り）</span><span class="v">'+yen(c.net)+'</span></div></div>'
+        +'</div></div>';
+    }).join('');
+    host.innerHTML=head+(cards||'<p class="hint">対象の従業員がいません。</p>');
+  }
+  function renderInputArea(){
+    var ml=$('#input-list'), bv=$('#bonus-view'), hint=$('#in-hint'), bonus=(state.inputMode==='bonus');
+    $$('.imode').forEach(function(x){ x.classList.toggle('on', x.dataset.imode===state.inputMode); });
+    if(ml) ml.style.display=bonus?'none':''; if(bv) bv.style.display=bonus?'':'none'; if(hint) hint.style.display=bonus?'none':'';
+    if(bonus) renderBonus(); else renderInput();
+  }
+
   /* ---------- 一覧 / 集計 ---------- */
   function renderListView(){
     var host=$('#view-list'); if(!host) return; loadPrev();
@@ -579,9 +649,27 @@
     document.addEventListener('click',function(e){ var hi=e.target.closest('.help-i'); if(hi){ openHelp(hi.dataset.help); } });
     $('#help-x').addEventListener('click',function(){ $('#help-ov').classList.remove('on'); });
     $('#help-ov').addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); });
-    document.addEventListener('change',function(ev){ if(!ev.target.classList.contains('scr-month'))return; state.month=ev.target.value||state.month; state._prevYm=null; /* 月替わりで前月比キャッシュを更新 */ $$('.scr-month').forEach(function(m){ m.value=state.month; }); updatePaydayPreview();
-      if($('#scr-input').classList.contains('active')){$('#in-month').textContent=monthLabel();renderInput();}
+    document.addEventListener('change',function(ev){ if(!ev.target.classList.contains('scr-month'))return; state.month=ev.target.value||state.month; state._prevYm=null; state._bonusPrevYm=null; /* 月替わりで前月比/賞与前月キャッシュを更新 */ $$('.scr-month').forEach(function(m){ m.value=state.month; }); updatePaydayPreview();
+      if($('#scr-input').classList.contains('active')){$('#in-month').textContent=monthLabel();renderInputArea();}
       if($('#scr-list').classList.contains('active')) renderListView(); });
+
+    // 入力タブ: 月次給与/賞与 モード切替
+    var inScr=$('#scr-input');
+    function bonusEmpOf(el){ var id=el.dataset.ba||el.dataset.bp; return (state.employees||[]).find(function(x){return x.id===id;}); }
+    if(inScr){
+      inScr.addEventListener('click',function(ev){ var m=ev.target.closest('.imode'); if(!m)return; state.inputMode=m.dataset.imode==='bonus'?'bonus':'monthly'; renderInputArea(); if(window.persistSaveDebounced)persistSaveDebounced(); });
+      // 入力中は値を保存のみ(再描画しない=フォーカス維持)。結果はblur(change)で更新。
+      inScr.addEventListener('input',function(ev){ var ba=ev.target.closest('[data-ba]'), bp=ev.target.closest('[data-bp]'); if(!ba&&!bp)return;
+        var e=bonusEmpOf(ba||bp); if(!e)return; var en=bonusEntry(e);
+        if(ba) en.amount=ba.value.replace(/[^0-9]/g,''); else en.prevAfter=bp.value.replace(/[^0-9]/g,'');
+        if(window.persistSaveDebounced)persistSaveDebounced(); });
+      inScr.addEventListener('change',function(ev){
+        var bn=ev.target.closest('[data-bn]');
+        if(bn){ if(!state.bonus)state.bonus={byEmp:{}}; if(bn.dataset.bn==='payYm'){ state.bonus.payYm=bn.value; state._bonusPrevYm=null; } else { state.bonus.payDay=bn.value; } renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
+        var ba=ev.target.closest('[data-ba]'), bp=ev.target.closest('[data-bp]');
+        if(ba||bp){ var e=bonusEmpOf(ba||bp); if(e){ var en=bonusEntry(e); if(ba) en.amount=ba.value.replace(/[^0-9]/g,''); else en.prevAfter=bp.value.replace(/[^0-9]/g,''); } renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); }
+      });
+    }
 
     // 設定 seg
     $('#set-seg').addEventListener('click',function(ev){ var b=ev.target.closest('.seg-b'); if(!b)return; $$('.seg-b',this).forEach(function(x){x.classList.toggle('on',x===b);}); var s=b.dataset.set;
@@ -700,7 +788,7 @@
     activeEmps().forEach(function(e){ try{
       var r=compute(e);
       var days=(window.PayrollCalc&&PayrollCalc.calcPaymentDays)?PayrollCalc.calcPaymentDays(e,ym,method):0;
-      Store.savePayslip(ym, e.id, { name:e.name, shikyuTotal:r.shikyuTotal, paymentDays:days, kojoTotal:r.kojoTotal, net:r.net });
+      Store.savePayslip(ym, e.id, { name:e.name, shikyuTotal:r.shikyuTotal, paymentDays:days, kojoTotal:r.kojoTotal, net:r.net, kazei:r.kazei, siTotal:(r.si&&r.si.total)||0 });
     }catch(_e){} });
   }
   // 定時決定: 当年の4・5・6月の履歴から 総支給+支払基礎日数 を自動セット(無い月は空欄=手入力)
@@ -718,7 +806,7 @@
 
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';
-  function snapshot(){ return { v:1, company:state.company, employees:state.employees, month:state.month, theme:state.theme, prefer:state.prefer, depts:state.depts, roles:state.roles, showRetired:state.showRetired }; }
+  function snapshot(){ return { v:1, company:state.company, employees:state.employees, month:state.month, theme:state.theme, prefer:state.prefer, depts:state.depts, roles:state.roles, showRetired:state.showRetired, bonus:state.bonus }; }
   var _saveT=null;
   function persistSave(){ try{ localStorage.setItem(PKEY, JSON.stringify(snapshot())); }catch(e){} if(window.Store&&Store.cloudSaveState){ try{ Store.cloudSaveState(snapshot()); }catch(e){} } try{ saveMonthlyPayslips(); }catch(e){} }
   function persistSaveDebounced(){ if(_saveT)clearTimeout(_saveT); _saveT=setTimeout(persistSave, 500); }
@@ -728,6 +816,7 @@
       if(s.company) state.company=s.company; state.employees=s.employees;
       if(s.month) state.month=s.month; if(s.theme) state.theme=s.theme; if(s.prefer) state.prefer=s.prefer;
       if(s.depts) state.depts=s.depts; if(s.roles) state.roles=s.roles; if(s.showRetired!=null) state.showRetired=s.showRetired;
+      if(s.bonus) state.bonus=s.bonus;
     }
     // クラウド(Supabase)が有効なら後から読み込んで上書き＋再描画
     reloadCloud();
@@ -736,6 +825,7 @@
     state.company=cs.company||state.company; state.employees=cs.employees;
     if(cs.month)state.month=cs.month; if(cs.theme)state.theme=cs.theme; if(cs.prefer)state.prefer=cs.prefer;
     if(cs.depts)state.depts=cs.depts; if(cs.roles)state.roles=cs.roles; if(cs.showRetired!=null)state.showRetired=cs.showRetired;
+    if(cs.bonus)state.bonus=cs.bonus;
     $$('.scr-month').forEach(function(m){ m.value=state.month; }); fillCompany(); var act=$('.screen.active'); if(act)showScreen(act.id); return true; }
   function reloadCloud(){ if(window.Store&&Store.cloudLoadState){ return Store.cloudLoadState().then(applyCloudState).catch(function(){return false;}); } return Promise.resolve(false); }
   window.PayslipReloadCloud=reloadCloud; window.PayslipPersistSave=persistSave;
