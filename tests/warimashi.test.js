@@ -154,6 +154,16 @@ T('保障給/高い方: 歩合 vs 時給×総時間 の高い方', function () {
   eq(W.higherOf(150000, W.guaranteePay(1200, 160 * 60)), 192000);
   eq(W.higherOf(250000, W.guaranteePay(1200, 160 * 60)), 250000);
 });
+/* 歩合の基本給配線(app.js syncBasePay の単一ソース) */
+T('commissionBasePay: 歩合<保障 → 保障給適用 / 歩合>保障 → 歩合実績', function () {
+  eq(W.commissionBasePay(150000, 1200, 160 * 60), 192000); // 歩合15万 < 保障192000 → 保障給
+  eq(W.commissionBasePay(250000, 1200, 160 * 60), 250000); // 歩合25万 > 保障192000 → 歩合実績
+  eq(W.commissionBasePay(192000, 1200, 160 * 60), 192000); // 同額
+});
+T('commissionBasePay: 保障時給未設定(0)なら歩合実績がそのまま基本給', function () {
+  eq(W.commissionBasePay(180000, '', 160 * 60), 180000);
+  eq(W.commissionBasePay(0, '', 160 * 60), 0);
+});
 T('最低賃金チェック: 賃金÷総時間 ≧ 地域別最賃', function () {
   // 時給換算 192000/160=1200 → 東京1163以上=OK / 1100基準割れ
   eq(W.minWageOk(192000, 160 * 60, 1163), true);
