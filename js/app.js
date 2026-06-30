@@ -102,7 +102,7 @@
       rateOt:'', rateHoliday:'', rateNight:'', rateOver60:'', gyoshu:'ippan' },
     month:'2026-06', prefer:'col2_1', theme:{accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}, depts:['営業部'], roles:['課長','主任','一般'],
     employees:[defEmp('山田 太郎')], open:{},
-    inputMode:'monthly', printMode:'monthly', empFilter:'active', bonus:{ payYm:'', payDay:'', byEmp:{} } };
+    inputMode:'monthly', printMode:'monthly', empFilter:'active', bonus:{ payYm:'', payDay:'', byEmp:{} }, confirmed:{} };
 
   // マイカー通勤 1か月非課税限度(片道km・国税庁No.2585 令和8年4月〜)
   function carCommuteNonTax(km){ km=num(km);
@@ -533,6 +533,13 @@
       if($('#scr-list')&&$('#scr-list').classList.contains('active')) renderListView(); }).catch(function(){});
   }
   function diffBadge(e,r){ var pv=state._prev||{}; if(!(e.id in pv)) return ''; var d=r.net-pv[e.id]; if(d===0) return ''; var cls=d>0?'up':'dn'; var t=d>0?'▲+'+fmtN(d):'▼'+fmtN(-d); return '<span class="diffb '+cls+'" title="前月比('+state._prevYm+')">'+t+'</span>'; }
+  // ── 確認(未入力)ハイブリッド: 自動の前月比＋手動の確認✓・変動なしは自動済扱い ──
+  function empConfirmed(e){ var c=state.confirmed&&state.confirmed[state.month]; return !!(c&&c[e.id]); }
+  function empAutoOk(e,r){ var pv=state._prev||{}; return (e.id in pv) && (r.net-pv[e.id])===0; } // 前月あり且つ変動なし=自動済扱い
+  function empNeedsReview(e,r){ return !empConfirmed(e) && !empAutoOk(e,r); }      // 変化あり/新規 かつ 未確認
+  function reviewCounts(){ var done=0,total=0; state.employees.forEach(function(e){ if(!isActiveInMonth(e,state.month))return; total++; var r=compute(e); if(empConfirmed(e)||empAutoOk(e,r))done++; }); return {done:done,total:total,need:total-done}; }
+  function setConfirm(id,on){ if(!state.confirmed[state.month])state.confirmed[state.month]={}; if(on)state.confirmed[state.month][id]=true; else delete state.confirmed[state.month][id]; }
+  function toast(msg){ try{ var t=document.getElementById('app-toast'); if(!t){ t=document.createElement('div'); t.id='app-toast'; t.style.cssText='position:fixed;left:50%;bottom:88px;transform:translateX(-50%);background:#2E7D54;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 4px 16px rgba(0,0,0,.22);z-index:9999;opacity:0;transition:opacity .25s;pointer-events:none'; document.body.appendChild(t); } t.textContent=msg; t.style.opacity='1'; clearTimeout(t._h); t._h=setTimeout(function(){ t.style.opacity='0'; },2200); }catch(e){} }
   // 入社月/退職月の日割・社保の注記(黄・ブロックしない)
   function prorateNote(e){ var pr=e._prorate; if(!pr||(!pr.prorate&&pr.shahoMonth)) return ''; var msg=[];
     if(pr.prorate&&pr.factor<1) msg.push((pr.isJoin&&!pr.isLeave?'入社月':pr.isLeave&&!pr.isJoin?'退職月':'入社/退職月')+'につき在籍'+pr.zd+'日で日割（'+pr.zd+'/'+pr.dim+'日）');
@@ -553,13 +560,30 @@
       +'<div style="font-size:10.5px;color:#3D6B53;margin-top:5px">祝日: '+esc(holStr)+'</div>'
       +'<div style="font-size:10px;color:#7aa08c;margin-top:3px">出勤日数は所定を初期表示。各自で手修正できます（赤で止めません）。会社独自の休みは「設定▸会社の決まり」で追加できます。</div>'
       +'</div>';
-    host.innerHTML=calHTML+state.employees.map(function(e,i){
+    var cnt=reviewCounts(), reviewOnly=!!state._reviewOnly;
+    var progHTML='<div class="cal-box" style="background:#fff;border:1px solid #d4eae0;border-radius:12px;padding:10px 12px;margin-bottom:12px">'
+      +'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">'
+        +'<b style="color:#2E7D54;font-size:13px">確認 '+cnt.done+'/'+cnt.total+'名</b>'
+        +(cnt.need>0?'<span style="background:#fff8e1;border:1px solid #F4D8A8;color:#92500A;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">未確認 '+cnt.need+'名</span>':'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 全員確認済</span>')
+        +'<label style="font-size:11px;color:#3D6B53;display:inline-flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" data-reviewonly'+(reviewOnly?' checked':'')+' style="width:13px;height:13px">要確認だけ表示</label>'
+        +'<span id="save-status" style="margin-left:auto;font-size:10.5px;color:#A9C4B6">'+(state._savedAt?'自動保存済 '+esc(state._savedAt):'')+'</span>'
+      +'</div>'
+      +'<div style="font-size:10px;color:#7aa08c;margin-top:4px">前月と変わった人だけ「確認」を。変わっていない人は自動で確認済み扱いです。</div>'
+      +'</div>';
+    var cards=state.employees.map(function(e,i){
       if(!isActiveInMonth(e,state.month)) return '';
       ensureKintai(e);
       if(sche!=null){ var soi=kinIdx(e,/出勤/); if(soi>=0 && (e.kintai[soi].value===''||e.kintai[soi].value==null)) e.kintai[soi].value=String(sche); }
-      var r=compute(e), open=state.open['I'+e.id], mw=minWageInfo(e);
+      var r=compute(e);
+      if(reviewOnly && !empNeedsReview(e,r)) return '';
+      var open=state.open['I'+e.id], mw=minWageInfo(e);
+      var cf=empConfirmed(e), nr=empNeedsReview(e,r);
+      var confHTML = cf
+        ? '<label class="emp-conf" style="font-size:10.5px;color:#3D9E72;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:2px;cursor:pointer"><input type="checkbox" class="econf" data-econf="'+i+'" checked style="width:13px;height:13px">確認済</label>'
+        : nr ? '<label class="emp-conf" style="font-size:10.5px;color:#92500A;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:2px;cursor:pointer"><input type="checkbox" class="econf" data-econf="'+i+'" style="width:13px;height:13px">確認</label>'
+        : '';
       return '<div class="acc icard'+(open?' open':'')+'" data-i="'+i+'">'
-        +'<div class="ic-top"><span class="acc-nm">'+esc(e.name)+wsBadge(e)+'</span><span class="acc-net">'+yen(r.net)+'</span><span class="diffb-wrap">'+diffBadge(e,r)+'</span><button class="ic-detail" data-toggle="'+i+'">詳細<span class="acc-cv">▾</span></button></div>'
+        +'<div class="ic-top"><span class="acc-nm">'+esc(e.name)+wsBadge(e)+'</span><span class="acc-net">'+yen(r.net)+'</span><span class="diffb-wrap">'+diffBadge(e,r)+'</span>'+confHTML+'<button class="ic-detail" data-toggle="'+i+'">詳細<span class="acc-cv">▾</span></button></div>'
         +compactKinHTML(e)+prorateNote(e)
         +((mw&&!mw.ok)?'<div class="cr-warn" style="margin:0 12px 10px">⚠ 最低賃金（'+esc(mw.prefName)+'：時給'+fmtN(mw.minWage)+'円）を下回っています（約'+fmtN(mw.hourly)+'円）。設定▸従業員マスタで'+(e.payType==='時給'?'時給':'基本給')+'を上げてください。</div>':'')
         +'<div class="acc-body">'
@@ -571,6 +595,11 @@
           +'<div class="grp"><div class="grp-h">法定外控除<button class="mini add" data-add="extraKojo" data-i="'+i+'">＋</button></div><div class="rows">'+rowsHTML('extraKojo',e.extraKojo)+'</div></div>'
           +'<div class="calc-wrap">'+calcBoxHTML(e)+'</div></div></div>';
     }).join('');
+    var emptyMsg=(reviewOnly && !cards) ? '<p class="hint" style="text-align:center;padding:18px 0">要確認の人はいません（全員確認済み）。</p>' : '';
+    var confirmBtn='<div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px"><button class="btn-primary" data-confirm-month style="flex:0 0 auto;padding:11px 18px;font-size:14px">今月を確定</button>'
+      +(cnt.need>0?'<span style="font-size:11px;color:#92500A;font-weight:700">未確認 '+cnt.need+'名</span>':'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 確認済</span>')
+      +'<span style="font-size:10px;color:#7aa08c">確定すると全員を確認済みにして今月分を保存します（あとで直せます）。</span></div>';
+    host.innerHTML=calHTML+progHTML+cards+emptyMsg+confirmBtn;
   }
   function refreshCard(i){ var e=state.employees[i]; var card=$('#input-list .acc[data-i="'+i+'"]'); if(!card) return; var r=compute(e); card.querySelector('.acc-net').textContent=yen(r.net); var dw=card.querySelector('.diffb-wrap'); if(dw) dw.innerHTML=diffBadge(e,r); var cw=card.querySelector('.calc-wrap'); if(cw) cw.innerHTML=calcBoxHTML(e); var wr=card.querySelector('.wi-resw'); if(wr) wr.innerHTML=wiResHTML(e); }
 
@@ -815,6 +844,10 @@
     // 入力 accordion
     var il=$('#input-list');
     il.addEventListener('click',function(e){
+      if(e.target.classList.contains('econf')){ var eci=+e.target.dataset.econf; var emc=state.employees[eci]; if(emc){ setConfirm(emc.id, e.target.checked); renderInput(); persistSaveDebounced(); } return; }
+      if(e.target.dataset.reviewonly!=null){ state._reviewOnly=e.target.checked; renderInput(); return; }
+      var cmb=e.target.closest('[data-confirm-month]');
+      if(cmb){ state.employees.forEach(function(emp){ if(isActiveInMonth(emp,state.month)) setConfirm(emp.id,true); }); try{ saveMonthlyPayslips(); }catch(_){} persistSave(); renderInput(); toast('今月を確定しました'); return; }
       var fs=e.target.closest('[data-fillsche]');
       if(fs){ var sd=fs.dataset.fillsche; state.employees.forEach(function(emp){ if(!isActiveInMonth(emp,state.month))return; ensureKintai(emp); var oi=kinIdx(emp,/出勤/); if(oi>=0) emp.kintai[oi].value=sd; }); renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
       var tg=e.target.closest('[data-toggle]');
@@ -879,9 +912,10 @@
 
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';
-  function snapshot(){ return { v:1, company:state.company, employees:state.employees, month:state.month, theme:state.theme, prefer:state.prefer, depts:state.depts, roles:state.roles, showRetired:state.showRetired, bonus:state.bonus }; }
+  function snapshot(){ return { v:1, company:state.company, employees:state.employees, month:state.month, theme:state.theme, prefer:state.prefer, depts:state.depts, roles:state.roles, showRetired:state.showRetired, bonus:state.bonus, confirmed:state.confirmed }; }
   var _saveT=null;
-  function persistSave(){ try{ localStorage.setItem(PKEY, JSON.stringify(snapshot())); }catch(e){} if(window.Store&&Store.cloudSaveState){ try{ Store.cloudSaveState(snapshot()); }catch(e){} } try{ saveMonthlyPayslips(); }catch(e){} }
+  function persistSave(){ try{ localStorage.setItem(PKEY, JSON.stringify(snapshot())); }catch(e){} if(window.Store&&Store.cloudSaveState){ try{ Store.cloudSaveState(snapshot()); }catch(e){} } try{ saveMonthlyPayslips(); }catch(e){}
+    try{ var d=new Date(); state._savedAt=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); var ss=document.getElementById('save-status'); if(ss) ss.textContent='自動保存済 '+state._savedAt; }catch(e){} }
   function persistSaveDebounced(){ if(_saveT)clearTimeout(_saveT); _saveT=setTimeout(persistSave, 500); }
   // 旧テンプレ名→新テンプレ名(実体準拠)への移行。保存済みstate.preferを吸収
   var PREFER_MIGRATE={cols:'col2_1',cols2:'col2_2',cols3:'col2_3',vstack:'col1_1',vstack2:'col1_2',strips:'col1_3'};
@@ -893,6 +927,7 @@
       if(s.month) state.month=s.month; if(s.theme) state.theme=s.theme; if(s.prefer) state.prefer=migPrefer(s.prefer);
       if(s.depts) state.depts=s.depts; if(s.roles) state.roles=s.roles; if(s.showRetired!=null) state.showRetired=s.showRetired;
       if(s.bonus) state.bonus=s.bonus;
+      if(s.confirmed) state.confirmed=s.confirmed;
     }
     // クラウド(Supabase)が有効なら後から読み込んで上書き＋再描画
     reloadCloud();
@@ -902,6 +937,7 @@
     if(cs.month)state.month=cs.month; if(cs.theme)state.theme=cs.theme; if(cs.prefer)state.prefer=migPrefer(cs.prefer);
     if(cs.depts)state.depts=cs.depts; if(cs.roles)state.roles=cs.roles; if(cs.showRetired!=null)state.showRetired=cs.showRetired;
     if(cs.bonus)state.bonus=cs.bonus;
+    if(cs.confirmed)state.confirmed=cs.confirmed;
     $$('.scr-month').forEach(function(m){ m.value=state.month; }); fillCompany(); var act=$('.screen.active'); if(act)showScreen(act.id); return true; }
   function reloadCloud(){ if(window.Store&&Store.cloudLoadState){ return Store.cloudLoadState().then(applyCloudState).catch(function(){return false;}); } return Promise.resolve(false); }
   window.PayslipReloadCloud=reloadCloud; window.PayslipPersistSave=persistSave;
