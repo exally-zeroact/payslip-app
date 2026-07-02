@@ -84,7 +84,7 @@
 
   function defEmp(name){
     return { id:uid(), name:name||'山田 太郎', no:'', birthYmd:'1980-05-15', dept:'', role:'',
-      payType:'月給', base:'250000', hourly:'1200', commissionAmt:'', hourlyGuarantee:'', fuyou:'1', pref:'tokyo', commute:'8400', commuteType:'public', commuteKm:'', residentTax:'12500', bank:'',
+      payType:'月給', base:'250000', hourly:'1200', commissionAmt:'', hourlyGuarantee:'', fuyou:'1', pref:'tokyo', commute:'8400', commuteType:'public', commuteKm:'', residentTax:'12500', residentTaxMode:'monthly', residentTaxAnnual:'', residentTaxIkkatsu:false, bank:'',
       annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0',
       kintai:[{label:'出勤日数',value:'21'},{label:'欠勤日数',value:'0'},{label:'有給取得',value:'1'}],
       shikyu:[{label:'基本給',value:'250000'},{label:'住宅手当',value:'10000'}],
@@ -176,6 +176,12 @@
   }
   // 在籍判定・入社/退職月の日割は lib/zaiseki.js(純関数・テスト可能)に集約。bare参照で解決。
   function ZK(){ return (typeof Zaiseki!=='undefined')?Zaiseki:(window&&window.Zaiseki); }
+  function JZ(){ return (typeof Juminzei!=='undefined')?Juminzei:(window&&window.Juminzei); }
+  // 住民税の当月天引き額: 年額モードは特別徴収12分割+退職時(一括/普通)。既定monthlyは月額直接入力のまま(回帰ゼロ)
+  function residentTaxOf(e){
+    if(e.residentTaxMode==='annual'){ var jz=JZ(); if(jz&&jz.juminForMonth) return jz.juminForMonth({annualTax:num(e.residentTaxAnnual), ym:state.month, retireYmd:e.taishokuYmd, ikkatsu:!!e.residentTaxIkkatsu}); }
+    return num(e.residentTax);
+  }
   function isActiveInMonth(e, ym){ var z=ZK(); return z?z.isActiveInMonth(e,ym):!(e.retired&&!e.taishokuYmd); }
   function prorateInfo(e, ym){ var z=ZK(); return z?z.prorateInfo(e,ym):{prorate:false,factor:1,shahoMonth:true,isJoin:false,isLeave:false,zd:0,dim:0,mid:false}; }
   // 勤怠カレンダー: その月の所定労働日数(暦日−休みの曜日−祝日−会社独自休)。祝日エンジン未読込ならnull
@@ -214,7 +220,7 @@
       e._shahoExemptThisMonth=ex; // 注記用
       if(ex!=null){ apply=Object.assign({},e.apply||{},{health:ex?false:true,pension:ex?false:true,kaigo:ex?false:true}); }
     }
-    return PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:num(e.fuyou), taxClass:e.taxClass, residentTax:num(e.residentTax), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:apply, extraKojo:e.extraKojo, shahoMonth:pr.shahoMonth });
+    return PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:num(e.fuyou), taxClass:e.taxClass, residentTax:residentTaxOf(e), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:apply, extraKojo:e.extraKojo, shahoMonth:pr.shahoMonth });
   }
   function payDateObj(){
     var ym=state.month||'2026-06', y=Number(ym.slice(0,4)), m=Number(ym.slice(5,7)), c=state.company||{};
@@ -356,7 +362,16 @@
       +'<div class="chip-row" style="margin:-2px 0 10px"><span class="chip'+(e.taxClass==='otsu'?' on':'')+'" data-tax="1">'+(e.taxClass==='otsu'?'✓ ':'')+'副業・掛け持ち（所得税は乙欄）</span><span class="help-i" data-help="taxclass" style="margin-left:6px">💡</span></div>'
       +'<div class="frow"><div class="flabel">通勤方法</div><select class="finput m-f" data-f="commuteType"><option value="public"'+(e.commuteType!=='car'?' selected':'')+'>公共交通</option><option value="car"'+(e.commuteType==='car'?' selected':'')+'>マイカー等</option></select></div>'
       +(e.commuteType==='car'?'<div class="frow2"><div class="frow"><div class="flabel">片道距離<span class="hint2">km</span></div><input class="finput num m-f" data-f="commuteKm" value="'+attr(e.commuteKm)+'"></div><div class="frow"><div class="flabel">非課税限度<span class="hint2">自動</span></div><input class="finput num" value="'+yen(commuteLimit(e))+'" readonly style="background:#f7fcf9;color:#3D6B53"></div></div>':'<div class="hint" style="margin:-4px 0 10px">公共交通＝月15万まで非課税。マイカーは距離別（自動）。</div>')
-      +'<div class="frow"><div class="flabel">住民税<span class="hint2">円/月</span></div><input class="finput num m-f" data-f="residentTax" inputmode="numeric" value="'+attr(fmtN(e.residentTax))+'"></div>'
+      +'<div class="frow2"><div class="frow"><div class="flabel">住民税<span class="hint2">徴収方法</span></div><select class="finput m-f" data-f="residentTaxMode"><option value="monthly"'+(e.residentTaxMode==='annual'?'':' selected')+'>月額を直接（通知書）</option><option value="annual"'+(e.residentTaxMode==='annual'?' selected':'')+'>年額から自動（12分割）</option></select></div>'
+        +(e.residentTaxMode==='annual'
+          ? '<div class="frow"><div class="flabel">年税額<span class="hint2">円/年・通知書</span></div><input class="finput num m-f" data-f="residentTaxAnnual" inputmode="numeric" value="'+attr(fmtN(e.residentTaxAnnual))+'"></div>'
+          : '<div class="frow"><div class="flabel">月額<span class="hint2">円/月</span></div><input class="finput num m-f" data-f="residentTax" inputmode="numeric" value="'+attr(fmtN(e.residentTax))+'"></div>')
+        +'</div>'
+      +(e.residentTaxMode==='annual'
+        ? '<div class="hint" style="margin:-4px 2px 10px">当月（'+esc(state.month)+'）の天引き額 <b>'+yen(residentTaxOf(e))+'</b>'
+          +((e.taishokuYmd&&/^\d{4}-(0[6-9]|1[0-2])/.test(e.taishokuYmd))?' <span class="chip'+(e.residentTaxIkkatsu?' on':'')+'" data-rtik="1" style="cursor:pointer">'+(e.residentTaxIkkatsu?'✓ ':'')+'退職時に残額を一括</span>':'')
+          +'<div style="color:#92500A;margin-top:3px">特別徴収は6月〜翌5月。<b>通知書の額が正</b>（自動は端数を6月に合算した概算）。1〜4月退職は残額一括（法定）、6〜12月退職は普通徴収へ（申出で一括）。</div></div>'
+        : '')
       +'<div class="frow"><div class="flabel">振込先<span class="hint2">任意</span></div><input class="finput m-f" data-f="bank" value="'+attr(e.bank)+'" placeholder="○○銀行 普通 1234567"></div>'
       +shahoSection(e)
       +'<div class="sec-lb" style="border-top:1px dashed #d4eae0">法定控除（使わないものは外せる）<span class="help-i" data-help="legalkojo">💡</span></div>'
@@ -859,6 +874,7 @@
       if(ev.target.dataset.refetch){ autoFillTeijiMonths(emp, renderEmpMaster); return; }
       if(ev.target.dataset.apply){ var ak=ev.target.dataset.apply; if(!emp.apply)emp.apply={}; emp.apply[ak]=(emp.apply[ak]===false)?true:false; renderEmpMaster(); return; }
       if(ev.target.dataset.short){ emp.shortTime=!emp.shortTime; renderEmpMaster(); return; }
+      if(ev.target.dataset.rtik){ emp.residentTaxIkkatsu=!emp.residentTaxIkkatsu; renderEmpMaster(); return; }
       if(ev.target.dataset.tax){ emp.taxClass=(emp.taxClass==='otsu')?'ko':'otsu'; renderEmpMaster(); return; }
       if(ev.target.classList.contains('wb-chip')){ var wlab=ev.target.dataset.wb; emp.wbInclude=emp.wbInclude||[]; emp.wbExclude=emp.wbExclude||[];
         if(isInBasis(emp,wlab)){ emp.wbInclude=emp.wbInclude.filter(function(x){return x!==wlab;}); if(emp.wbExclude.indexOf(wlab)<0)emp.wbExclude.push(wlab); }
@@ -876,7 +892,7 @@
       if((f==='dept'||f==='role')&&ev.target.value==='__new'){ var label=f==='dept'?'部署':'役職'; var nv=(prompt('新しい'+label+'名',''))||''; nv=nv.trim(); if(nv){ var list=f==='dept'?state.depts:state.roles; if(list.indexOf(nv)<0)list.push(nv); emp[f]=nv; } renderEmpMaster(); return; }
       emp[f]=ev.target.value; if(ev.target.classList.contains('num')){ emp[f]=String(num(ev.target.value)); ev.target.value=fmtN(emp[f]); }
       if(f==='workStatus'){ if(!emp.apply)emp.apply={}; var off=(emp.workStatus==='sankyu'||emp.workStatus==='ikukyu'); ['health','pension','kaigo'].forEach(function(k){ if(off) emp.apply[k]=false; else delete emp.apply[k]; }); }
-      if(f==='payType'||f==='dept'||f==='role'||f==='commuteType'||f==='workStatus') renderEmpMaster();
+      if(f==='payType'||f==='dept'||f==='role'||f==='commuteType'||f==='workStatus'||f==='residentTaxMode'||f==='residentTaxAnnual'||f==='taishokuYmd') renderEmpMaster();
     });
     el.addEventListener('input',function(ev){ var card=ev.target.closest('.mco'); if(!card)return; var i=+card.dataset.i; var emp=state.employees[i]; var t=ev.target;
       if(!emp.shaho)emp.shaho={mode:'teiji',months:[]};
