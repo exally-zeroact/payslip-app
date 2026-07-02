@@ -88,7 +88,7 @@
       annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0',
       kintai:[{label:'出勤日数',value:'21'},{label:'欠勤日数',value:'0'},{label:'有給取得',value:'1'}],
       shikyu:[{label:'基本給',value:'250000'},{label:'住宅手当',value:'10000'}],
-      apply:{}, taxClass:'ko', retired:false, workStatus:'normal', leavePay:'',
+      apply:{}, taxClass:'ko', retired:false, workStatus:'normal', leavePay:'', leaveStartYmd:'', leaveEndYmd:'', leaveDaysInMonth:'',
       warimashi:{ mode:'easy', otH:'', otM:'', nightH:'', nightM:'', holidayH:'', holidayM:'',
         detail:{ ot:{h:'',m:''}, otNight:{h:'',m:''}, over60:{h:'',m:''}, over60Night:{h:'',m:''}, night:{h:'',m:''}, holiday:{h:'',m:''}, holidayNight:{h:'',m:''} } },
       wbInclude:[], wbExclude:[],
@@ -206,7 +206,15 @@
         if(kgaku>0) shikyu=shikyu.concat([{label:'欠勤控除',value:-kgaku}]);
       }
     }
-    return PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:num(e.fuyou), taxClass:e.taxClass, residentTax:num(e.residentTax), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:e.apply, extraKojo:e.extraKojo, shahoMonth:pr.shahoMonth });
+    // 産休/育休の社保免除を月末在籍基準で当月判定。日付未設定=null→従来(e.applyの全月免除)のまま=回帰ゼロ。
+    var apply=e.apply;
+    if(e.workStatus==='sankyu'||e.workStatus==='ikukyu'){
+      var zk=ZK();
+      var ex=(zk&&zk.shahoExemptMonthly)?zk.shahoExemptMonthly({leaveType:e.workStatus,startYmd:e.leaveStartYmd,endYmd:e.leaveEndYmd,ym:state.month,leaveDaysInMonth:num(e.leaveDaysInMonth)}):null;
+      e._shahoExemptThisMonth=ex; // 注記用
+      if(ex!=null){ apply=Object.assign({},e.apply||{},{health:ex?false:true,pension:ex?false:true,kaigo:ex?false:true}); }
+    }
+    return PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:num(e.fuyou), taxClass:e.taxClass, residentTax:num(e.residentTax), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:apply, extraKojo:e.extraKojo, shahoMonth:pr.shahoMonth });
   }
   function payDateObj(){
     var ym=state.month||'2026-06', y=Number(ym.slice(0,4)), m=Number(ym.slice(5,7)), c=state.company||{};
@@ -298,7 +306,16 @@
       byoukyu:'病気休職：社保は継続(本人負担あり)。傷病手当金は健保(給与でない)。',
       kyugyo:'会社都合の休業：休業手当=平均賃金の60%以上を支給に入れる(課税・社保対象)。' }[s];
     var warn=(s==='kyugyo'&&num(e.leavePay)<=0)?'<div class="cr-warn">⚠ 休業手当が未入力(0)です。会社都合の休業は<b>平均賃金の60%以上</b>の支払いが必要(労基法26条)。「休暇中の金額」に入れてください。</div>':'';
-    return warn+'<div class="ri-note" style="margin-top:6px">'+msg+'<br>※自動の社保オフは下の「法定控除」で個別に戻せます。</div>';
+    // 産休/育休: 休業開始日/終了日(月末在籍基準)＋育休14日ルール用の当月日数
+    var dates='';
+    if(s==='sankyu'||s==='ikukyu'){
+      dates='<div class="frow2" style="margin-top:6px">'
+        +'<div class="frow"><div class="flabel">休業開始日<span class="hint2">任意</span></div><input type="date" class="finput m-f" data-f="leaveStartYmd" value="'+attr(e.leaveStartYmd)+'"></div>'
+        +'<div class="frow"><div class="flabel">休業終了日<span class="hint2">予定可</span></div><input type="date" class="finput m-f" data-f="leaveEndYmd" value="'+attr(e.leaveEndYmd)+'"></div></div>'
+        +(s==='ikukyu'?'<div class="frow"><div class="flabel">当月の育休日数<span class="hint2">14日ルール用・任意</span></div><input class="finput num m-f" data-f="leaveDaysInMonth" inputmode="numeric" value="'+attr(e.leaveDaysInMonth)+'" placeholder="同一月内に14日以上で免除"></div>':'')
+        +'<div class="ri-note" style="margin-top:4px;color:#92500A">日付を入れると<b>その月の末日が休業中の月だけ</b>社保免除（年金機構・月末基準）。'+(s==='ikukyu'?'月末が育休でない短期月でも<b>同一月内14日以上</b>なら免除（令和4年10月改正）。賞与は連続1か月超で免除。':'賞与は産休中の支払月も免除。')+'<br>日付未入力なら<b>全月免除</b>（従来）のまま。</div>';
+    }
+    return warn+'<div class="ri-note" style="margin-top:6px">'+msg+'<br>※自動の社保オフは下の「法定控除」で個別に戻せます。</div>'+dates;
   }
   function chips(e,pool,key){
     var have=e[key].map(function(x){return x.label;});
@@ -640,6 +657,15 @@
     var prevAfter=manualPrev?num(en.prevAfter):(histPrev?prevMap[e.id]:null);
     var hasKaigo=(window.PayrollCalc&&PayrollCalc.isKaigoTarget)?PayrollCalc.isKaigoTarget(e.birthYmd,ym):false;
     var si=SZl?SZl.calcBonusSI({ bonus:bonus, healthRate:prefRate(e.pref,ym), kaigoRate:(S&&S.getKaigo)?S.getKaigo(ym).jugyoin:0.00795, hasKaigo:hasKaigo, employRate:employRateOf((state.company||{}).gyoshu, employYearOfYm(ym)), ytdKenpoBonus:0 }):{total:0,health:0,pension:0,kaigo:0,employ:0,hyojun:0,kenpoBase:0,koseiBase:0};
+    // 産休/育休の賞与社保免除(産休=賞与月末が産休中/育休=連続1か月超)。日付未設定=従来(workStatusで全免除)。雇用保険は実支払×率で残す。
+    var bonusExempt=false;
+    if(e.workStatus==='sankyu'||e.workStatus==='ikukyu'){
+      var zb=ZK();
+      var be=(zb&&zb.shahoExemptBonus)?zb.shahoExemptBonus({leaveType:e.workStatus,startYmd:e.leaveStartYmd,endYmd:e.leaveEndYmd,bonusYm:ym}):null;
+      bonusExempt=(be==null)?true:be; // 日付未設定→従来どおり全免除
+    }
+    if(bonusExempt){ si={ total:si.employ, health:0, pension:0, kaigo:0, employ:si.employ, hyojun:si.hyojun, kenpoBase:si.kenpoBase, koseiBase:si.koseiBase }; }
+    e._bonusExempt=bonusExempt;
     var tax={tax:0}, noPrev=false;
     if(prevAfter==null) noPrev=true;
     else if(SZl) tax=SZl.calcBonusTax({ bonus:bonus, bonusSI:si.total, prevSalary:prevAfter, prevSI:0, fuyou:num(e.fuyou), taxClass:e.taxClass, payYm:ym });
@@ -655,7 +681,8 @@
       +'<label style="font-size:12px;color:#2E7D54;font-weight:700">支給日 <input class="finput finput-sm" data-bn="payDay" value="'+attr(b.payDay)+'" placeholder="例 12月10日" style="width:110px"></label>'
       +'</div>'
       +'<div class="hint" style="margin:8px 0 0">賞与の所得税は<b>前月（'+esc(pm)+'）の給与（社保控除後）</b>と扶養人数で率が決まります（国税庁 算出率表）。前月を計算・保存していれば自動、無ければ各行で手入力してください。</div>'
-      +'<div class="hint" style="margin:4px 0 0;color:#92500A">⚠ 健康保険は<b>年度累計573万円</b>まで（厚年は1回150万円まで）。本アプリは<b>この1回分</b>で計算します。年内に複数回の賞与があり累計が573万円を超える場合は、超過分の健保がかからない点をご確認ください。</div></div>';
+      +'<div class="hint" style="margin:4px 0 0;color:#92500A">⚠ 健康保険は<b>年度累計573万円</b>まで（厚年は1回150万円まで）。本アプリは<b>この1回分</b>で計算します。年内に複数回の賞与があり累計が573万円を超える場合は、超過分の健保がかからない点をご確認ください。</div>'
+      +'<div class="hint" style="margin:4px 0 0">産休中の支払賞与は社保免除。育休は<b>賞与支払月末を含む連続1か月超の育休</b>のみ社保免除（厚年81条の2・令和4年改正）。従業員マスタの休業開始/終了日で自動判定（雇用保険は実額のため残ります）。</div></div>';
     var cards=state.employees.filter(function(e){return isActiveInMonth(e,ym);}).map(function(e){
       var c=computeBonus(e), en=bonusEntry(e);
       var prevBox = c.noPrev

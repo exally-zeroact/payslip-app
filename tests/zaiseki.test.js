@@ -65,3 +65,49 @@ T('社保月割: shahoMonth=trueは従来どおり(回帰)', function () {
   var b = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 300000 }], birthYmd: '1980-05-15', payYm: '2026-06', fuyou: 0, shahoMonth: true });
   eq(a.net, b.net); eq(a.si.total, b.si.total);
 });
+
+/* ── 産育休 社保免除(月末在籍基準・令和4年改正)──────────────── */
+T('産休: 開始4/10〜終了7/31。6月(末日休業中)→免除true', function () {
+  eq(Z.shahoExemptMonthly({ leaveType: 'sankyu', startYmd: '2026-04-10', endYmd: '2026-07-31', ym: '2026-06' }), true);
+});
+T('産休: 開始月(4月末が休業中)→免除true / 終了翌月(8月)→false', function () {
+  eq(Z.shahoExemptMonthly({ leaveType: 'sankyu', startYmd: '2026-04-10', endYmd: '2026-07-31', ym: '2026-04' }), true);
+  eq(Z.shahoExemptMonthly({ leaveType: 'sankyu', startYmd: '2026-04-10', endYmd: '2026-07-31', ym: '2026-08' }), false);
+});
+T('終了月特例: 終了日が月末(7/31)→7月も免除 / 7/15終了は7月末非該当(産休14日無し)→false', function () {
+  eq(Z.shahoExemptMonthly({ leaveType: 'sankyu', startYmd: '2026-04-10', endYmd: '2026-07-31', ym: '2026-07' }), true);
+  eq(Z.shahoExemptMonthly({ leaveType: 'sankyu', startYmd: '2026-04-10', endYmd: '2026-07-15', ym: '2026-07' }), false);
+});
+T('育休14日ルール: 月末非該当の同一月短期育休 14日以上→true / 13日→false(令和4年10月改正)', function () {
+  eq(Z.shahoExemptMonthly({ leaveType: 'ikukyu', startYmd: '2026-06-01', endYmd: '2026-06-14', ym: '2026-06', leaveDaysInMonth: 14 }), true);
+  eq(Z.shahoExemptMonthly({ leaveType: 'ikukyu', startYmd: '2026-06-01', endYmd: '2026-06-13', ym: '2026-06', leaveDaysInMonth: 13 }), false);
+});
+T('産休には14日ルール無し: 月末非該当の短期産休14日でもfalse', function () {
+  eq(Z.shahoExemptMonthly({ leaveType: 'sankyu', startYmd: '2026-06-01', endYmd: '2026-06-14', ym: '2026-06', leaveDaysInMonth: 14 }), false);
+});
+T('介護休/病休/通常は免除なし(false)', function () {
+  eq(Z.shahoExemptMonthly({ leaveType: 'kaigokyu', startYmd: '2026-04-01', endYmd: '2026-08-31', ym: '2026-06' }), false);
+  eq(Z.shahoExemptMonthly({ leaveType: 'byoukyu', startYmd: '2026-04-01', endYmd: '2026-08-31', ym: '2026-06' }), false);
+  eq(Z.shahoExemptMonthly({ leaveType: 'normal', ym: '2026-06' }), false);
+});
+T('日付未設定→null(呼び出し側で従来=全月免除フォールバック)', function () {
+  eq(Z.shahoExemptMonthly({ leaveType: 'sankyu', ym: '2026-06' }), null);
+  eq(Z.shahoExemptMonthly({ leaveType: 'ikukyu', startYmd: '2026-06-01', ym: '2026-06' }), null);
+});
+T('賞与免除(育休): 連続1か月超(4/15〜5/31)・5月末休業中→true', function () {
+  eq(Z.shahoExemptBonus({ leaveType: 'ikukyu', startYmd: '2026-04-15', endYmd: '2026-05-31', bonusYm: '2026-05' }), true);
+});
+T('賞与免除(育休): 1か月以下(6/1〜6/20・6月末休業中)→false', function () {
+  eq(Z.shahoExemptBonus({ leaveType: 'ikukyu', startYmd: '2026-06-01', endYmd: '2026-06-20', bonusYm: '2026-06' }), false);
+});
+T('賞与免除(育休): ちょうど1か月(6/1〜6/30)→false / 1か月超(6/1〜7/1)→true', function () {
+  eq(Z.shahoExemptBonus({ leaveType: 'ikukyu', startYmd: '2026-06-01', endYmd: '2026-06-30', bonusYm: '2026-06' }), false);
+  eq(Z.shahoExemptBonus({ leaveType: 'ikukyu', startYmd: '2026-06-01', endYmd: '2026-07-01', bonusYm: '2026-06' }), true);
+});
+T('賞与免除(産休): 1か月超要件なし・賞与月末が産休中→true', function () {
+  eq(Z.shahoExemptBonus({ leaveType: 'sankyu', startYmd: '2026-06-20', endYmd: '2026-08-10', bonusYm: '2026-06' }), true);
+});
+T('賞与免除: 賞与月末が休業外→false / 日付未設定→null', function () {
+  eq(Z.shahoExemptBonus({ leaveType: 'ikukyu', startYmd: '2026-04-01', endYmd: '2026-05-15', bonusYm: '2026-06' }), false);
+  eq(Z.shahoExemptBonus({ leaveType: 'ikukyu', bonusYm: '2026-06' }), null);
+});
