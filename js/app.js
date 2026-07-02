@@ -749,13 +749,40 @@
     }).join('');
   }
   function renderSumView(){
-    var rows=activeEmps().map(function(e){var r=compute(e);return {name:e.name,dept:e.dept||'未分類',s:r.shikyuTotal,k:r.kojoTotal,n:r.net};});
-    var tot=rows.reduce(function(a,x){return {s:a.s+x.s,k:a.k+x.k,n:a.n+x.n};},{s:0,k:0,n:0});
+    // 母集合は入力/印刷と統一(isActiveInMonth=当月在籍)
+    var rows=state.employees.filter(function(e){return isActiveInMonth(e,state.month);}).map(function(e){
+      var r=compute(e), si=r.si||{};
+      return { name:e.name, s:r.shikyuTotal, k:r.kojoTotal, n:r.net,
+        health:num(si.health), kaigo:num(si.kaigo), pension:num(si.pension), employ:num(si.employ),
+        tax:num(r.incomeTax), jumin:num(r.residentTax) };
+    });
+    var t=rows.reduce(function(a,x){return {s:a.s+x.s,k:a.k+x.k,n:a.n+x.n,health:a.health+x.health,kaigo:a.kaigo+x.kaigo,pension:a.pension+x.pension,employ:a.employ+x.employ,tax:a.tax+x.tax,jumin:a.jumin+x.jumin};},{s:0,k:0,n:0,health:0,kaigo:0,pension:0,employ:0,tax:0,jumin:0});
     var body=rows.map(function(x){return '<tr><td>'+esc(x.name)+'</td><td class="num">'+yen(x.s)+'</td><td class="num">'+yen(x.k)+'</td><td class="num">'+yen(x.n)+'</td></tr>';}).join('');
-    $('#view-sum').innerHTML='<div class="card"><div class="card-h">月次集計（'+monthLabel().replace(/ /g,'')+'）</div>'
+    var shakaiHonnin=t.health+t.kaigo+t.pension; // 健保+厚年+介護の本人負担計
+    var mlabel=monthLabel().replace(/ /g,'');
+    var kh=function(l,v){ return '<div class="pay-row"><span>'+l+'</span><span class="num">'+yen(v)+'</span></div>'; };
+    $('#view-sum').innerHTML='<div class="card"><div class="card-h">月次集計（'+mlabel+'）</div>'
       +'<table class="sumtab"><thead><tr><th>従業員</th><th>支給合計</th><th>控除合計</th><th>差引支給</th></tr></thead>'
-      +'<tbody>'+body+'<tr class="total"><td>全員合計（'+rows.length+'名）</td><td class="num">'+yen(tot.s)+'</td><td class="num">'+yen(tot.k)+'</td><td class="num">'+yen(tot.n)+'</td></tr></tbody></table>'
-      +'<p class="hint">年次・部署別/役職別・賃金台帳・社保一覧はDB保存後に自動生成（STEP6）。</p></div>';
+      +'<tbody>'+body+'<tr class="total"><td>全員合計（'+rows.length+'名）</td><td class="num">'+yen(t.s)+'</td><td class="num">'+yen(t.k)+'</td><td class="num">'+yen(t.n)+'</td></tr></tbody></table>'
+      +'</div>'
+      +'<div class="card"><div class="card-h">控除の内訳（本人負担・'+mlabel+'）</div>'
+        +'<table class="sumtab"><tbody>'
+        +'<tr><td>健康保険</td><td class="num">'+yen(t.health)+'</td></tr>'
+        +(t.kaigo>0?'<tr><td>介護保険</td><td class="num">'+yen(t.kaigo)+'</td></tr>':'')
+        +'<tr><td>厚生年金</td><td class="num">'+yen(t.pension)+'</td></tr>'
+        +'<tr><td>雇用保険</td><td class="num">'+yen(t.employ)+'</td></tr>'
+        +'<tr><td>源泉所得税</td><td class="num">'+yen(t.tax)+'</td></tr>'
+        +'<tr><td>住民税</td><td class="num">'+yen(t.jumin)+'</td></tr>'
+        +'<tr class="total"><td>控除合計</td><td class="num">'+yen(t.k)+'</td></tr>'
+        +'</tbody></table></div>'
+      +'<div class="card"><div class="card-h">納付の目安（'+mlabel+'）</div>'
+        +kh('源泉所得税 <span class="pay-sub">税務署へ・原則翌月10日</span>', t.tax)
+        +kh('住民税（特別徴収）<span class="pay-sub">市区町村へ・翌月10日</span>', t.jumin)
+        +kh('社会保険 健保＋厚年＋介護 <span class="pay-sub">労使折半・本人＋会社</span>', shakaiHonnin*2)
+        +kh('　└ うち本人負担（給与天引き）', shakaiHonnin)
+        +kh('雇用保険 本人負担 <span class="pay-sub">会社負担は労働保険で年度精算</span>', t.employ)
+        +'<p class="hint" style="color:#92500A;margin-top:8px">⚠ 目安です。社会保険は<b>労使折半で本人負担の約2倍</b>（＋子ども・子育て拠出金は会社のみ別途）。正確な納付額は<b>納入告知書・決定通知書</b>でご確認ください。雇用保険は労働保険として年度で申告・精算します。</p>'
+      +'</div>';
   }
 
   /* ---------- 印刷 / PDF ---------- */

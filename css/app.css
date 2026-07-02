@@ -264,6 +264,9 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .sumtab thead th{color:#2E7D54;font-weight:700;border-bottom:1.5px solid #C8ECD8;}
 .sumtab td.num{font-family:'DM Mono',monospace;color:#1a4a2e;}
 .sumtab tr.total td{font-weight:700;background:#F0FAF4;}
+.pay-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 2px;border-bottom:1px solid #eef4f0;font-size:13px;}
+.pay-row .num{font-family:'DM Mono',monospace;color:#1a4a2e;font-weight:700;white-space:nowrap;}
+.pay-sub{font-size:10.5px;color:#8FA89A;font-weight:400;margin-left:6px;}
 
 /* theme swatches */
 .theme-row{display:flex;gap:8px;flex-wrap:wrap;}
