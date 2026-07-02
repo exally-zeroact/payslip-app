@@ -649,14 +649,14 @@
     Store.getPayslipsByYm(pm,pm).then(function(rows){ var m={}; (rows||[]).forEach(function(r){ if(r&&r.data&&r.data.kazei!=null) m[r.employee_id]=num(r.data.kazei); }); state._bonusPrev=m;
       if($('#scr-input')&&$('#scr-input').classList.contains('active')&&state.inputMode==='bonus') renderBonus(); }).catch(function(){});
   }
-  function bonusEntry(e){ var b=state.bonus||(state.bonus={payYm:'',payDay:'',byEmp:{}}); if(!b.byEmp)b.byEmp={}; if(!b.byEmp[e.id])b.byEmp[e.id]={amount:'',prevAfter:''}; return b.byEmp[e.id]; }
+  function bonusEntry(e){ var b=state.bonus||(state.bonus={payYm:'',payDay:'',byEmp:{}}); if(!b.byEmp)b.byEmp={}; if(!b.byEmp[e.id])b.byEmp[e.id]={amount:'',prevAfter:'',ytd:''}; return b.byEmp[e.id]; }
   function computeBonus(e){
     var SZl=SZ(), S=SHH(), ym=bonusYmOf(), en=bonusEntry(e);
     var bonus=num(en.amount), prevMap=state._bonusPrev||{};
     var manualPrev=(en.prevAfter!=null&&en.prevAfter!==''), histPrev=(e.id in prevMap);
     var prevAfter=manualPrev?num(en.prevAfter):(histPrev?prevMap[e.id]:null);
     var hasKaigo=(window.PayrollCalc&&PayrollCalc.isKaigoTarget)?PayrollCalc.isKaigoTarget(e.birthYmd,ym):false;
-    var si=SZl?SZl.calcBonusSI({ bonus:bonus, healthRate:prefRate(e.pref,ym), kaigoRate:(S&&S.getKaigo)?S.getKaigo(ym).jugyoin:0.00795, hasKaigo:hasKaigo, employRate:employRateOf((state.company||{}).gyoshu, employYearOfYm(ym)), ytdKenpoBonus:0 }):{total:0,health:0,pension:0,kaigo:0,employ:0,hyojun:0,kenpoBase:0,koseiBase:0};
+    var si=SZl?SZl.calcBonusSI({ bonus:bonus, healthRate:prefRate(e.pref,ym), kaigoRate:(S&&S.getKaigo)?S.getKaigo(ym).jugyoin:0.00795, hasKaigo:hasKaigo, employRate:employRateOf((state.company||{}).gyoshu, employYearOfYm(ym)), ytdKenpoBonus:num(en.ytd) }):{total:0,health:0,pension:0,kaigo:0,employ:0,hyojun:0,kenpoBase:0,koseiBase:0};
     // 産休/育休の賞与社保免除(産休=賞与月末が産休中/育休=連続1か月超)。日付未設定=従来(workStatusで全免除)。雇用保険は実支払×率で残す。
     var bonusExempt=false;
     if(e.workStatus==='sankyu'||e.workStatus==='ikukyu'){
@@ -681,7 +681,7 @@
       +'<label style="font-size:12px;color:#2E7D54;font-weight:700">支給日 <input class="finput finput-sm" data-bn="payDay" value="'+attr(b.payDay)+'" placeholder="例 12月10日" style="width:110px"></label>'
       +'</div>'
       +'<div class="hint" style="margin:8px 0 0">賞与の所得税は<b>前月（'+esc(pm)+'）の給与（社保控除後）</b>と扶養人数で率が決まります（国税庁 算出率表）。前月を計算・保存していれば自動、無ければ各行で手入力してください。</div>'
-      +'<div class="hint" style="margin:4px 0 0;color:#92500A">⚠ 健康保険は<b>年度累計573万円</b>まで（厚年は1回150万円まで）。本アプリは<b>この1回分</b>で計算します。年内に複数回の賞与があり累計が573万円を超える場合は、超過分の健保がかからない点をご確認ください。</div>'
+      +'<div class="hint" style="margin:4px 0 0;color:#92500A">⚠ 健康保険は<b>年度累計573万円</b>まで（厚年は1回150万円まで）。年内2回目以降の賞与は、各行の<b>「本年度の既往賞与（標準賞与額）累計」</b>を入れると累計573万で自動調整します。</div>'
       +'<div class="hint" style="margin:4px 0 0">産休中の支払賞与は社保免除。育休は<b>賞与支払月末を含む連続1か月超の育休</b>のみ社保免除（厚年81条の2・令和4年改正）。従業員マスタの休業開始/終了日で自動判定（雇用保険は実額のため残ります）。</div></div>';
     var cards=state.employees.filter(function(e){return isActiveInMonth(e,ym);}).map(function(e){
       var c=computeBonus(e), en=bonusEntry(e);
@@ -699,7 +699,9 @@
         +'<div class="ic-top"><span class="acc-nm">'+esc(e.name)+'</span><span class="acc-net">'+yen(c.net)+'</span></div>'
         +'<div style="padding:0 12px 12px">'
         +'<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><span style="font-size:12px;color:#2E7D54;font-weight:700;min-width:54px">賞与額</span><input class="finput num" data-ba="'+e.id+'" inputmode="numeric" value="'+attr(en.amount)+'" placeholder="円" style="flex:1"></div>'
-        +prevBox+(caps?'<div style="margin:4px 0">'+caps+'</div>':'')+warn
+        +prevBox
+        +'<div style="font-size:11px;color:#4b6b58;margin:5px 0">本年度の既往賞与（標準賞与額）累計 <input class="finput num" data-by="'+e.id+'" inputmode="numeric" value="'+attr(en.ytd)+'" placeholder="0" style="width:110px"> 円 <span style="color:#8FA89A">（2回目以降のみ・健保 年573万上限用）</span></div>'
+        +(caps?'<div style="margin:4px 0">'+caps+'</div>':'')+warn
         +'<div class="calc-box"><div class="ch">賞与の自動計算（標準賞与額 '+yen(hyojun)+'）</div>'
           +'<div class="calc-line"><span>賞与額</span><span class="v">'+yen(c.bonus)+'</span></div>'
           +'<div class="calc-line"><span>健康保険</span><span class="v">'+yen(c.si.health)+'</span></div>'
@@ -799,19 +801,19 @@
 
     // 入力タブ: 月次給与/賞与 モード切替
     var inScr=$('#scr-input');
-    function bonusEmpOf(el){ var id=el.dataset.ba||el.dataset.bp; return (state.employees||[]).find(function(x){return x.id===id;}); }
+    function bonusEmpOf(el){ var id=el.dataset.ba||el.dataset.bp||el.dataset.by; return (state.employees||[]).find(function(x){return x.id===id;}); }
     if(inScr){
       inScr.addEventListener('click',function(ev){ var m=ev.target.closest('.imode'); if(!m)return; state.inputMode=m.dataset.imode==='bonus'?'bonus':'monthly'; renderInputArea(); if(window.persistSaveDebounced)persistSaveDebounced(); });
       // 入力中は値を保存のみ(再描画しない=フォーカス維持)。結果はblur(change)で更新。
-      inScr.addEventListener('input',function(ev){ var ba=ev.target.closest('[data-ba]'), bp=ev.target.closest('[data-bp]'); if(!ba&&!bp)return;
-        var e=bonusEmpOf(ba||bp); if(!e)return; var en=bonusEntry(e);
-        if(ba) en.amount=ba.value.replace(/[^0-9]/g,''); else en.prevAfter=bp.value.replace(/[^0-9]/g,'');
+      inScr.addEventListener('input',function(ev){ var ba=ev.target.closest('[data-ba]'), bp=ev.target.closest('[data-bp]'), by=ev.target.closest('[data-by]'); if(!ba&&!bp&&!by)return;
+        var e=bonusEmpOf(ba||bp||by); if(!e)return; var en=bonusEntry(e);
+        if(ba) en.amount=ba.value.replace(/[^0-9]/g,''); else if(bp) en.prevAfter=bp.value.replace(/[^0-9]/g,''); else en.ytd=by.value.replace(/[^0-9]/g,'');
         if(window.persistSaveDebounced)persistSaveDebounced(); });
       inScr.addEventListener('change',function(ev){
         var bn=ev.target.closest('[data-bn]');
         if(bn){ if(!state.bonus)state.bonus={byEmp:{}}; if(bn.dataset.bn==='payYm'){ state.bonus.payYm=bn.value; state._bonusPrevYm=null; } else { state.bonus.payDay=bn.value; } renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
-        var ba=ev.target.closest('[data-ba]'), bp=ev.target.closest('[data-bp]');
-        if(ba||bp){ var e=bonusEmpOf(ba||bp); if(e){ var en=bonusEntry(e); if(ba) en.amount=ba.value.replace(/[^0-9]/g,''); else en.prevAfter=bp.value.replace(/[^0-9]/g,''); } renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); }
+        var ba=ev.target.closest('[data-ba]'), bp=ev.target.closest('[data-bp]'), by=ev.target.closest('[data-by]');
+        if(ba||bp||by){ var e=bonusEmpOf(ba||bp||by); if(e){ var en=bonusEntry(e); if(ba) en.amount=ba.value.replace(/[^0-9]/g,''); else if(bp) en.prevAfter=bp.value.replace(/[^0-9]/g,''); else en.ytd=by.value.replace(/[^0-9]/g,''); } renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); }
       });
     }
 
