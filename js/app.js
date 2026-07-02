@@ -835,8 +835,15 @@
     var out=Render.build(people, doc, state.prefer, state.theme);
     var f=$('#frame'); f.srcdoc=out.html;
     var pw=out.orientation==='landscape'?1123:794, ph=out.orientation==='landscape'?794:1123;
-    var wrap=$('.preview-wrap'); var s=Math.min(1,(wrap.clientWidth-32)/pw);
-    f.style.width=pw+'px'; f.style.height=ph+'px'; f.style.transform='scale('+s+')'; f.style.transformOrigin='top left';
+    f.style.width=pw+'px'; f.style.height=ph+'px'; f.style.transformOrigin='top left';
+    f.dataset.pw=pw; f.dataset.ph=ph; // リサイズ時の再フィット用
+    fitPreview();
+  }
+  // A4プレビューを親幅にフィット(モバイル回転/リサイズで再計算)
+  function fitPreview(){
+    var f=$('#frame'), wrap=$('.preview-wrap'); if(!f||!wrap||!f.dataset.pw) return;
+    var pw=+f.dataset.pw, ph=+f.dataset.ph, s=Math.min(1,(wrap.clientWidth-32)/pw);
+    f.style.transform='scale('+s+')';
     f.style.marginRight=(-(pw*(1-s)))+'px'; f.style.marginBottom=(-(ph*(1-s)))+'px';
   }
 
@@ -984,6 +991,8 @@
       var tg=e.target.closest('.cp-toggle:not(.cp-reset)'); if(tg){ state._oc=(state._oc===tg.dataset.cpk)?null:tg.dataset.cpk; renderDesign(); return; }
       var w=e.target.closest('.cw'); if(w){ state.theme[w.dataset.ck]=w.dataset.col; state._oc=null; afterDesign(); } });
     $('#b-print').addEventListener('click',function(){ var f=$('#frame'); try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} });
+    // モバイルの回転/リサイズでプレビューを再フィット(再描画せず軽く)
+    var _fitT; window.addEventListener('resize',function(){ if(!$('#scr-print')||!$('#scr-print').classList.contains('active'))return; clearTimeout(_fitT); _fitT=setTimeout(fitPreview,120); });
     $('#b-xlsx').addEventListener('click',function(){ if(!window.PayslipXlsx)return; var v=$('#p-emp').value; var emps=(v==='__all')?state.employees.filter(function(e){return isActiveInMonth(e,state.month);}):[state.employees[+v]];
       var isBonus=state.printMode==='bonus'; // 印刷の月次/賞与トグルに合わせる(賞与で月次が出る不具合を修正)
       var people=isBonus?buildBonusPeople(emps):buildPeople(emps);

@@ -20,6 +20,16 @@ T('健保 東京 令和7(2025-06)=既存KENKO_RITSU(9.91%)', function () {
   var k = SH.getKenko('tokyo', '2025-06');
   ok(Math.abs(k.total - SH.KENKO_RITSU.tokyo.total) < 1e-9, 'total ' + k.total);
 });
+/* 令和7年度=協会けんぽ公式(rate_prefectures/r07・2026-07照合)。値をロックし再発防止 */
+T('健保 令和7 公式値ロック(協会けんぽ2025年度)', function () {
+  var exp = { hokkaido:0.1031, iwate:0.0962, miyagi:0.1011, yamagata:0.0975, fukushima:0.0962, ibaraki:0.0967, tochigi:0.0982, saitama:0.0976, chiba:0.0979, tokyo:0.0991, kanagawa:0.0992, niigata:0.0955, toyama:0.0965, fukui:0.0994, nagano:0.0969, gifu:0.0993, aichi:0.1003, osaka:0.1024, hyogo:0.1016, hiroshima:0.0997, yamaguchi:0.1036, tokushima:0.1047, kochi:0.1013, fukuoka:0.1031, saga:0.1078, nagasaki:0.1041, kagoshima:0.1031, okinawa:0.0944 };
+  Object.keys(exp).forEach(function (p) {
+    var k = SH.getKenko(p, '2025-06');
+    ok(Math.abs(k.total - exp[p]) < 1e-9, p + ' 令和7=' + k.total + ' 期待' + exp[p]);
+    ok(Math.abs(k.jugyoin - k.total / 2) < 1e-9, p + ' 折半でない');
+  });
+});
+T('健保 令和7: 47都道府県すべて存在', function () { eq(Object.keys(SH.KENKO_RITSU).length, 47); });
 T('健保 令和8で東京と新潟で料率が異なる(新潟9.21%)', function () {
   eq(SH.getKenko('niigata', '2026-06').total, 0.0921);
   ok(SH.getKenko('tokyo', '2026-06').total !== SH.getKenko('niigata', '2026-06').total);
