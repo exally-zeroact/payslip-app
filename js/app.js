@@ -23,6 +23,7 @@
   var WORK_STATUS=[['normal','通常'],['sankyu','産休'],['ikukyu','育休'],['kaigokyu','介護休'],['byoukyu','病気休職'],['kyugyo','休業(会社都合)']];
   var WS_LABEL=function(k){ var f=WORK_STATUS.find(function(x){return x[0]===k;}); return f?f[1]:'通常'; };
   var HELP={
+    bonusPrev:{ t:'💡 賞与の所得税と「前月の給与（社保後）」', b:'賞与（ボーナス）の所得税は、月給とは別の<b>「賞与に対する源泉徴収税額の算出率の表」</b>で決まります。\n\n● 使う数字＝<b>前月の給与から社会保険料（健保・厚年・雇用・介護）を引いた後の金額</b>と<b>扶養人数</b>。\n● この2つで「税率（％）」が決まり、賞与額（社保を引いた後）にかけて所得税を出します。\n● 前月の給与をこのアプリで計算・保存していれば<b>自動</b>で入ります。無ければ手入力してください（給与明細の「差引」ではなく、社会保険料を引いた額）。\n\n【特例＝手計算になる場合】\n● 前月に給与が無い、または\n● 賞与（社保後）が前月給与（社保後）の<b>10倍を超える</b>とき\n→ この表が使えず、<b>月額表</b>で計算します（税額が変わるため手計算が必要）。' },
     fuyou:{ t:'💡 扶養人数とは？（配偶者含む）', b:'所得税の計算に使う「扶養親族等の数」です。次の合計人数を入れます。\n\n● <b>源泉控除対象配偶者</b>：1人と数える\n　＝あなたが扶養している配偶者で、配偶者の年収が約150万円以下が目安。\n● <b>控除対象扶養親族</b>：16歳以上で扶養している家族（子・親など）の人数。\n\n※年齢はその年の<b>12月31日時点</b>で判定。<b>16歳未満は数えません（0人）</b>。\n※共働きで配偶者に十分な収入がある場合、配偶者は0。\n\n例）専業主婦の妻＋高校生1人＋5歳の子 → <b>2</b>（妻1＋高校生1。5歳は16歳未満で0）' },
     shaho:{ t:'💡 社会保険（標準報酬月額）とは？', b:'毎月の健康保険・厚生年金・介護は「標準報酬月額」という<b>基準額×料率</b>で決まり、<b>原則1年は固定</b>（残業が多い月でも変わりません）。決め方は4つ：\n\n● <b>毎年の見直し(定時決定)</b>…毎年4〜6月の総支給の平均で決定（支払基礎日数17日以上の月で平均）。9月分〜翌8月分に適用。\n● <b>入社したばかり(資格取得)</b>…実績が無いので入社時の見込み月額で決定。\n● <b>給料が変わった(随時改定)</b>…固定給が変わり3か月平均で2等級以上動いたら途中改定。\n● <b>金額が分かる(直接入力)</b>…決定通知書・額表の額をそのまま。\n\n※支払基礎日数＝給料を払った対象日数。月給は原則その月の暦日数。17日未満の月は平均から外します。' },
     warimashi:{ t:'💡 割増賃金（残業・深夜・休日）', b:'残業などの<b>時間を入れるだけ</b>で、率は法令から自動で計算します。\n\n● 残業（時間外）…<b>1.25倍</b>／月60時間を超えた分は<b>1.5倍</b>\n● 深夜（夜22時〜朝5時）…<b>+0.25</b>（残業中の深夜は合計1.5倍）\n● 法定休日の出勤…<b>1.35倍</b>\n\n1時間あたりの単価は「割増の基礎（基本給＋一律の手当）÷ 1か月平均所定労働時間」で自動算出。時間は<b>「時間」「分」で1分単位</b>、空欄は0です。端数は基発150号どおり処理します。' },
@@ -376,8 +377,8 @@
       +shahoSection(e)
       +'<div class="sec-lb" style="border-top:1px dashed #d4eae0">法定控除（使わないものは外せる）<span class="help-i" data-help="legalkojo">💡</span></div>'
       +'<div class="chip-row">'+LEGAL_KOJO.map(function(lk){
-          if(lk[0]==='kaigo'){ var kt=(window.PayrollCalc&&PayrollCalc.isKaigoTarget(e.birthYmd,state.month)); if(!kt) return '<span class="chip chip-dim" title="40〜64歳が対象。生年月日から自動">介護保険（対象外）</span>'; var ko=(e.apply&&e.apply.kaigo===false); return '<span class="chip'+(ko?'':' on')+'" data-apply="kaigo" title="40〜64歳=自動で対象">'+(ko?'':'✓ ')+'介護保険（自動）</span>'; }
-          var off=(e.apply&&e.apply[lk[0]]===false); return '<span class="chip'+(off?'':' on')+'" data-apply="'+lk[0]+'">'+(off?'':'✓ ')+esc(lk[1])+'</span>';
+          if(lk[0]==='kaigo'){ var kt=(window.PayrollCalc&&PayrollCalc.isKaigoTarget(e.birthYmd,state.month)); if(!kt) return '<span class="chip chip-dim" title="40〜64歳が対象。生年月日から自動">介護保険（対象外）</span>'; var ko=(e.apply&&e.apply.kaigo===false); return '<span class="chip chip-auto'+(ko?'':' on')+'" data-apply="kaigo" title="40〜64歳=自動で対象">'+(ko?'':'✓ ')+'介護保険（自動）</span>'; }
+          var off=(e.apply&&e.apply[lk[0]]===false); return '<span class="chip chip-auto'+(off?'':' on')+'" data-apply="'+lk[0]+'">'+(off?'':'✓ ')+esc(lk[1])+'</span>';
         }).join('')+'</div>'
       +'<div class="sec-lb">支給項目（タップでON/OFF・通勤は上の欄）</div><div class="chip-row">'+chips(e,SUP_POOL,'shikyu')+'</div>'
       +'<div class="addcustom"><input class="finput ac-inp" data-g="shikyu" placeholder="自由な項目名（例：特別手当）"><button class="btn-ghost ac-btn" data-g="shikyu" style="padding:10px 12px">＋追加</button></div>'
@@ -695,20 +696,20 @@
       +'<label style="font-size:12px;color:#2E7D54;font-weight:700">賞与支給月 <input type="month" class="finput finput-sm" data-bn="payYm" value="'+attr(ym)+'"></label>'
       +'<label style="font-size:12px;color:#2E7D54;font-weight:700">支給日 <input class="finput finput-sm" data-bn="payDay" value="'+attr(b.payDay)+'" placeholder="例 12月10日" style="width:110px"></label>'
       +'</div>'
-      +'<div class="hint" style="margin:8px 0 0">賞与の所得税は<b>前月（'+esc(pm)+'）の給与（社保控除後）</b>と扶養人数で率が決まります（国税庁 算出率表）。前月を計算・保存していれば自動、無ければ各行で手入力してください。</div>'
+      +'<div class="hint" style="margin:8px 0 0">賞与の所得税は<b>前月（'+esc(pm)+'）の給与から社会保険料を引いた額</b>と扶養人数で税率が決まります（国税庁 算出率表）。<span class="help-i" data-help="bonusPrev">💡</span> 前月を計算・保存していれば自動、無ければ各行で手入力してください。</div>'
       +'<div class="hint" style="margin:4px 0 0;color:#92500A">⚠ 健康保険は<b>年度累計573万円</b>まで（厚年は1回150万円まで）。年内2回目以降の賞与は、各行の<b>「本年度の既往賞与（標準賞与額）累計」</b>を入れると累計573万で自動調整します。</div>'
       +'<div class="hint" style="margin:4px 0 0">産休中の支払賞与は社保免除。育休は<b>賞与支払月末を含む連続1か月超の育休</b>のみ社保免除（厚年81条の2・令和4年改正）。従業員マスタの休業開始/終了日で自動判定（雇用保険は実額のため残ります）。</div></div>';
     var cards=state.employees.filter(function(e){return isActiveInMonth(e,ym);}).map(function(e){
       var c=computeBonus(e), en=bonusEntry(e);
       var prevBox = c.noPrev
-        ? '<div class="cr-warn" style="margin:6px 0">⚠ 前月（'+esc(pm)+'）の給与（社保控除後）が未取得です。前月を計算・保存するか、ここに手入力してください（赤で止めません）。<div style="margin-top:5px">前月給与(社保控除後) <input class="finput num" data-bp="'+e.id+'" inputmode="numeric" value="'+attr(en.prevAfter)+'" placeholder="円" style="width:130px"></div></div>'
-        : '<div style="font-size:11px;color:#4b6b58;margin:5px 0">前月給与(社保控除後): <b>'+yen(c.prevAfter)+'</b> '+(c.fromHistory?'（前月'+esc(pm)+'から自動）':'（手入力）')+' <input class="finput num" data-bp="'+e.id+'" inputmode="numeric" value="'+attr(en.prevAfter)+'" placeholder="上書き" style="width:100px;margin-left:6px"></div>';
+        ? '<div class="cr-warn" style="margin:6px 0">⚠ <b>前月（'+esc(pm)+'）の給与から社会保険料を引いた額</b>が未取得です（賞与の税率の基準）。前月を計算・保存するか、ここに手入力してください（赤で止めません）。<div style="margin-top:5px">前月の給与（社保を引いた後） <input class="finput num" data-bp="'+e.id+'" inputmode="numeric" value="'+attr(en.prevAfter)+'" placeholder="円" style="width:130px"></div></div>'
+        : '<div style="font-size:11px;color:#4b6b58;margin:5px 0">前月の給与（社保を引いた後）: <b>'+yen(c.prevAfter)+'</b> '+(c.fromHistory?'（前月'+esc(pm)+'から自動）':'（手入力）')+' <input class="finput num" data-bp="'+e.id+'" inputmode="numeric" value="'+attr(en.prevAfter)+'" placeholder="上書き" style="width:100px;margin-left:6px"></div>';
       var hyojun=c.si.hyojun||0, caps='';
       if(hyojun>0&&c.si.kenpoBase<hyojun) caps+='<span class="cap-badge">健保 年573万上限</span>';
       if(hyojun>0&&c.si.koseiBase<hyojun) caps+='<span class="cap-badge">厚年 1回150万上限</span>';
       var taxLine, warn='';
       if(c.noPrev){ taxLine='<div class="calc-line"><span>源泉所得税</span><span class="v">前月給与の入力待ち</span></div>'; }
-      else if(c.tax.special){ taxLine='<div class="calc-line"><span>源泉所得税</span><span class="v">月額表で要計算</span></div>'; warn='<div class="cr-warn" style="margin:6px 0">⚠ 前月給与なし／賞与が前月給与(社保後)の10倍超のため、この賞与は月額表で計算する特例です。源泉税は手計算してください。</div>'; }
+      else if(c.tax.special){ taxLine='<div class="calc-line"><span>源泉所得税</span><span class="v">月額表で要計算</span></div>'; warn='<div class="cr-warn" style="margin:6px 0">⚠ この賞与は<b>特例</b>です（前月に給与がない、または賞与が前月給与（社保後）の<b>10倍超</b>）。通常の算出率表が使えず<b>月額表</b>で計算するため、源泉所得税は手計算してください。<span class="help-i" data-help="bonusPrev">💡</span></div>'; }
       else { taxLine='<div class="calc-line"><span>源泉所得税（率 '+c.tax.rate+'%'+(c.tax.otsu?'・乙欄':'')+'）</span><span class="v">'+yen(c.taxAmt)+'</span></div>'; }
       return '<div class="acc icard'+(num(en.amount)>0?' open':'')+'">'
         +'<div class="ic-top"><span class="acc-nm">'+esc(e.name)+'</span><span class="acc-net">'+yen(c.net)+'</span></div>'
@@ -811,9 +812,18 @@
     var tr=$('#tpl-row'); if(tr){ tr.innerHTML=TPL_OPTS.map(function(t){ var on=(state.prefer||'col2_1')===t[0];
       return '<button type="button" class="tpl-card'+(on?' on':'')+(t[4]?' land':'')+'" data-tpl="'+t[0]+'"><span class="tpl-badge">✓</span><img class="tpl-thumb" src="img/'+t[2]+'.png" alt="'+t[1]+'"><div class="tpl-meta"><div class="tpl-name">'+t[1]+'</div><div class="tpl-desc">'+t[3]+'</div></div></button>'; }).join(''); }
   }
+  // 印刷: 賞与モードは「月で選ぶ」を隠し、賞与月(入力▸賞与で設定)を表示=二重管理しない(P1-19)
+  function updatePrintMonthUI(){
+    var isBonus=state.printMode==='bonus';
+    var w=$('#p-month-wrap'), bn=$('#p-bonus-note'), bl=$('#p-bonus-label');
+    if(w) w.style.display=isBonus?'none':'';
+    if(bn) bn.style.display=isBonus?'':'none';
+    if(bl&&isBonus){ var ym=bonusYmOf(); bl.textContent=(ym?bonusMonthLabel().replace(/ /g,''):'未設定')+'（入力 ▸ 賞与 で設定）'; }
+  }
   function renderPrint(){
     $('#p-month').value=state.month;
     $$('.pmode').forEach(function(x){ x.classList.toggle('on', x.dataset.pmode===(state.printMode||'monthly')); });
+    updatePrintMonthUI();
     var sel=$('#p-emp'); sel.innerHTML='<option value="__all">全員</option>'+state.employees.map(function(e,i){return isActiveInMonth(e,state.month)?'<option value="'+i+'">'+esc(e.name)+'</option>':'';}).join('');
     doPreview();
   }
@@ -893,7 +903,7 @@
       var mu=ev.target.closest('[data-moveup]'); if(mu){ moveEmp(+mu.dataset.moveup,-1); return; }
       var md=ev.target.closest('[data-movedn]'); if(md){ moveEmp(+md.dataset.movedn,1); return; }
       if(ev.target.dataset.goleave!=null){ var gl=+ev.target.dataset.goleave; var ge=state.employees[gl]; state.open[ge.id]=true; state.open['D'+ge.id]=true; renderEmpMaster(); return; } // カードの詳細(就業状況)を開く=1経路に集約
-      if(ev.target.dataset.goretire!=null){ var gr=+ev.target.dataset.goretire; if(activeEmps().length<=1){ alert('稼働中は最低1名必要です'); return; } if(!confirm((state.employees[gr].name||'この従業員')+' を退職にしますか？')) return; state.employees[gr].retired=true; state.employees[gr].retiredYmd=state.month; renderEmpMaster(); return; }
+      if(ev.target.dataset.goretire!=null){ var gr=+ev.target.dataset.goretire; if(activeEmps().length<=1){ alert('稼働中は最低1名必要です'); return; } if(!confirm((state.employees[gr].name||'この従業員')+' を退職にします。給与計算・印刷の対象から外れます（データは残ります）。')) return; state.employees[gr].retired=true; state.employees[gr].retiredYmd=state.month; renderEmpMaster(); return; }
       var card=ev.target.closest('.mco');
       var tg=ev.target.closest('[data-toggle]');
       if(tg){ var ti=+tg.dataset.toggle; var e=state.employees[ti]; state.open[e.id]=!state.open[e.id]; renderEmpMaster(); return; }
@@ -942,7 +952,10 @@
       var cmb=e.target.closest('[data-confirm-month]');
       if(cmb){ state.employees.forEach(function(emp){ if(isActiveInMonth(emp,state.month)) setConfirm(emp.id,true); }); try{ saveMonthlyPayslips(); }catch(_){} persistSave(); renderInput(); toast('今月を確定しました'); return; }
       var fs=e.target.closest('[data-fillsche]');
-      if(fs){ var sd=fs.dataset.fillsche; state.employees.forEach(function(emp){ if(!isActiveInMonth(emp,state.month))return; ensureKintai(emp); var oi=kinIdx(emp,/出勤/); if(oi>=0) emp.kintai[oi].value=sd; }); renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
+      if(fs){ var sd=fs.dataset.fillsche;
+        var hasManual=state.employees.some(function(emp){ if(!isActiveInMonth(emp,state.month))return false; var mi=kinIdx(emp,/出勤/); return mi>=0 && emp.kintai[mi].value!=='' && emp.kintai[mi].value!=null && String(emp.kintai[mi].value)!==String(sd); });
+        if(hasManual && !confirm('手入力した出勤日数がある人も含めて、全員の出勤を所定（'+sd+'日）で上書きします。よろしいですか？')) return;
+        state.employees.forEach(function(emp){ if(!isActiveInMonth(emp,state.month))return; ensureKintai(emp); var oi=kinIdx(emp,/出勤/); if(oi>=0) emp.kintai[oi].value=sd; }); renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
       var tg=e.target.closest('[data-toggle]');
       if(tg){ var i=+tg.dataset.toggle; var emp=state.employees[i]; state.open['I'+emp.id]=!state.open['I'+emp.id]; il.querySelector('.acc[data-i="'+i+'"]').classList.toggle('open'); return; }
       var wm=e.target.closest('.wi-mode'); if(wm){ var c1=e.target.closest('.acc'); var ci1=+c1.dataset.i; var em1=state.employees[ci1]; if(!em1.warimashi)em1.warimashi={}; em1.warimashi.mode=wm.dataset.wm; renderInput(); return; }
@@ -963,7 +976,7 @@
     // 印刷
     $('#p-emp').addEventListener('change',doPreview);
     // #p-monthは.scr-monthに統合(P1-18)→共通ハンドラ(対象月change)が state.month同期＋doPreviewを行う
-    $('#print-mode-seg').addEventListener('click',function(e){ var b=e.target.closest('.pmode'); if(!b)return; state.printMode=b.dataset.pmode==='bonus'?'bonus':'monthly'; $$('.pmode').forEach(function(x){ x.classList.toggle('on', x.dataset.pmode===state.printMode); }); doPreview(); });
+    $('#print-mode-seg').addEventListener('click',function(e){ var b=e.target.closest('.pmode'); if(!b)return; state.printMode=b.dataset.pmode==='bonus'?'bonus':'monthly'; $$('.pmode').forEach(function(x){ x.classList.toggle('on', x.dataset.pmode===state.printMode); }); updatePrintMonthUI(); doPreview(); });
     function afterDesign(){ renderDesign(); if($('#scr-print')&&$('#scr-print').classList.contains('active')) doPreview(); }
     $('#tpl-row').addEventListener('click',function(e){ var b=e.target.closest('[data-tpl]'); if(!b)return; state.prefer=b.dataset.tpl; afterDesign(); });
     $('#color-pickers').addEventListener('click',function(e){

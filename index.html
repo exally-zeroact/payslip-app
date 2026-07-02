@@ -89,7 +89,8 @@
     <div class="card">
       <div class="imode-seg" id="print-mode-seg"><b class="pmode on" data-pmode="monthly">月次給与</b><b class="pmode" data-pmode="bonus">賞与</b></div>
       <div class="frow2">
-        <div><label>月で選ぶ</label><input id="p-month" type="month" class="finput scr-month"></div>
+        <div id="p-month-wrap"><label>月で選ぶ</label><input id="p-month" type="month" class="finput scr-month"></div>
+        <div id="p-bonus-note" style="display:none"><label>賞与月</label><div id="p-bonus-label" class="finput" style="background:#f7fcf9;color:#3D6B53;font-size:12px;line-height:1.35">—</div></div>
         <div><label>従業員で選ぶ</label><select id="p-emp" class="finput"></select></div>
       </div>
       <p class="hint" style="margin:-2px 0 8px">見た目（レイアウト・色）は「設定 ▸ 明細デザイン」で決めます。<b>PDFで保存</b>するには「印刷 / PDF保存」を押し、印刷ダイアログで送信先を「PDFに保存」にしてください。</p>

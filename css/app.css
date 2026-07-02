@@ -193,6 +193,8 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .btn-ghost:hover{background:#F0FAF4;}
 .chip{font-size:12px;padding:5px 10px;border:1px solid #C8ECD8;border-radius:14px;background:#fff;color:#1A4A2E;cursor:pointer;}
 .chip.on{background:#52B788;border-color:#52B788;color:#fff;font-weight:700;}
+/* 既定でON(自動)の法定控除チップは控えめに=主張しすぎ防止(P1-21a)。OFFにする操作性は保つ */
+.chip.on.chip-auto{background:#EAF6F0;border-color:#C3E5D4;color:#3D7A5A;font-weight:600;}
 .mini{font-size:11px;padding:3px 8px;border:1px solid #e3ede8;border-radius:8px;background:#fff;cursor:pointer;color:#4A6B5A;}
 .mini.del{color:#C62828;}
 
