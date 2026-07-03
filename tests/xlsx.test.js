@@ -24,9 +24,17 @@ T('集計AOA: 見出し行と各従業員行・合計行', function () {
   eq(last[0], '合計'); eq(last[1], 258400+200000); eq(last[2], 19000+3000); eq(last[3], 239400+197000);
 });
 
-T('集計AOA: 列幅と表題の結合', function () {
+T('集計AOA: 列幅と表題の結合(要確認列含む5列)', function () {
   var s = X.shukeiAOA(people, {});
-  eq(s.cols.length, 4); ok(s.merges.length >= 1, '表題は結合');
+  eq(s.cols.length, 5); ok(s.merges.length >= 1, '表題は結合');
+  eq(s.aoa[2][4], '要確認'); // 見出しに要確認列
+});
+T('集計AOA: warningsがある人は要確認列に⚠表示', function () {
+  var pw = [{ name:'警告太郎', shikyuTotal:100000, kojoTotal:0, net:100000, warnings:['最低賃金未満'] },
+            { name:'普通花子', shikyuTotal:200000, kojoTotal:3000, net:197000, warnings:[] }];
+  var s = X.shukeiAOA(pw, {});
+  ok(/⚠.*最低賃金未満/.test(s.aoa[3][4]), '警告太郎の要確認列に⚠');
+  eq(s.aoa[4][4], ''); // 普通花子は空
 });
 
 T('明細AOA: 会社/表題/氏名・支給日/勤怠/支給控除2列/合計/差引', function () {

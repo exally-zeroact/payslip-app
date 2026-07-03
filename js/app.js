@@ -76,6 +76,13 @@
     hourly=Math.floor(hourly);
     return { hourly:hourly, minWage:mw, prefName:((S.todofuken||{})[e.pref]||{}).name||'', ok:(hourly===0||hourly>=mw) };
   }
+  // 経理向け警告(最賃割れ/差引マイナス/休業手当未入力)。従業員に渡す明細でなく集計/Excelに出す。
+  function empWarnings(e){
+    var w=[]; var mw=minWageInfo(e); if(mw&&!mw.ok) w.push('最低賃金（'+mw.prefName+' 時給'+fmtN(mw.minWage)+'円）未満（約'+fmtN(mw.hourly)+'円）');
+    try{ var r=compute(e); if(r&&r.netNegative) w.push('差引支給がマイナス'); }catch(_){}
+    if(e.workStatus==='kyugyo'&&num(e.leavePay)<=0) w.push('休業手当が未入力（平均賃金60%以上・労基26条）');
+    return w;
+  }
   function prefOptions(sel){
     var S=SHH(); var K=(S&&S.KENKO_RITSU)||{tokyo:{name:'東京都'}};
     return Object.keys(K).map(function(code){return '<option value="'+code+'"'+(code===sel?' selected':'')+'>'+esc(K[code].name)+'</option>';}).join('');
@@ -751,8 +758,10 @@
   }
   function renderSumView(){
     // 母集合は入力/印刷と統一(isActiveInMonth=当月在籍)
+    var warnList=[];
     var rows=state.employees.filter(function(e){return isActiveInMonth(e,state.month);}).map(function(e){
       var r=compute(e), si=r.si||{};
+      var ws=empWarnings(e); if(ws.length) warnList.push({name:e.name, w:ws});
       return { name:e.name, s:r.shikyuTotal, k:r.kojoTotal, n:r.net,
         health:num(si.health), kaigo:num(si.kaigo), pension:num(si.pension), employ:num(si.employ),
         tax:num(r.incomeTax), jumin:num(r.residentTax) };
@@ -762,7 +771,10 @@
     var shakaiHonnin=t.health+t.kaigo+t.pension; // 健保+厚年+介護の本人負担計
     var mlabel=monthLabel().replace(/ /g,'');
     var kh=function(l,v){ return '<div class="pay-row"><span>'+l+'</span><span class="num">'+yen(v)+'</span></div>'; };
-    $('#view-sum').innerHTML='<div class="card"><div class="card-h">月次集計（'+mlabel+'）</div>'
+    var warnCard = warnList.length ? ('<div class="card" style="border-color:#F4D8A8;background:#fffdf7"><div class="card-h" style="color:#92500A">⚠ 要確認（'+warnList.length+'名）</div>'
+      + warnList.map(function(x){ return '<div class="pay-row"><span><b>'+esc(x.name)+'</b></span><span style="font-size:11.5px;color:#92500A;text-align:right">'+x.w.map(esc).join('<br>')+'</span></div>'; }).join('')
+      + '<p class="hint" style="margin-top:6px">この一覧・Excel（給与集計）にのみ表示。従業員へ渡す明細には出しません。</p></div>') : '';
+    $('#view-sum').innerHTML=warnCard+'<div class="card"><div class="card-h">月次集計（'+mlabel+'）</div>'
       +'<table class="sumtab"><thead><tr><th>従業員</th><th>支給合計</th><th>控除合計</th><th>差引支給</th></tr></thead>'
       +'<tbody>'+body+'<tr class="total"><td>全員合計（'+rows.length+'名）</td><td class="num">'+yen(t.s)+'</td><td class="num">'+yen(t.k)+'</td><td class="num">'+yen(t.n)+'</td></tr></tbody></table>'
       +'</div>'
@@ -787,7 +799,7 @@
   }
 
   /* ---------- 印刷 / PDF ---------- */
-  function buildPeople(emps){ return emps.map(function(e){ var r=compute(e); var k=(e.kintai||[]).filter(function(x){ if(/代休取得|振替休日/.test(x.label||'')) return num(x.value)>0; return true; }); var oi=k.findIndex(function(x){return /出勤/.test(x.label||'');}); var wt={label:'労働時間',value:workedLabel(e)}; if(oi>=0)k.splice(oi+1,0,wt); else k.unshift(wt); return { name:e.name, company:state.company.name, payDate:payDateStr(), kintai:k, shikyu:r.shikyu, kojo:r.kojo, net:r.net, shikyuTotal:r.shikyuTotal, kojoTotal:r.kojoTotal }; }); }
+  function buildPeople(emps){ return emps.map(function(e){ var r=compute(e); var k=(e.kintai||[]).filter(function(x){ if(/代休取得|振替休日/.test(x.label||'')) return num(x.value)>0; return true; }); var oi=k.findIndex(function(x){return /出勤/.test(x.label||'');}); var wt={label:'労働時間',value:workedLabel(e)}; if(oi>=0)k.splice(oi+1,0,wt); else k.unshift(wt); return { name:e.name, company:state.company.name, payDate:payDateStr(), kintai:k, shikyu:r.shikyu, kojo:r.kojo, net:r.net, shikyuTotal:r.shikyuTotal, kojoTotal:r.kojoTotal, warnings:empWarnings(e) }; }); }
   // 賞与明細用: 月次明細と同じテンプレ/テーマ(ユーザー選択)で 勤怠なし・支給=賞与/控除=賞与社保+源泉
   function bonusMonthLabel(){ var ym=bonusYmOf(); var y=Number(ym.slice(0,4)), m=Number(ym.slice(5,7)); var k=['','一','二','三','四','五','六','七','八','九','十','十一','十二']; return '令 和 '+(y-2018)+' 年 '+(k[m]||m)+' 月 賞 与'; }
   function buildBonusPeople(emps){ return emps.map(function(e){ var c=computeBonus(e); var kojo=[{label:'健康保険',value:c.si.health}]; if(c.si.kaigo>0) kojo.push({label:'介護保険',value:c.si.kaigo}); kojo.push({label:'厚生年金',value:c.si.pension}); kojo.push({label:'雇用保険',value:c.si.employ}); kojo.push({label:'源泉所得税',value:c.taxAmt}); return { name:e.name, company:state.company.name, payDate:(state.bonus&&state.bonus.payDay)||payDateStr(), kintai:[], shikyu:[{label:'賞与',value:c.bonus}], kojo:kojo, net:c.net, shikyuTotal:c.bonus, kojoTotal:c.si.total+c.taxAmt }; }); }
