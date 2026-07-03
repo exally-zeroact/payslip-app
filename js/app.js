@@ -52,7 +52,7 @@
   // 雇用保険 従業員負担(令和7年度・業種別)
   // 雇用保険 労働者負担(厚労省)。区分は全国共通の3種で網羅。料率は年度で自動選択(所得税と同様)
   var EMPLOY_GYOSHU=[['ippan','一般の事業'],['kensetsu','建設の事業'],['norin','農林水産・清酒製造']];
-  var EMPLOY_RATES={ 2025:{ippan:0.0055,kensetsu:0.0065,norin:0.0065}, 2026:{ippan:0.005,kensetsu:0.006,norin:0.006} }; // 令和7→令和8(引下げ)
+  var EMPLOY_RATES={ 2025:{ippan:0.0055,kensetsu:0.0065,norin:0.0065}, 2026:{ippan:0.005,kensetsu:0.006,norin:0.006} }; // 令和7→令和8(引下げ)★厚労省 労働者負担 照合済2026-07(一般5.5→5.0/1000・建設農林6.5→6.0/1000)★
   // 雇用保険料率は労働保険年度(4/1〜翌3/31)で切替。1〜3月は前年度扱い(例 2026-03=令和7年度)。
   function employYear(){ var ym=String(state.month||''); var y=parseInt(ym.slice(0,4),10)||2026, m=parseInt(ym.slice(5,7),10)||1; var fy=(m>=4)?y:y-1; return fy>=2026?2026:2025; }
   function employRateOf(code,year){ var t=EMPLOY_RATES[year||employYear()]||EMPLOY_RATES[2026]; return t[code]!=null?t[code]:t.ippan; }
@@ -106,7 +106,7 @@
     employees:[defEmp('山田 太郎')], open:{},
     inputMode:'monthly', printMode:'monthly', empFilter:'active', bonus:{ payYm:'', payDay:'', byEmp:{} }, confirmed:{} };
 
-  // マイカー通勤 1か月非課税限度(片道km・国税庁No.2585 令和8年4月〜)
+  // マイカー通勤 1か月非課税限度(片道km・国税庁No.2585 令和8年4月〜)★12区分 公式照合済2026-07★
   function carCommuteNonTax(km){ km=num(km);
     if(km<2)return 0; if(km<10)return 4200; if(km<15)return 7300; if(km<25)return 13500; if(km<35)return 19700; if(km<45)return 25900;
     if(km<55)return 32300; if(km<65)return 38700; if(km<75)return 45700; if(km<85)return 52700; if(km<95)return 59600; return 66400; }

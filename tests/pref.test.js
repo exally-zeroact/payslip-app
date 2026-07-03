@@ -44,6 +44,15 @@ T('全47府県: 健保=han50(標準報酬×その府県のjugyoin) と一致', f
   });
 });
 
+/* 標準報酬月額 上限/下限の公式値ロック(厚年32等級=88,000〜650,000 / 健保50等級=〜1,390,000) */
+T('標準報酬 上限/下限(厚年650,000・健保1,390,000・最低88,000)', function () {
+  eq(SH.getHyojunPension(700000), 650000); // 厚年 上限32等級
+  eq(SH.getHyojunPension(650000), 650000);
+  eq(SH.getHyojunPension(50000), 88000);   // 厚年 下限1等級
+  eq(SH.getHyojunHealth(1500000), 1390000); // 健保 上限50等級
+  eq(SH.getHyojunHealth(1400000), 1390000);
+});
+
 /* 不正コードはフォールバックで落ちない（東京等の既定） */
 T('未知の府県コードでも例外なく数値（フォールバック）', function () {
   var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 300000 }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0, hyojunBase: 300000 });
