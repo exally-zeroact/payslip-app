@@ -18,6 +18,14 @@
   // 既定テーマ(焦茶系・文字は濃いインク・罫線は淡グレー)
   var DEFAULT_THEME={accent:'#6f5a3e', line:'#cfc9b8', ink:'#23261f'};
   var COLOR_TARGETS=[['accent','アクセント色'],['line','罫線の色'],['ink','文字の色']];
+  // 配色プリセット(明細全体の色を一括切替。個別微調整は下のピッカーで)
+  var THEME_PRESETS=[
+    {name:'クラシック紺', accent:'#2E4A6B', line:'#C8D2DE', ink:'#1a2733'},
+    {name:'セピア',       accent:'#6f5a3e', line:'#cfc9b8', ink:'#23261f'},
+    {name:'グレー',       accent:'#595959', line:'#D9D9D9', ink:'#23261f'},
+    {name:'ミント',       accent:'#3D9E72', line:'#C8ECD8', ink:'#1a4a2e'},
+    {name:'モノクロ',     accent:'#404040', line:'#BFBFBF', ink:'#000000'}
+  ];
   var PAYTYPES=['月給','時給','日給','歩合','役員'];
   // 就業状況。産休/育休=社保免除(自動off・上書き可)、介護休/病休=社保継続、休業=会社都合(休業手当)
   var WORK_STATUS=[['normal','通常'],['sankyu','産休'],['ikukyu','育休'],['kaigokyu','介護休'],['byoukyu','病気休職'],['kyugyo','休業(会社都合)']];
@@ -405,9 +413,18 @@
     var s=e.shaho||{mode:'auto',months:[]}; var mode=s.mode||'auto';
     var r=compute(e), sb=shahoBasisOf(e);
     var th=e.shortTime?15:17;
-    var seg='<div class="sh-seg">'+SH_MODES.map(function(m){return '<b class="sh-mode'+(mode===m[0]?' on':'')+'" data-mode="'+m[0]+'">'+m[1]+'<span class="j">'+m[2]+'</span></b>';}).join('')+'</div>';
-    seg+='<div class="chip-row" style="margin:-2px 0 8px"><span class="chip'+(e.shortTime?' on':'')+'" data-short="1">'+(e.shortTime?'✓ ':'')+'短時間労働者（定時決定は'+th+'日）</span></div>';
+    // 2段: 既定は「自動(基本給から)」を主役に。他4モードは「詳しく」を開いた時だけ(既に詳細選択済なら開いて表示)
+    var shdOpen = !!(state.open&&state.open['SHD'+e.id]) || mode!=='auto';
+    var seg;
+    if(shdOpen){
+      seg='<div class="sh-seg">'+SH_MODES.map(function(m){return '<b class="sh-mode'+(mode===m[0]?' on':'')+'" data-mode="'+m[0]+'">'+m[1]+'<span class="j">'+m[2]+'</span></b>';}).join('')+'</div>';
+      seg+='<div class="chip-row" style="margin:-2px 0 8px"><span class="chip'+(e.shortTime?' on':'')+'" data-short="1">'+(e.shortTime?'✓ ':'')+'短時間労働者（定時決定は'+th+'日）</span></div>';
+    } else {
+      seg='<div class="sh-auto-lead">✓ 標準報酬は<b>基本給から自動</b>で計算（見込み・4〜6月の入力は不要）</div>'
+        +'<div class="sh-dtgl" data-shd="'+e.id+'">詳しく（定時決定・入社時・随時改定・直接入力）<span class="mco-cv" style="margin-left:6px">▾</span></div>';
+    }
     var body='';
+    if(shdOpen){
     if(mode==='auto'){
       body+='<div class="sh-tip">入力した<b>基本給＋手当（通勤含む）</b>から標準報酬を自動で当て、社会保険を計算します。<b>見込みや4〜6月の入力は不要</b>。正式な決定額があれば右の他タブで上書きできます。</div>';
     } else if(mode==='teiji'||mode==='zuiji'){
@@ -421,6 +438,7 @@
     } else {
       body+='<div class="sh-tip">決定通知書・保険料額表の<b>標準報酬月額</b>をそのまま入力します。</div><div class="frow"><div class="flabel">標準報酬月額<span class="hint2">円</span></div><input class="finput num sh-manual" value="'+attr(s.manual)+'" placeholder="340000"></div>';
     }
+    } // shdOpen
     var period=mode==='auto'?'基本給ベース（自動・あとで上書き可）':mode==='teiji'?'その年9月〜翌8月（毎年見直し）':mode==='shutoku'?'入社月〜（次の見直しまで）':mode==='zuiji'?'変動の4か月目〜（次の見直しまで）':'通知書のとおり';
     var exempt=(e.workStatus==='sankyu'||e.workStatus==='ikukyu');
     return '<div class="sec-lb" style="border-top:1px dashed #d4eae0">社会保険（毎月の天引き）<span class="help-i" data-help="shaho">💡</span></div>'+seg+body+shahoHeroHTML(r,period,sb.undetermined,mode==='auto',exempt);
@@ -818,7 +836,11 @@
     var cp=$('#color-pickers'); if(cp){
       var bar=COLOR_TARGETS.map(function(t){ var cur=state.theme[t[0]]||''; var op=state._oc===t[0]; return '<button class="cp-toggle'+(op?' open':'')+'" data-cpk="'+t[0]+'"><span class="cp-cur" style="background:'+cur+'"></span>'+t[1]+'<span class="cp-cv">▾</span></button>'; }).join('');
       var pal=''; if(state._oc){ var cur2=state.theme[state._oc]||''; pal='<div class="cp-sw">'+PALETTE.map(function(col){ var on=cur2.toLowerCase()===col.toLowerCase(); return '<span class="cw'+(on?' on':'')+'" data-ck="'+state._oc+'" data-col="'+col+'" title="'+col+'" style="background:'+col+'"></span>'; }).join('')+'</div>'; }
-      cp.innerHTML='<div class="cp-bar">'+bar+'<button class="cp-toggle cp-reset" data-reset="1">↺ 色を初期に戻す</button></div>'+pal;
+      // 配色プリセット行(一括切替・現在themeと3色一致でON)
+      var th=state.theme||{};
+      var preset='<div class="cp-preset">'+THEME_PRESETS.map(function(p,i){ var on=(String(th.accent).toLowerCase()===p.accent.toLowerCase()&&String(th.line).toLowerCase()===p.line.toLowerCase()&&String(th.ink).toLowerCase()===p.ink.toLowerCase());
+        return '<button type="button" class="cp-ps'+(on?' on':'')+'" data-preset="'+i+'"><span class="cp-ps-sw"><span style="background:'+p.accent+'"></span><span style="background:'+p.line+'"></span><span style="background:'+p.ink+'"></span></span>'+p.name+'</button>'; }).join('')+'</div>';
+      cp.innerHTML='<div class="cp-lb">配色プリセット</div>'+preset+'<div class="cp-lb" style="margin-top:10px">色を個別に微調整</div><div class="cp-bar">'+bar+'<button class="cp-toggle cp-reset" data-reset="1">↺ 初期に戻す</button></div>'+pal;
     }
     // テンプレの種類ギャラリー(横ストリップは横長カード=full幅)
     var tr=$('#tpl-row'); if(tr){ tr.innerHTML=TPL_OPTS.map(function(t){ var on=(state.prefer||'col2_1')===t[0];
@@ -927,7 +949,8 @@
       var tg=ev.target.closest('[data-toggle]');
       if(tg){ var ti=+tg.dataset.toggle; var e=state.employees[ti]; state.open[e.id]=!state.open[e.id]; renderEmpMaster(); return; }
       if(!card) return; var i=+card.dataset.i; var emp=state.employees[i];
-      var sm=ev.target.closest('.sh-mode'); if(sm){ if(!emp.shaho)emp.shaho={months:[]}; emp.shaho.mode=sm.dataset.mode; if(sm.dataset.mode==='teiji'){ autoFillTeijiMonths(emp, renderEmpMaster); } else { renderEmpMaster(); } return; }
+      var shd=ev.target.closest('[data-shd]'); if(shd){ if(!state.open)state.open={}; var kk='SHD'+emp.id; state.open[kk]=!state.open[kk]; renderEmpMaster(); return; } // 社保「詳しく」開閉
+      var sm=ev.target.closest('.sh-mode'); if(sm){ if(!emp.shaho)emp.shaho={months:[]}; emp.shaho.mode=sm.dataset.mode; if(sm.dataset.mode==='auto'&&state.open){ delete state.open['SHD'+emp.id]; } /* 自動選択で「詳しく」を畳む */ if(sm.dataset.mode==='teiji'){ autoFillTeijiMonths(emp, renderEmpMaster); } else { renderEmpMaster(); } return; }
       if(ev.target.dataset.refetch){ autoFillTeijiMonths(emp, renderEmpMaster); return; }
       if(ev.target.dataset.apply){ var ak=ev.target.dataset.apply; if(!emp.apply)emp.apply={}; emp.apply[ak]=(emp.apply[ak]===false)?true:false; renderEmpMaster(); return; }
       if(ev.target.dataset.short){ emp.shortTime=!emp.shortTime; renderEmpMaster(); return; }
@@ -999,6 +1022,7 @@
     function afterDesign(){ renderDesign(); if($('#scr-print')&&$('#scr-print').classList.contains('active')) doPreview(); }
     $('#tpl-row').addEventListener('click',function(e){ var b=e.target.closest('[data-tpl]'); if(!b)return; state.prefer=b.dataset.tpl; afterDesign(); });
     $('#color-pickers').addEventListener('click',function(e){
+      var ps=e.target.closest('[data-preset]'); if(ps){ var p=THEME_PRESETS[+ps.dataset.preset]; if(p){ state.theme={accent:p.accent,line:p.line,ink:p.ink}; state._oc=null; afterDesign(); } return; } // プリセット一括適用
       if(e.target.closest('[data-reset]')){ state.theme={accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}; state._oc=null; afterDesign(); return; } // 色のみ初期化(レイアウトは維持)
       var tg=e.target.closest('.cp-toggle:not(.cp-reset)'); if(tg){ state._oc=(state._oc===tg.dataset.cpk)?null:tg.dataset.cpk; renderDesign(); return; }
       var w=e.target.closest('.cw'); if(w){ state.theme[w.dataset.ck]=w.dataset.col; state._oc=null; afterDesign(); } });

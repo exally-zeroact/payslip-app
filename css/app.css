@@ -72,6 +72,8 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .sh-seg b{text-align:center;border:1.5px solid #d4eae0;border-radius:9px;padding:8px 4px;font-size:11px;font-weight:700;color:#7aa08c;cursor:pointer;background:#fff;}
 .sh-seg b.on{border-color:#52B788;background:#F0FAF4;color:#2E7D54;}
 .sh-seg b .j{display:block;font-size:9px;color:#A9C4B6;font-weight:400;margin-top:1px;}
+.sh-auto-lead{background:#F0FAF4;border:1.5px solid #C8ECD8;border-radius:9px;padding:9px 11px;font-size:12px;color:#2E7D54;margin:2px 0 6px;}.sh-auto-lead b{color:#1a4a2e;}
+.sh-dtgl{display:inline-flex;align-items:center;font-size:11.5px;color:#7aa08c;cursor:pointer;padding:2px 2px 8px;}
 .sh-tip{font-size:10.5px;color:#7aa08c;line-height:1.5;margin:0 0 8px;}.sh-tip b{color:#3D6B53;}
 .f3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:4px 0 6px;}.f3>*{min-width:0;}
 .mcol{display:flex;flex-direction:column;gap:4px;}.mcol .mlb{font-size:11px;font-weight:700;color:#3D6B53;}
@@ -137,6 +139,13 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .cp-sw{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;padding:8px;background:#f7fcf9;border:1px solid #e3ede8;border-radius:10px;}
 .cw{width:24px;height:24px;border-radius:5px;border:1px solid rgba(0,0,0,.12);cursor:pointer;}
 .cw.on{outline:2px solid #52B788;outline-offset:1px;}
+/* 配色プリセット */
+.cp-lb{font-size:11px;font-weight:700;color:#7aa08c;margin:0 0 6px;}
+.cp-preset{display:flex;flex-wrap:wrap;gap:6px;}
+.cp-ps{display:inline-flex;align-items:center;gap:7px;border:1.5px solid #d4eae0;border-radius:10px;background:#fff;padding:6px 10px 6px 7px;font-size:11.5px;font-weight:700;color:#3D6B53;cursor:pointer;}
+.cp-ps.on{border-color:#52B788;background:#F0FAF4;}
+.cp-ps-sw{display:inline-flex;border-radius:4px;overflow:hidden;border:1px solid rgba(0,0,0,.12);}
+.cp-ps-sw span{width:12px;height:18px;display:block;}
 .chip-dim{background:#eef2f0;color:#9fb3aa;border:1px dashed #d8e0db;cursor:default;}
 .mco-retired{opacity:.62;}
 .ret-badge{display:inline-block;font-size:10px;font-weight:700;color:#7A6A2E;background:#FBF3D6;border:1px solid #E6DCB0;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
