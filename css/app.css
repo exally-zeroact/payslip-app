@@ -278,6 +278,17 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .pay-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 2px;border-bottom:1px solid #eef4f0;font-size:13px;}
 .pay-row .num{font-family:'DM Mono',monospace;color:#1a4a2e;font-weight:700;white-space:nowrap;}
 .pay-sub{font-size:10.5px;color:#8FA89A;font-weight:400;margin-left:6px;}
+/* 帳票: 部署別・賃金台帳 */
+.sumtab tr.dept-h td{background:#EEF7F1;color:#2E7D54;font-weight:700;font-size:11px;}
+.dc-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.dc-tab{border-collapse:collapse;font-size:11px;white-space:nowrap;}
+.dc-tab th,.dc-tab td{border:1px solid #e3ede8;padding:4px 7px;text-align:right;}
+.dc-tab thead th{background:#F0FAF4;color:#2E7D54;font-weight:700;position:sticky;top:0;}
+.dc-tab td.dc-lb,.dc-tab th:first-child{text-align:left;position:sticky;left:0;background:#fff;color:#3D6B53;font-weight:700;}
+.dc-tab thead th:first-child{background:#F0FAF4;z-index:1;}
+.dc-tab td.num{font-family:'DM Mono',monospace;color:#1a4a2e;}
+.dc-tab td.tot{font-weight:700;background:#F7FCF9;}
+.dc-tab tr.dc-net td{background:#F0FAF4;font-weight:700;}
 
 /* theme swatches */
 .theme-row{display:flex;gap:8px;flex-wrap:wrap;}

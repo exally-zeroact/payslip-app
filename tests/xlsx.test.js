@@ -58,3 +58,28 @@ T('sheetName: 31字以内・禁止文字除去・重複回避', function () {
   var used={}; eq(X.sheetName('同名', used), '同名'); ok(X.sheetName('同名', used) !== '同名', '重複は別名');
   ok(X.sheetName('あ'.repeat(40)).length <= 31, '31字以内');
 });
+
+/* 帳票AOA(社保一覧・部署別・賃金台帳) */
+T('社保一覧AOA: 見出し＋各人＋合計', function () {
+  var rows = [{ name:'山田', hyojun:300000, health:15000, kaigo:2000, pension:27000, employ:1500, sum:45500 }];
+  var s = X.shakaiListAOA(rows, { monthLabel:'令和8年6月分' });
+  eq(s.aoa[2][0], '氏名'); eq(s.aoa[2][6], '本人計');
+  eq(s.aoa[3][1], 300000); eq(s.aoa[3][6], 45500);
+  var last = s.aoa[s.aoa.length-1]; eq(last[0], '合計'); eq(last[6], 45500);
+});
+T('部署別AOA: 部署見出し＋小計＋総合計', function () {
+  var g = { groups:[{ dept:'営業', rows:[{name:'A',s:300000,k:50000,n:250000}], sub:{s:300000,k:50000,n:250000} }], total:{s:300000,k:50000,n:250000} };
+  var s = X.deptSummaryAOA(g, {});
+  ok(/営業/.test(s.aoa[3][0]), '部署見出し');
+  var last = s.aoa[s.aoa.length-1]; eq(last[0], '総合計'); eq(last[1], 300000);
+});
+T('賃金台帳Sheets: 確定済み月のある従業員だけシート化', function () {
+  var CD = require('../lib/chingin-daicho.js');
+  var emps = [{ id:'e1', name:'山田' }, { id:'e2', name:'鈴木' }];
+  var recs = [{ ym:'2026-04', employee_id:'e1', data:{ shikyuTotal:300000, kojoTotal:50000, net:250000, shikyu:[{label:'基本給',value:300000}], kojo:[{label:'健康保険',value:15000}], work:{days:21,workMin:9600,otMin:600} } }];
+  var L = CD.buildLedger(recs, 2026, emps);
+  var sheets = X.chinginDaichoSheets(L, 2026, CD, {});
+  eq(sheets.length, 1); // 鈴木は保存なし=シート無し
+  ok(/山田/.test(sheets[0].name), '山田のシート');
+  eq(sheets[0].aoa[2][0], '項目'); eq(sheets[0].aoa[2][13], '年計'); // 12月+年計
+});

@@ -816,6 +816,73 @@
       +'</div>';
   }
 
+  /* ---------- 帳票（賃金台帳・社保一覧・部署別集計） ---------- */
+  function CD(){ return window.ChinginDaicho; }
+  function fmtMinLbl(min){ min=num(min); if(!min)return ''; return Math.floor(min/60)+':'+('0'+(min%60)).slice(-2); }
+  function activeMonthEmps(){ return state.employees.filter(function(e){return isActiveInMonth(e,state.month);}); }
+  // 社保一覧(月次・現計算)
+  function shakaiRows(){ return activeMonthEmps().map(function(e){ var r=compute(e), si=r.si||{}; return { name:e.name, dept:e.dept||'未分類', hyojun:num(r.hyojun), health:num(si.health), kaigo:num(si.kaigo), pension:num(si.pension), employ:num(si.employ), sum:num(si.health)+num(si.kaigo)+num(si.pension)+num(si.employ) }; }); }
+  function shakaiListHTML(){ var rows=shakaiRows(); var mlabel=monthLabel().replace(/ /g,'');
+    var t=rows.reduce(function(a,x){return {health:a.health+x.health,kaigo:a.kaigo+x.kaigo,pension:a.pension+x.pension,employ:a.employ+x.employ,sum:a.sum+x.sum};},{health:0,kaigo:0,pension:0,employ:0,sum:0});
+    var body=rows.map(function(x){ return '<tr><td>'+esc(x.name)+'</td><td class="num">'+yen(x.hyojun)+'</td><td class="num">'+yen(x.health)+'</td><td class="num">'+yen(x.kaigo)+'</td><td class="num">'+yen(x.pension)+'</td><td class="num">'+yen(x.employ)+'</td><td class="num">'+yen(x.sum)+'</td></tr>'; }).join('');
+    return '<div class="card"><div class="card-h">社会保険一覧（本人負担・'+mlabel+'）<button class="btn-ghost" data-choxlsx="shakai" style="margin-left:auto;padding:5px 12px;font-size:12px">Excel</button></div>'
+      +'<div style="overflow-x:auto"><table class="sumtab" style="min-width:520px"><thead><tr><th>従業員</th><th>標準報酬</th><th>健保</th><th>介護</th><th>厚年</th><th>雇用</th><th>本人計</th></tr></thead>'
+      +'<tbody>'+body+'<tr class="total"><td>合計</td><td class="num">—</td><td class="num">'+yen(t.health)+'</td><td class="num">'+yen(t.kaigo)+'</td><td class="num">'+yen(t.pension)+'</td><td class="num">'+yen(t.employ)+'</td><td class="num">'+yen(t.sum)+'</td></tr></tbody></table></div>'
+      +'<p class="hint" style="margin-top:6px">当月の計算値。会社負担は健保・厚年・介護がほぼ同額（折半）、雇用は会社率で別途。算定基礎届・納付確認の素にどうぞ。</p></div>'; }
+  // 部署別集計(月次・現計算)
+  function deptRows(){ return activeMonthEmps().map(function(e){ var r=compute(e); return { dept:e.dept||'未分類', name:e.name, s:r.shikyuTotal, k:r.kojoTotal, n:r.net }; }); }
+  function deptSummaryHTML(){ var g=CD()?CD().deptGroups(deptRows()):{groups:[],total:{s:0,k:0,n:0}}; var mlabel=monthLabel().replace(/ /g,'');
+    var body=g.groups.map(function(gr){ return '<tr class="dept-h"><td colspan="4">'+esc(gr.dept)+'（'+gr.rows.length+'名）</td></tr>'
+      + gr.rows.map(function(x){ return '<tr><td style="padding-left:16px">'+esc(x.name)+'</td><td class="num">'+yen(x.s)+'</td><td class="num">'+yen(x.k)+'</td><td class="num">'+yen(x.n)+'</td></tr>'; }).join('')
+      + '<tr class="total"><td>'+esc(gr.dept)+' 小計</td><td class="num">'+yen(gr.sub.s)+'</td><td class="num">'+yen(gr.sub.k)+'</td><td class="num">'+yen(gr.sub.n)+'</td></tr>'; }).join('');
+    return '<div class="card"><div class="card-h">部署別集計（'+mlabel+'）<button class="btn-ghost" data-choxlsx="dept" style="margin-left:auto;padding:5px 12px;font-size:12px">Excel</button></div>'
+      +'<table class="sumtab"><thead><tr><th>部署 / 従業員</th><th>支給合計</th><th>控除合計</th><th>差引支給</th></tr></thead>'
+      +'<tbody>'+body+'<tr class="total" style="background:#E7F5EC"><td>総合計</td><td class="num">'+yen(g.total.s)+'</td><td class="num">'+yen(g.total.k)+'</td><td class="num">'+yen(g.total.n)+'</td></tr></tbody></table>'
+      +'<p class="hint" style="margin-top:6px">部署は従業員マスタの「部署」で設定。未設定は「未分類」。</p></div>'; }
+  // 賃金台帳(年間・従業員別・確定済み月から)
+  function chinginDaichoHTML(L, year){
+    var CDm=CD(); var note='<p class="hint" style="margin:0 0 10px">「今月を確定」で保存した月だけ反映（労基法108条の賃金台帳）。横スクロール可。<button class="btn-ghost" data-choxlsx="daicho" style="margin-left:8px;padding:4px 10px;font-size:11px">Excel</button></p>';
+    if(!L.length) return note+'<div class="card"><p class="hint">従業員がいません。</p></div>';
+    var months=[]; for(var mm=1;mm<=12;mm++)months.push(mm);
+    var cards=L.map(function(row){ var t=CDm.ledgerTotals(row), lab=CDm.ledgerLabels(row);
+      if(t.savedMonths===0) return '<div class="card"><div class="card-h">'+esc(row.name)+'（'+year+'年）</div><p class="hint">この年の確定済み月がありません。</p></div>';
+      function rowT(label,getRaw,totalRaw,fmt){ fmt=fmt||yen; return '<tr><td class="dc-lb">'+esc(label)+'</td>'+months.map(function(m){ var d=row.monthly[m]; return '<td class="num">'+(d?fmt(getRaw(d)):'')+'</td>'; }).join('')+'<td class="num tot">'+fmt(totalRaw)+'</td></tr>'; }
+      var head='<tr><th>項目</th>'+months.map(function(m){return '<th>'+m+'月</th>';}).join('')+'<th>年計</th></tr>';
+      var b='';
+      b+=rowT('労働日数',function(d){return (d.work||{}).days;},t.days,function(v){return num(v)||'';});
+      b+=rowT('労働時間',function(d){return (d.work||{}).workMin;},t.workMin,fmtMinLbl);
+      b+=rowT('時間外',function(d){return (d.work||{}).otMin;},t.otMin,fmtMinLbl);
+      b+=rowT('深夜',function(d){return (d.work||{}).nightMin;},t.nightMin,fmtMinLbl);
+      b+=rowT('法定休日',function(d){return (d.work||{}).holidayMin;},t.holidayMin,fmtMinLbl);
+      lab.shikyu.forEach(function(l){ b+=rowT(l,function(d){return CDm.itemVal(d.shikyu,l);},t.shikyu[l],yen); });
+      b+=rowT('総支給',function(d){return d.shikyuTotal;},t.shikyuTotal,yen);
+      lab.kojo.forEach(function(l){ b+=rowT(l,function(d){return CDm.itemVal(d.kojo,l);},t.kojo[l],yen); });
+      b+=rowT('控除計',function(d){return d.kojoTotal;},t.kojoTotal,yen);
+      b+='<tr class="dc-net">'+rowT('差引支給',function(d){return d.net;},t.net,yen).replace('<tr>','').replace('</tr>','')+'</tr>';
+      return '<div class="card"><div class="card-h">'+esc(row.name)+'（'+year+'年・確定'+t.savedMonths+'か月）</div>'
+        +'<div class="dc-wrap"><table class="dc-tab"><thead>'+head+'</thead><tbody>'+b+'</tbody></table></div></div>';
+    }).join('');
+    return note+cards;
+  }
+  function renderChinginDaicho(sub){ var host=$('#view-cho'); var year=parseInt(String(state.month||'').slice(0,4),10)||2026;
+    if(!(window.Store&&Store.getPayslipsByYm)){ host.innerHTML=sub+'<div class="card"><p class="hint">履歴保存が未対応です（保存を有効化してください）。</p></div>'; return; }
+    Store.getPayslipsByYm(year+'-01', year+'-12').then(function(recs){ host.innerHTML=sub+chinginDaichoHTML(CD().buildLedger(recs||[], year, state.employees), year); })
+      .catch(function(){ host.innerHTML=sub+'<div class="card"><p class="hint">読込に失敗しました。</p></div>'; }); }
+  function choSub(v){ return '<div class="seg" style="margin-bottom:10px">'
+    +'<button class="seg-b'+(v==='shakai'?' on':'')+'" data-cho="shakai">社保一覧</button>'
+    +'<button class="seg-b'+(v==='dept'?' on':'')+'" data-cho="dept">部署別</button>'
+    +'<button class="seg-b'+(v==='daicho'?' on':'')+'" data-cho="daicho">賃金台帳</button></div>'; }
+  function renderChoView(){ var host=$('#view-cho'); if(!host)return; var v=state.choView||'shakai'; var sub=choSub(v);
+    if(v==='dept') host.innerHTML=sub+deptSummaryHTML();
+    else if(v==='daicho'){ host.innerHTML=sub+'<div class="card"><div class="card-h">賃金台帳</div><p class="hint">読込中…</p></div>'; renderChinginDaicho(sub); }
+    else host.innerHTML=sub+shakaiListHTML(); }
+  function downloadChoXlsx(kind){ if(!window.PayslipXlsx) return; var co=(state.company||{}).name, mlabel=monthLabel().replace(/ /g,'');
+    if(kind==='shakai'){ PayslipXlsx.downloadSheets([{name:'社保一覧', aoa:PayslipXlsx.shakaiListAOA(shakaiRows(),{company:co,monthLabel:mlabel})}], {filename:'社保一覧_'+state.month+'.xlsx'}); return; }
+    if(kind==='dept'){ var g=CD().deptGroups(deptRows()); PayslipXlsx.downloadSheets([{name:'部署別集計', aoa:PayslipXlsx.deptSummaryAOA(g,{company:co,monthLabel:mlabel})}], {filename:'部署別集計_'+state.month+'.xlsx'}); return; }
+    if(kind==='daicho'){ var year=parseInt(String(state.month||'').slice(0,4),10)||2026;
+      Store.getPayslipsByYm(year+'-01',year+'-12').then(function(recs){ var L=CD().buildLedger(recs||[],year,state.employees);
+        var sheets=PayslipXlsx.chinginDaichoSheets(L, year, CD(), {company:co}); if(!sheets.length){ alert('確定済みの月がありません。'); return; } PayslipXlsx.downloadSheets(sheets,{filename:'賃金台帳_'+year+'.xlsx'}); }); return; } }
+
   /* ---------- 印刷 / PDF ---------- */
   function buildPeople(emps){ return emps.map(function(e){ var r=compute(e); var k=(e.kintai||[]).filter(function(x){ if(/代休取得|振替休日/.test(x.label||'')) return num(x.value)>0; return true; }); var oi=k.findIndex(function(x){return /出勤/.test(x.label||'');}); var wt={label:'労働時間',value:workedLabel(e)}; if(oi>=0)k.splice(oi+1,0,wt); else k.unshift(wt); return { name:e.name, company:state.company.name, payDate:payDateStr(), kintai:k, shikyu:r.shikyu, kojo:r.kojo, net:r.net, shikyuTotal:r.shikyuTotal, kojoTotal:r.kojoTotal, warnings:empWarnings(e) }; }); }
   // 賞与明細用: 月次明細と同じテンプレ/テーマ(ユーザー選択)で 勤怠なし・支給=賞与/控除=賞与社保+源泉
@@ -1012,7 +1079,11 @@
       var g=e.target.dataset.g, ri=+e.target.dataset.ri, f=e.target.dataset.f; if(e.target.classList.contains('ck')){emp[g][ri].hikazei=e.target.checked;refreshCard(ci);return;} if(g&&!isNaN(ri)&&f){emp[g][ri][f]=e.target.value;refreshCard(ci);} });
 
     // 一覧/集計
-    $$('.seg-b[data-view]').forEach(function(b){ b.addEventListener('click',function(){ $$('.seg-b[data-view]').forEach(function(x){x.classList.toggle('on',x===b);}); var v=b.dataset.view; $('#view-list').style.display=v==='list'?'':'none'; $('#view-sum').style.display=v==='sum'?'':'none'; if(v==='sum')renderSumView(); else renderListView(); }); });
+    $$('.seg-b[data-view]').forEach(function(b){ b.addEventListener('click',function(){ $$('.seg-b[data-view]').forEach(function(x){x.classList.toggle('on',x===b);}); var v=b.dataset.view; $('#view-list').style.display=v==='list'?'':'none'; $('#view-sum').style.display=v==='sum'?'':'none'; var vc=$('#view-cho'); if(vc)vc.style.display=v==='cho'?'':'none'; if(v==='sum')renderSumView(); else if(v==='cho')renderChoView(); else renderListView(); }); });
+    // 帳票のサブ切替(賃金台帳/社保一覧/部署別)＋Excel
+    var vcho=$('#view-cho'); if(vcho) vcho.addEventListener('click',function(e){
+      var st=e.target.closest('[data-cho]'); if(st){ state.choView=st.dataset.cho; renderChoView(); return; }
+      var dl=e.target.closest('[data-choxlsx]'); if(dl){ downloadChoXlsx(dl.dataset.choxlsx); return; } });
     $('#view-list').addEventListener('click',function(e){ var tg=e.target.closest('[data-ltoggle]'); if(!tg)return; var id=tg.dataset.ltoggle; state.open['L'+id]=!state.open['L'+id]; $('#view-list .acc[data-lid="'+id+'"]').classList.toggle('open'); });
 
     // 印刷
@@ -1046,7 +1117,14 @@
     activeEmps().forEach(function(e){ try{
       var r=compute(e);
       var days=(window.PayrollCalc&&PayrollCalc.calcPaymentDays)?PayrollCalc.calcPaymentDays(e,ym,method):0;
-      Store.savePayslip(ym, e.id, { name:e.name, shikyuTotal:r.shikyuTotal, paymentDays:days, kojoTotal:r.kojoTotal, net:r.net, kazei:r.kazei, siTotal:(r.si&&r.si.total)||0 });
+      var wc=e.warimashi||{};
+      // 賃金台帳用の内訳(後方互換=読む側は無くても壊れない)。ot/night/holidayは割増入力(かんたん)から分換算
+      var work={ days:kintaiVal(e,/出勤/), workMin:workedMin(e),
+        otMin:num(wc.otH)*60+num(wc.otM), nightMin:num(wc.nightH)*60+num(wc.nightM), holidayMin:num(wc.holidayH)*60+num(wc.holidayM) };
+      var si=r.si||{};
+      Store.savePayslip(ym, e.id, { name:e.name, shikyuTotal:r.shikyuTotal, paymentDays:days, kojoTotal:r.kojoTotal, net:r.net, kazei:r.kazei, siTotal:si.total||0,
+        shikyu:r.shikyu, kojo:r.kojo, hyojun:r.hyojun, dept:(e.dept||''), tax:num(r.incomeTax), jumin:num(r.residentTax),
+        si:{ health:num(si.health), kaigo:num(si.kaigo), pension:num(si.pension), employ:num(si.employ) }, work:work });
     }catch(_e){} });
   }
   // 定時決定: 当年の4・5・6月の履歴から 総支給+支払基礎日数 を自動セット(無い月は空欄=手入力)
