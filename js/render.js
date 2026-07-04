@@ -182,11 +182,8 @@
     return '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><style>'+css+'</style></head><body data-orientation="'+orientation+'">'+body+'</body></html>';
   }
 
-  // ---- 自動テンプレ選択（ロジックは lib/select.js = PayslipSelect に集約・テスト可能）----
-  function choose(people, prefer){
-    var S = global.PayslipSelect;
-    return S.choose(people, prefer);
-  }
+  // テンプレは手動選択(prefer)。旧・人数/項目数からの自動選択は廃止(手動選択に移行)。
+  // 収まり容量(実測): col2_X=支給/控除 各≤20段(1人)/各≤10段(2人) / col1_X=支給段+控除段 合計≤17〜18段。段=2項目で1段。
 
   // 白へ寄せて薄く(amt 0..1)。文字の濃淡・罫線の濃淡を1色から作る(色相は変えない=「文字は文字/線は線」を別々に指定)
   function lighten(hex, amt){
@@ -219,7 +216,7 @@
       return { html: html, builder: prefer, fits: true, orientation: orient, pages: pages.length };
     },
     lighten: lighten, rootFor: rootFor,
-    buildCols: buildCols, buildVstack1: buildVstack1, buildStrips: buildStrips, choose: choose
+    buildCols: buildCols, buildVstack1: buildVstack1, buildStrips: buildStrips
   };
   global.Render = Render;
 })(window);
