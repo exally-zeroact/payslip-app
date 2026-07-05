@@ -109,5 +109,107 @@
       .map(function(x){ return { ym:x.ym, employee_id:x.employee_id, data:x.data }; }));
   };
 
+  // ── Web明細(従業員向け配布・パスワード方式) ──
+  // 会社が月次/賞与明細を「Web公開」→従業員は リンク(?t=token)で開き、初回だけ「会社発行の初回コード」で本人を縛って
+  // 自分のパスワードを設定→以後はパスワード(＋端末記憶deviceToken)で閲覧。★電子交付の同意(所得税法)まで明細を1バイトも返さない★。
+  // 生年月日PINは廃止(同じ誕生日・推測に弱い)。未読/開封(openedAt)を記録。本番=Supabase(schema/RPC)。ここはlocalStorage実装。
+  var MPUB_KEY='payslip_meisai_pub_v1', MDOC_KEY='payslip_meisai_docs_v1';
+  function mPub(){ try{ return JSON.parse(localStorage.getItem(MPUB_KEY)||'[]'); }catch(e){ return []; } }
+  function mPubW(a){ try{ localStorage.setItem(MPUB_KEY, JSON.stringify(a)); }catch(e){} }
+  function mDoc(){ try{ return JSON.parse(localStorage.getItem(MDOC_KEY)||'[]'); }catch(e){ return []; } }
+  function mDocW(a){ try{ localStorage.setItem(MDOC_KEY, JSON.stringify(a)); }catch(e){} }
+  // 簡易ハッシュ(localStorage用・非暗号)。★本番はSupabase RPCでpgcrypto crypt()/bcryptの適正ハッシュ★。
+  function hashOf(s){ s=String(s||''); var h=5381; for(var i=0;i<s.length;i++){ h=((h<<5)+h+s.charCodeAt(i))>>>0; } return 'h'+h.toString(36); }
+  function rndToken(){ return 't'+Math.random().toString(36).slice(2,10)+Math.random().toString(36).slice(2,6); }
+  function rndCode(){ var c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s=''; for(var i=0;i<8;i++){ s+=c[Math.floor(Math.random()*c.length)]; } return s; } // 紛らわしい文字を除いた8桁
+  function findPub(token){ var pubs=mPub(); for(var i=0;i<pubs.length;i++){ if(pubs[i].token===token) return { pubs:pubs, i:i, p:pubs[i] }; } return { pubs:pubs, i:-1, p:null }; }
+  // 認証: deviceToken(端末記憶) or password で本人確認。OKならpub返す。
+  function authPub(p, cred){ cred=cred||{};
+    if(cred.deviceToken && (p.deviceTokens||[]).indexOf(cred.deviceToken)>=0) return true;
+    if(cred.password!=null && p.pwHash && p.pwHash===hashOf(cred.password)) return true;
+    return false; }
+
+  // 会社: 明細を公開。items=[{employeeId,name,ym,kind('monthly'|'bonus'),data(render.js用)}]。従業員ごとに token/初回コードを確保・doc upsert。返り=[{employeeId,name,token,link}]
+  Store.publishMeisai = function(items){
+    // TODO(supabase): pay_meisai_pub(token,account_id,employee_id,init_code,pw_hash,device_tokens,consent_at)＋pay_meisai_docs(...) にupsert(RLS=会社のみ)。
+    var pubs=mPub(), docs=mDoc(), now=new Date().toISOString(), out=[];
+    (items||[]).forEach(function(it){
+      var p=pubs.filter(function(x){ return x.employeeId===it.employeeId; })[0];
+      if(!p){ p={ token:rndToken(), employeeId:it.employeeId, initCode:rndCode(), pwHash:null, deviceTokens:[], consentAt:null, createdAt:now }; pubs.push(p); }
+      // 既発行は token/初回コード/パスワード/同意 を保持(再公開で消さない)
+      var id='md_'+p.token+'_'+it.ym+'_'+it.kind;
+      var d={ id:id, token:p.token, ym:it.ym, kind:it.kind, name:it.name, data:it.data, publishedAt:now, openedAt:null };
+      var di=docs.findIndex(function(x){ return x.id===id; }); if(di>=0){ d.openedAt=docs[di].openedAt; docs[di]=d; } else docs.push(d);
+      out.push({ employeeId:it.employeeId, name:it.name, token:p.token, link:'meisai.html?t='+p.token });
+    });
+    mPubW(pubs); mDocW(docs); return Promise.resolve(out);
+  };
+  // 会社: 公開一覧。返り=[{employeeId,name,token,link,hasPassword,initCode(パスワード未設定の間だけ),consentAt,docs:[{ym,kind,openedAt}]}]
+  Store.listMeisaiPub = function(){
+    // TODO(supabase): 会社のpay_meisai_pub(init_code含む・会社はRLSで読める)＋docsをselect。
+    var pubs=mPub(), docs=mDoc();
+    return Promise.resolve(pubs.map(function(p){
+      var ds=docs.filter(function(x){ return x.token===p.token; }).map(function(x){ return { ym:x.ym, kind:x.kind, name:x.name, publishedAt:x.publishedAt, openedAt:x.openedAt }; });
+      var nm=(ds[0]&&ds[0].name)||''; var hasPw=!!p.pwHash;
+      return { employeeId:p.employeeId, name:nm, token:p.token, link:'meisai.html?t='+p.token, hasPassword:hasPw, initCode:(hasPw?null:p.initCode), consentAt:p.consentAt, docs:ds };
+    }));
+  };
+  // 従業員: トークンの状態(初回か/記憶済か)。★明細/コードは返さない★。返り={found,hasPassword,remembered,name}
+  Store.meisaiAuth = function(token, deviceToken){
+    // TODO(supabase): RPC meisai_auth(p_token,p_device) → found/has_password/remembered。
+    var f=findPub(token); if(!f.p) return Promise.resolve({ found:false });
+    var docs=mDoc().filter(function(x){ return x.token===token; }); var nm=(docs[0]&&docs[0].name)||'';
+    var remembered=!!(deviceToken && (f.p.deviceTokens||[]).indexOf(deviceToken)>=0);
+    return Promise.resolve({ found:true, hasPassword:!!f.p.pwHash, remembered:remembered, name:nm });
+  };
+  // 従業員: 初回パスワード設定(会社発行の初回コードで本人を縛る)。返り={ok} or {badInit} or {alreadySet}
+  Store.meisaiSetPassword = function(token, initCode, password){
+    // TODO(supabase): RPC meisai_set_password(p_token,p_init,p_pw) SECURITY DEFINER。init照合→pw_hash設定・init無効化。
+    var f=findPub(token); if(!f.p) return Promise.resolve({ ok:false, notFound:true });
+    if(f.p.pwHash) return Promise.resolve({ ok:false, alreadySet:true });
+    if(String(initCode||'').toUpperCase().trim()!==String(f.p.initCode||'')) return Promise.resolve({ ok:false, badInit:true });
+    if(String(password||'').length<4) return Promise.resolve({ ok:false, weak:true });
+    f.p.pwHash=hashOf(password); f.p.initCode=null; mPubW(f.pubs);
+    return Promise.resolve({ ok:true });
+  };
+  // 従業員: パスワード照合→OKで端末記憶用deviceToken発行。返り={ok,deviceToken} or {bad}
+  Store.meisaiVerifyPassword = function(token, password){
+    // TODO(supabase): RPC meisai_verify(p_token,p_pw)→deviceToken(サーバ保存)。
+    var f=findPub(token); if(!f.p || !f.p.pwHash) return Promise.resolve({ ok:false });
+    if(f.p.pwHash!==hashOf(password)) return Promise.resolve({ ok:false, bad:true });
+    var dt=rndToken(); if(!f.p.deviceTokens)f.p.deviceTokens=[]; f.p.deviceTokens.push(dt); mPubW(f.pubs);
+    return Promise.resolve({ ok:true, deviceToken:dt });
+  };
+  // 従業員: 明細取得。cred={deviceToken}or{password}。★認証NG/同意前は docs を1件も返さない★。返り={docs,name}|{needConsent,name}|{unauth}
+  Store.getMeisaiDocs = function(token, cred){
+    // TODO(supabase): RPC get_meisai(p_token,p_device) SECURITY DEFINER。認証＋同意済ならdocs返す。anon直readは不可。
+    var f=findPub(token); if(!f.p) return Promise.resolve({ unauth:true });
+    if(!authPub(f.p, cred)) return Promise.resolve({ unauth:true });
+    var docs=mDoc().filter(function(x){ return x.token===token; }).sort(function(a,b){ return (b.ym||'').localeCompare(a.ym||''); });
+    var nm=(docs[0]&&docs[0].name)||'';
+    if(!f.p.consentAt) return Promise.resolve({ needConsent:true, name:nm });
+    return Promise.resolve({ name:nm, consentAt:f.p.consentAt,
+      docs:docs.map(function(x){ return { id:x.id, ym:x.ym, kind:x.kind, name:x.name, data:x.data, openedAt:x.openedAt }; }) });
+  };
+  // 従業員: 電子交付に同意(認証必須)。返り={ok,consentAt} or {unauth}
+  Store.setMeisaiConsent = function(token, cred){
+    var f=findPub(token); if(!f.p) return Promise.resolve({ ok:false });
+    if(!authPub(f.p, cred)) return Promise.resolve({ ok:false, unauth:true });
+    if(!f.p.consentAt){ f.p.consentAt=new Date().toISOString(); mPubW(f.pubs); }
+    return Promise.resolve({ ok:true, consentAt:f.p.consentAt });
+  };
+  // 会社: 初回コード再発行(＝旧パスワード/記憶を無効化・本人が再設定)。返り={ok,initCode}
+  Store.reissueMeisaiInit = function(token){
+    var f=findPub(token); if(!f.p) return Promise.resolve({ ok:false });
+    f.p.initCode=rndCode(); f.p.pwHash=null; f.p.deviceTokens=[]; mPubW(f.pubs);
+    return Promise.resolve({ ok:true, initCode:f.p.initCode });
+  };
+  // 従業員: 明細を開いた(openedAt記録)。
+  Store.markMeisaiOpened = function(docId){
+    var docs=mDoc(); var i=docs.findIndex(function(x){ return x.id===docId; });
+    if(i>=0 && !docs[i].openedAt){ docs[i].openedAt=new Date().toISOString(); mDocW(docs); }
+    return Promise.resolve(true);
+  };
+
   global.Store = Store;
 })(window);

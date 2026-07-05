@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>給与明細 — Web交付</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- PWA: 「ホーム画面に追加」でアプリ風(全画面・アイコン)。App Storeインストールではない。アイコンは緑地に白「給」のinline SVG。 -->
+<meta name="theme-color" content="#3D9E72">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="給与明細">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Crect width='180' height='180' rx='40' fill='%233D9E72'/%3E%3Ctext x='90' y='122' font-size='96' font-family='sans-serif' fill='white' text-anchor='middle'%3E給%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22給与明細%22%2C%22short_name%22%3A%22給与明細%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23F0FAF4%22%2C%22theme_color%22%3A%22%233D9E72%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%253D%2527http%253A%252F%252Fwww.w3.org%252F2000%252Fsvg%2527%2520width%253D%2527192%2527%2520height%253D%2527192%2527%253E%253Crect%2520width%253D%2527192%2527%2520height%253D%2527192%2527%2520rx%253D%252742%2527%2520fill%253D%2527%25233D9E72%2527%252F%253E%253Ctext%2520x%253D%252796%2527%2520y%253D%2527130%2527%2520font-size%253D%2527104%2527%2520font-family%253D%2527sans-serif%2527%2520fill%253D%2527white%2527%2520text-anchor%253D%2527middle%2527%253E給%253C%252Ftext%253E%253C%252Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans JP',sans-serif;color:#1a4a2e;background:#F0FAF4;-webkit-text-size-adjust:100%;min-height:100vh;}
+.mhead{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;height:50px;padding:0 16px;background:#fff;border-bottom:1px solid #e3ede8;}
+.mhead .logo{font-family:'DM Mono',monospace;font-size:18px;color:#52B788;}
+.mhead .sub{font-size:10px;letter-spacing:.16em;color:#7aa08c;}
+.wrap{max-width:760px;margin:0 auto;padding:18px 14px 60px;}
+.card{background:#fff;border:1px solid #d4eae0;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 1px 4px rgba(30,80,46,.06);}
+.card h2{font-size:15px;color:#2E7D54;margin-bottom:10px;}
+.lead{font-size:12.5px;color:#3D6B53;line-height:1.7;}
+.finput{width:100%;padding:12px;border:1.5px solid #d4eae0;border-radius:10px;font-size:16px;color:#1A4A2E;background:#fff;-webkit-appearance:none;}
+.finput.num{font-family:'DM Mono',monospace;letter-spacing:.14em;text-align:center;}
+.lbl{font-size:11px;font-weight:700;color:#3D6B53;margin:2px 0 5px;display:block;}
+.btn{width:100%;padding:13px;background:#3D9E72;color:#fff;border:none;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 3px 12px rgba(61,158,114,.3);margin-top:12px;}
+.btn.ghost{background:#fff;color:#3D6B53;border:1.5px solid #d4eae0;box-shadow:none;}
+.err{color:#C0392B;font-size:12px;margin-top:8px;min-height:16px;}
+.consent-box{background:#F0FAF4;border:1.5px solid #C8ECD8;border-radius:10px;padding:12px;font-size:12px;color:#3D6B53;line-height:1.75;margin:10px 0;}
+.dlist .drow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border:1px solid #d4eae0;border-radius:12px;background:#fff;margin-bottom:8px;cursor:pointer;}
+.dlist .drow .dl{font-size:13px;font-weight:700;color:#1a4a2e;}
+.dlist .drow .ds{font-size:11px;color:#7aa08c;}
+.dlist .drow .dv{font-family:'DM Mono',monospace;font-weight:700;color:#2E7D54;white-space:nowrap;}
+.badge-new{display:inline-block;font-size:9px;background:#52B788;color:#fff;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
+.preview-wrap{overflow:auto;background:#cfcabd;border-radius:12px;padding:12px;display:flex;justify-content:center;}
+#frame{border:none;background:#fff;box-shadow:0 8px 32px rgba(30,60,40,.16);}
+.topbar{display:flex;gap:8px;margin-bottom:10px;}
+.topbar .btn{margin-top:0;}
+.hidden{display:none;}
+.hint{font-size:11px;color:#7aa08c;margin-top:8px;line-height:1.6;}
+</style>
+</head>
+<body>
+<header class="mhead"><span class="logo">給与明細</span><span class="sub">WEB交付</span></header>
+<div class="wrap">
+
+  <!-- ① トークン不正 -->
+  <div class="card hidden" id="sc-bad">
+    <h2>リンクが正しくありません</h2>
+    <p class="lead">お手元の「給与明細の閲覧リンク」から開いてください。ご不明な場合は勤務先のご担当者へお問い合わせください。</p>
+  </div>
+
+  <!-- ②a 初回パスワード設定(会社発行の初回コード＋自分のパスワード) -->
+  <div class="card hidden" id="sc-setup">
+    <h2>はじめての設定</h2>
+    <p class="lead">初回だけ設定します。会社から渡された<b>初回コード</b>を入れて、<b>自分のパスワード</b>を決めてください。<br>次回からはパスワードだけ（この端末では省略）で開けます。</p>
+    <div style="margin-top:14px">
+      <label class="lbl">初回コード（会社から受け取ったもの）</label>
+      <input class="finput num" id="setup-code" maxlength="8" placeholder="例：ABCD2345" autocomplete="off" autocapitalize="characters">
+      <label class="lbl" style="margin-top:12px">パスワード（4文字以上・自分で決める）</label>
+      <input class="finput" id="setup-pw" type="password" placeholder="パスワード" autocomplete="new-password">
+      <label class="lbl" style="margin-top:12px">パスワード（確認）</label>
+      <input class="finput" id="setup-pw2" type="password" placeholder="もう一度" autocomplete="new-password">
+      <div class="err" id="setup-err"></div>
+      <button class="btn" id="setup-go">設定して進む</button>
+    </div>
+  </div>
+
+  <!-- ②b ログイン(パスワード) -->
+  <div class="card hidden" id="sc-login">
+    <h2>ログイン</h2>
+    <p class="lead">ご自分の給与明細を表示します。<b>パスワード</b>を入力してください。</p>
+    <div style="margin-top:14px">
+      <label class="lbl">パスワード</label>
+      <input class="finput" id="login-pw" type="password" placeholder="パスワード" autocomplete="current-password">
+      <div class="err" id="login-err"></div>
+      <button class="btn" id="login-go">ログイン</button>
+      <div class="hint">パスワードを忘れた/漏れたときは、勤務先に「初回コードの再発行」を依頼してください（再設定できます）。</div>
+    </div>
+  </div>
+
+  <!-- ③ 電子交付の同意 -->
+  <div class="card hidden" id="sc-consent">
+    <h2>給与明細の電子交付について</h2>
+    <div class="consent-box">
+      給与明細を<b>この画面（電子データ）で受け取ること</b>に同意していただく必要があります（所得税法の定めによります）。<br>
+      ● 明細はこの画面でいつでも閲覧・PDF保存できます。<br>
+      ● 同意しない場合は、勤務先へご連絡のうえ書面での交付をご依頼ください。
+    </div>
+    <button class="btn" id="consent-go">同意して明細を見る</button>
+    <button class="btn ghost" id="consent-no">今はしない</button>
+    <div class="hint">同意した日時が記録されます。</div>
+  </div>
+
+  <!-- ④ 明細一覧 -->
+  <div class="card hidden" id="sc-list">
+    <h2 id="list-title">給与明細</h2>
+    <div class="dlist" id="dlist"></div>
+    <p class="hint">明細をタップすると内容が表示され、PDFで保存できます。</p>
+  </div>
+
+  <!-- ⑤ 明細ビュー -->
+  <div class="card hidden" id="sc-view">
+    <div class="topbar">
+      <button class="btn ghost" id="v-back" style="flex:1">← 一覧へ</button>
+      <button class="btn" id="v-pdf" style="flex:1">PDFで保存 / 印刷</button>
+    </div>
+    <div class="preview-wrap"><iframe id="frame" title="給与明細"></iframe></div>
+  </div>
+
+</div>
+
+<script src="js/render.js"></script>
+<!-- 本番はSupabase(RPC)。ローカル/同一ブラウザ検証はlocalStorage層で動作。 -->
+<!-- <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script> -->
+<!-- <script src="js/supa-config.js"></script> -->
+<script src="js/store.js"></script>
+<script src="js/meisai.js"></script>
+</body>
+</html>

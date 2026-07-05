@@ -44,6 +44,7 @@
     workstatus:{ t:'💡 就業状況（産休・育休・休職など）', b:'休んでいる人の区分です。給与計算に自動で反映します（すべて手で調整できます）。\n\n● <b>産休・育休</b>…社会保険（健保・厚年・介護）が<b>免除</b>＝自動で0に。給与は無給が一般的（入力で調整）。出産手当金・育児休業給付金は健保/雇用保険から出るお金で<b>給与には含めません</b>。\n● <b>介護休・病気休職</b>…社会保険は<b>継続</b>（無給でも本人負担が出ます）。介護休業給付金・傷病手当金は別途（給与でない）。\n● <b>休業（会社都合）</b>…<b>休業手当＝平均賃金の60%以上</b>を支給に入れます（課税・社保の対象）。\n\n※自動の社保オフは「法定控除」のチップで個別に戻せます。' },
     taxclass:{ t:'💡 所得税の区分（甲・乙・丙）', b:'所得税の源泉徴収の区分です。\n\n● <b>甲欄</b>…「扶養控除等申告書」を提出している人（＝メインの勤務先）。扶養を加味して計算。通常はこちら。\n● <b>乙欄</b>…申告書を未提出の人（副業・掛け持ちの2か所目など）。税率が高め・扶養は加味しません。\n● <b>丙欄</b>…<b>日雇い</b>（日々雇い入れられる人・継続2か月以内）。日額表 丙欄×出勤日数で計算。2か月を超えたら甲/乙へ。\n\n年分（令和7/令和8）は給与の対象月から自動で正しい税額表を選びます。' },
     shahoTiming:{ t:'💡 社会保険料の当月／翌月徴収', b:'社会保険料（健保・厚年・介護）を<b>いつの給与から天引きするか</b>です。\n\n● <b>翌月徴収</b>（法律の原則・健保167条/厚年84条）…前月分の保険料を当月の給与から控除。<b>入社した月は天引きなし</b>（翌月から）、<b>月末退職の月は2か月分</b>（前月＋当月）を最終給与から控除。\n● <b>当月徴収</b>…当月分をその月の給与から控除（会社の慣行）。\n\n※このアプリの既定は<b>当月</b>（今までの計算と同じ）。翌月に切り替えると入社月・退職月の天引きが上記のとおり変わります。雇用保険はどちらも実支払額×率です。' },
+    webmeisai:{ t:'💡 Web明細（従業員へ配布）', b:'給与明細を<b>従業員のスマホ/PCで閲覧</b>できるように公開します。\n\n● 「Web明細で公開」を押すと、対象月の在籍者ぶんの明細が公開され、<b>従業員ごとのリンク＋初回コード</b>ができます。\n● 従業員に<b>リンクと初回コード</b>を渡してください（LINE/メール/手渡しでOK）。従業員はリンクを開き、初回だけ<b>初回コードで自分のパスワードを設定</b>→<b>電子交付に同意</b>すると明細を見られます（所得税法の要件）。\n● 次回からは<b>パスワードだけ（その端末では省略）</b>。パスワードを忘れた/漏れたら「初回コード再発行」で再設定できます。\n● 誰が見たか（未読/開封）を一覧で確認できます。\n\n※本番運用はクラウド保存が必要です（同意するまで明細は表示されません）。' },
     commute:{ t:'💡 通勤手当（非課税）', b:'通勤手当は一定額まで所得税が<b>非課税</b>です。\n\n● <b>公共交通（電車・バス）</b>…月15万円まで非課税。\n● <b>マイカー等</b>…片道距離で月額が決まる（2km未満は全額課税〜95km以上66,400円・国税庁No.2585 令和8年4月〜）。\n\n限度を超えた分は課税されます。※所得税の非課税であって、社会保険・雇用保険では全額が算定基礎に入ります。' },
     legalkojo:{ t:'💡 法定控除（健保・厚年・雇用・所得税・住民税）', b:'給料から天引きする法律上の控除です。原則はかかりますが、<b>使わないものは外せます</b>（タップでオフ）。\n\n● 役員（労働者でない）→ <b>雇用保険は対象外</b>＝外す\n● 社会保険に未加入のパート → 健保・厚年を外す\n● 乙欄/別途納付など → 所得税を外す\n\n外すとその控除は計算しません（課税のもとからも引きません）。最終判断は会社で。' },
     warimashiBasis:{ t:'💡 割増の「基礎」に入れる手当', b:'残業代の単価を計算する“もとの賃金”です。手当の<b>名前でなく実態</b>で決めます（労基法37条5項・規則21条）。\n\n<b>外せる手当（限定列挙の7種）</b>…家族・通勤・別居・子女教育・住宅・臨時・1か月超ごとの手当。ただし<b>実態が伴う場合だけ</b>。\n● 例：住宅手当が「全員に一律定額」→ 住宅費用に応じていない＝<b>基礎に入れる</b>。\n● 例：通勤手当・扶養人数で変わる家族手当→ <b>外せる</b>。\n\n上記以外の手当は原則すべて基礎に入ります。タップで含む/外すを切替えできます。' },
@@ -939,6 +940,7 @@
     $$('.pmode').forEach(function(x){ x.classList.toggle('on', x.dataset.pmode===(state.printMode||'monthly')); });
     updatePrintMonthUI();
     var sel=$('#p-emp'); sel.innerHTML='<option value="__all">全員</option>'+state.employees.map(function(e,i){return isActiveInMonth(e,state.month)?'<option value="'+i+'">'+esc(e.name)+'</option>':'';}).join('');
+    renderWebMeisai();
     doPreview();
   }
   function doPreview(){
@@ -1119,7 +1121,47 @@
       var lbl=(isBonus?bonusMonthLabel():monthLabel()).replace(/ /g,'');
       var fn=isBonus?('賞与明細_'+bonusYmOf()+'.xlsx'):('給与明細_'+state.month+'.xlsx');
       PayslipXlsx.download(people, {company:state.company.name, monthLabel:lbl, filename:fn}); });
+    // Web明細で公開(従業員向け配布・アクセスコード方式)
+    $('#b-webpub').addEventListener('click',function(){
+      if(!(window.Store&&Store.publishMeisai)) return;
+      var isBonus=state.printMode==='bonus';
+      var emps=state.employees.filter(function(e){return isActiveInMonth(e,isBonus?bonusYmOf():state.month);});
+      var ym=isBonus?bonusYmOf():state.month, kind=isBonus?'bonus':'monthly';
+      var items=emps.map(function(e){ var person=(isBonus?buildBonusPeople([e]):buildPeople([e]))[0];
+        return { employeeId:e.id, name:e.name, ym:ym, kind:kind,
+          data:{ person:person, doc:isBonus?{month:bonusMonthLabel(),kind:'bonus'}:{month:monthLabel()}, prefer:state.prefer, theme:state.theme } }; });
+      Store.publishMeisai(items).then(function(){ renderWebMeisai(); toast(emps.length+'名の'+(isBonus?'賞与':'給与')+'明細をWeb公開しました'); });
+    });
+    $('#webmeisai-card').addEventListener('click',function(e){
+      var cp=e.target.closest('.wm-copy'); if(cp){ try{ navigator.clipboard.writeText(cp.dataset.link); toast('コピーしました'); }catch(err){} return; }
+      var ri=e.target.closest('.wm-reissue'); if(ri){ if(!confirm('初回コードを再発行しますか？\n現在のパスワードと端末の記憶は無効になり、従業員は新しい初回コードで再設定します。')) return;
+        Store.reissueMeisaiInit(ri.dataset.token).then(function(){ renderWebMeisai(); toast('初回コードを再発行しました'); }); return; }
+    });
     window.addEventListener('resize',function(){ if($('#scr-print').classList.contains('active'))doPreview(); });
+  }
+  // Web明細: 公開状況(従業員リンク＋同意＋未読/開封)を印刷タブに表示
+  function renderWebMeisai(){
+    var card=$('#webmeisai-card'), host=$('#webmeisai-body'); if(!card||!host||!(window.Store&&Store.listMeisaiPub))return;
+    Store.listMeisaiPub().then(function(list){
+      card.style.display=list.length?'':'none'; if(!list.length){ host.innerHTML=''; return; }
+      var unread=0; list.forEach(function(p){ (p.docs||[]).forEach(function(d){ if(!d.openedAt)unread++; }); });
+      var origin=(location.origin&&location.origin.indexOf('http')===0)?location.origin+location.pathname.replace(/[^\/]*$/,''):'';
+      host.innerHTML='<p class="hint" style="margin:-4px 0 10px">従業員に<b>リンク＋初回コード</b>を渡してください（LINE/メール/手渡し）。初回だけコードで自分のパスワードを設定→以後はパスワードだけ。'+(unread?'<b style="color:#92500A"> 未読 '+unread+'件</b>':' <b style="color:#2E7D54">全員が閲覧済み</b>')+'</p>'
+        +list.map(function(p){
+          var ds=(p.docs||[]).slice().sort(function(a,b){return (b.ym||'').localeCompare(a.ym||'');});
+          var openedTxt=ds.map(function(d){ return esc(d.ym)+(d.kind==='bonus'?'賞':'')+(d.openedAt?'✓':'<span style="color:#C0392B">未</span>'); }).join(' ');
+          var pwState=p.hasPassword?'<span style="font-size:10.5px;color:#2E7D54">パスワード設定済</span>':'<span style="font-size:10.5px;color:#92500A">パスワード未設定</span>';
+          var consentState=p.consentAt?'<span style="font-size:10.5px;color:#2E7D54">・同意済</span>':'<span style="font-size:10.5px;color:#92500A">・未同意</span>';
+          var codeRow = (!p.hasPassword && p.initCode)
+            ? '<div style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:#3D6B53;min-width:52px">初回コード</span><input class="finput num" readonly value="'+attr(p.initCode)+'" style="flex:1;font-size:13px;letter-spacing:.12em;padding:7px 9px" onclick="this.select()"><button class="btn-ghost wm-copy" data-link="'+attr(p.initCode)+'" style="padding:7px 10px;font-size:11px">コピー</button></div>'
+            : '<div style="font-size:10.5px;color:#7aa08c;margin-top:5px">初回コードは設定後に非表示（忘れた/漏れたら「再発行」）<button class="btn-ghost wm-reissue" data-token="'+attr(p.token)+'" style="padding:4px 8px;font-size:10.5px;margin-left:6px">初回コード再発行</button></div>';
+          return '<div style="border:1px solid #d4eae0;border-radius:10px;padding:9px 11px;margin-bottom:7px">'
+            +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:13px">'+esc(p.name||'(氏名未取得)')+'</b><span>'+pwState+consentState+'</span></div>'
+            +'<div style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:#3D6B53;min-width:52px">リンク</span><input class="finput" readonly value="'+attr(origin+p.link)+'" style="flex:1;font-size:11px;padding:7px 9px" onclick="this.select()"><button class="btn-ghost wm-copy" data-link="'+attr(origin+p.link)+'" style="padding:7px 10px;font-size:11px">コピー</button></div>'
+            +codeRow
+            +'<div style="font-size:10.5px;color:#7aa08c;margin-top:5px">公開: '+openedTxt+'</div></div>';
+        }).join('');
+    });
   }
 
   /* ---------- 月次明細を自動保存(定時決定4-6月の自動入力の素) ---------- */

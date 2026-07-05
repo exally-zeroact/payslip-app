@@ -71,3 +71,103 @@ create policy own_pay_payslips on pay_payslips for all using (account_id = auth.
 
 -- 棚名/列名は後から変更可(データそのまま): alter table 旧 rename to 新; / alter table x rename column 旧 to 新;
 -- 次の配線: index.html に supabase-js(CDN)+window.SUPA、アプリに ログイン(auth) を付け、保存/復元を pay_* に。
+
+-- ═══ Web明細(従業員向け配布・パスワード方式) ═══
+-- 会社が公開→従業員はリンク(?t=token)で開き、初回だけ「会社発行の初回コード(init_code)」で本人を縛って
+-- 自分のパスワードを設定(pw_hash)→以後はパスワード(＋端末記憶device_token)で自分の明細のみ閲覧。電子交付の同意まで明細を出さない。
+-- 生年月日PINは廃止(同じ誕生日・推測に弱い)。
+create table if not exists pay_meisai_pub (
+  token         uuid primary key default gen_random_uuid(),
+  account_id    uuid not null references auth.users(id) on delete cascade,  -- 発行元の会社
+  employee_id   text not null,
+  init_code     text,                              -- 会社発行の初回コード(平文・会社はRLSで読める/従業員はRPC照合のみ)。パスワード設定後はnull
+  pw_hash       text,                              -- 従業員が設定したパスワードのハッシュ(pgcrypto crypt/bcrypt・平文で持たない)。null=未設定
+  device_tokens text[] not null default '{}',      -- 端末記憶(ログイン済み端末)。認証はこれ or pw_hash
+  consent_at    timestamptz,                       -- 電子交付の同意日時(nullなら未同意=明細返さない)
+  created_at    timestamptz not null default now()
+);
+create table if not exists pay_meisai_docs (
+  id           text primary key,                   -- 'md_'+token+'_'+ym+'_'+kind
+  token        uuid not null references pay_meisai_pub(token) on delete cascade,
+  account_id   uuid not null references auth.users(id) on delete cascade,
+  ym           text not null,                       -- 'YYYY-MM'
+  kind         text not null,                       -- 'monthly' | 'bonus'
+  data         jsonb not null default '{}'::jsonb,  -- {person, doc, prefer, theme}(render.js用)
+  published_at timestamptz not null default now(),
+  opened_at    timestamptz
+);
+create index if not exists idx_pay_meisai_docs_token on pay_meisai_docs(token);
+
+-- RLS: 会社(account_id=auth.uid())は自分の発行分を全操作。従業員(anon)は直readさせない=RPC経由のみ。
+alter table pay_meisai_pub  enable row level security;
+alter table pay_meisai_docs enable row level security;
+drop policy if exists own_pay_meisai_pub on pay_meisai_pub;
+create policy own_pay_meisai_pub on pay_meisai_pub for all using (account_id = auth.uid()) with check (account_id = auth.uid());
+drop policy if exists own_pay_meisai_docs on pay_meisai_docs;
+create policy own_pay_meisai_docs on pay_meisai_docs for all using (account_id = auth.uid()) with check (account_id = auth.uid());
+
+-- 従業員向け SECURITY DEFINER のRPC(anonロールにexecute付与)。★pw_hash/init_codeはpgcrypto crypt()で保存/照合する想定(下は骨子)★。
+-- meisai_auth: トークンの状態(初回か/記憶済か)。明細/コードは返さない。
+create or replace function meisai_auth(p_token uuid, p_device text)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_pub pay_meisai_pub;
+begin
+  select * into v_pub from pay_meisai_pub where token=p_token;
+  if v_pub.token is null then return jsonb_build_object('found',false); end if;
+  return jsonb_build_object('found',true,'has_password',(v_pub.pw_hash is not null),
+    'remembered',(p_device is not null and p_device = any(v_pub.device_tokens)));
+end $$;
+-- meisai_set_password: 初回コード照合→パスワード設定(init_code無効化)。★最初の本人を初回コードで縛る★。
+create or replace function meisai_set_password(p_token uuid, p_init text, p_pw text)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_pub pay_meisai_pub;
+begin
+  select * into v_pub from pay_meisai_pub where token=p_token;
+  if v_pub.token is null then return jsonb_build_object('ok',false); end if;
+  if v_pub.pw_hash is not null then return jsonb_build_object('ok',false,'already_set',true); end if;
+  if v_pub.init_code is null or upper(trim(p_init)) <> v_pub.init_code then return jsonb_build_object('ok',false,'bad_init',true); end if;
+  update pay_meisai_pub set pw_hash=crypt(p_pw, gen_salt('bf')), init_code=null where token=p_token;
+  return jsonb_build_object('ok',true);
+end $$;
+-- meisai_verify: パスワード照合→端末記憶用device_token発行(サーバに保存)。
+create or replace function meisai_verify(p_token uuid, p_pw text)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_pub pay_meisai_pub; v_dev text;
+begin
+  select * into v_pub from pay_meisai_pub where token=p_token;
+  if v_pub.token is null or v_pub.pw_hash is null or v_pub.pw_hash <> crypt(p_pw, v_pub.pw_hash) then return jsonb_build_object('ok',false); end if;
+  v_dev := encode(gen_random_bytes(18),'hex');
+  update pay_meisai_pub set device_tokens = array_append(device_tokens, v_dev) where token=p_token;
+  return jsonb_build_object('ok',true,'device_token',v_dev);
+end $$;
+-- get_meisai: 認証(device_token or password)＋同意済なら docs を返す(＋opened_at更新)。未同意はneed_consent。認証NGはunauth。
+create or replace function get_meisai(p_token uuid, p_device text, p_pw text)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_pub pay_meisai_pub; v_docs jsonb; v_ok boolean;
+begin
+  select * into v_pub from pay_meisai_pub where token=p_token;
+  if v_pub.token is null then return jsonb_build_object('unauth',true); end if;
+  v_ok := (p_device is not null and p_device = any(v_pub.device_tokens))
+       or (p_pw is not null and v_pub.pw_hash is not null and v_pub.pw_hash = crypt(p_pw, v_pub.pw_hash));
+  if not v_ok then return jsonb_build_object('unauth',true); end if;
+  if v_pub.consent_at is null then return jsonb_build_object('need_consent',true); end if;
+  update pay_meisai_docs set opened_at=coalesce(opened_at, now()) where token=p_token;
+  select coalesce(jsonb_agg(jsonb_build_object('id',id,'ym',ym,'kind',kind,'data',data) order by ym desc),'[]') into v_docs
+    from pay_meisai_docs where token=p_token;
+  return jsonb_build_object('docs',v_docs);
+end $$;
+-- set_meisai_consent: 認証(device_token or password)必須で同意記録。
+create or replace function set_meisai_consent(p_token uuid, p_device text, p_pw text)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_pub pay_meisai_pub; v_ok boolean;
+begin
+  select * into v_pub from pay_meisai_pub where token=p_token;
+  if v_pub.token is null then return jsonb_build_object('ok',false); end if;
+  v_ok := (p_device is not null and p_device = any(v_pub.device_tokens))
+       or (p_pw is not null and v_pub.pw_hash is not null and v_pub.pw_hash = crypt(p_pw, v_pub.pw_hash));
+  if not v_ok then return jsonb_build_object('ok',false,'unauth',true); end if;
+  update pay_meisai_pub set consent_at=coalesce(consent_at, now()) where token=p_token;
+  return jsonb_build_object('ok',true);
+end $$;
+-- init_code再発行(会社)はRLSで会社が直接 update pay_meisai_pub set init_code=..., pw_hash=null, device_tokens='{}' でよい。
+-- grant execute on function meisai_auth(uuid,text), meisai_set_password(uuid,text,text), meisai_verify(uuid,text), get_meisai(uuid,text,text), set_meisai_consent(uuid,text,text) to anon;
