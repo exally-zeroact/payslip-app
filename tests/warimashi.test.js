@@ -210,6 +210,45 @@ T('詳細モードでもみなしは時間外(ot)区分から控除', function (
   eq(r.lines.find(function (l) { return l.key === 'ot'; }).minutes, 25 * 60);
 });
 
+/* ── 60時間 ちょうどの境界(off-by-one防止) ── */
+T('60h境界: 残業ちょうど60h→60h超は無し(over60inc行が出ない)', function () {
+  var r = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, otH: 60, otM: 0 });
+  eq(r.lines.filter(function (l) { return l.key === 'over60inc'; }).length, 0, '3600分ちょうどは超過0');
+  eq(r.total, W.han50Up(1592 * 1.25 * 60)); // = 119400 (残業のみ)
+  eq(r.total, 119400);
+});
+T('60h境界: 60h1分→60h超は1分だけ計上', function () {
+  var r = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, otH: 60, otM: 1 });
+  var o60 = r.lines.find(function (l) { return l.key === 'over60inc'; });
+  ok(o60 && o60.minutes === 1, '3601分→超過1分');
+});
+
+/* ── かんたん(増分方式) ≡ 詳細(排他区分) の同値ロック: 60h超×深夜が重なる複合ケース ──
+   easyは残業全体×1.25＋深夜/60h超を+0.25上乗せ。detailは排他区分の合成率。
+   夜勤が「通常帯」でも「60h超帯」でも raw合計は同じ=144,076 になることを固定(将来の式変更でズレたら検知)。 */
+T('同値: 残業70h+深夜2h → かんたん=144,076', function () {
+  var r = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, otH: 70, otM: 0, nightH: 2, nightM: 0 });
+  // ot 1592*1.25*70=139300 / 深夜 1592*0.25*2=796 / 60h超 1592*0.25*10=3980
+  eq(r.total, 139300 + 796 + 3980);
+  eq(r.total, 144076);
+});
+T('同値: 詳細で夜勤を「通常帯」に割付(ot58h+otNight2h+over60 10h)=144,076', function () {
+  var r = W.detail({ base: 260000, annualHolidays: 120, dailyHours: 8, seg: { ot: 58 * 60, otNight: 2 * 60, over60: 10 * 60 } });
+  eq(r.total, 144076);
+});
+T('同値: 詳細で夜勤を「60h超帯」に割付(ot60h+over60 8h+over60Night2h)=144,076', function () {
+  var r = W.detail({ base: 260000, annualHolidays: 120, dailyHours: 8, seg: { ot: 60 * 60, over60: 8 * 60, over60Night: 2 * 60 } });
+  eq(r.total, 144076);
+});
+
+/* ── 率上書きも かんたん≡詳細 で一致(合成式が両モードで整合) ── */
+T('同値(率上書き): 残業1.3で かんたん(残業50h+深夜0)=詳細(ot50h)一致', function () {
+  var e = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, otH: 50, rates: { ot: 1.3 } });
+  var d = W.detail({ base: 260000, annualHolidays: 120, dailyHours: 8, seg: { ot: 50 * 60 }, rates: { ot: 1.3 } });
+  eq(e.total, d.total);
+  eq(e.total, W.han50Up(1592 * 1.3 * 50)); // = 103480
+});
+
 /* 空入力は0 */
 T('空入力 → 割増0', function () {
   var r = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8 });
