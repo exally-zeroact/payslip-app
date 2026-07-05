@@ -3,6 +3,34 @@
 var Z = require('../lib/zaiseki.js');
 var PayslipCalc = require('../lib/calc.js');
 
+/* ── 社保の当月/翌月徴収(月数0/1/2) ── */
+T('社保徴収: current/未指定/日付なし=1(回帰)', function () {
+  eq(Z.shahoChargeMonths({ timing: 'current', ym: '2026-06' }), 1);
+  eq(Z.shahoChargeMonths({ ym: '2026-06' }), 1);
+  eq(Z.shahoChargeMonths({ timing: 'next', ym: '2026-06' }), 1); // 日付なし通常月
+});
+T('社保徴収: 翌月・入社月=0 / 翌月・通常月=1', function () {
+  eq(Z.shahoChargeMonths({ timing: 'next', ym: '2026-06', joinYmd: '2026-06-10' }), 0);
+  eq(Z.shahoChargeMonths({ timing: 'next', ym: '2026-07', joinYmd: '2026-06-10' }), 1);
+});
+T('社保徴収: 翌月・月末退職月=2 / 翌月・月中退職月=1', function () {
+  eq(Z.shahoChargeMonths({ timing: 'next', ym: '2026-06', taishokuYmd: '2026-06-30' }), 2); // 6月末
+  eq(Z.shahoChargeMonths({ timing: 'next', ym: '2026-06', taishokuYmd: '2026-06-15' }), 1); // 月中
+});
+T('社保徴収: 翌月・同月得喪=1', function () {
+  eq(Z.shahoChargeMonths({ timing: 'next', ym: '2026-06', joinYmd: '2026-06-05', taishokuYmd: '2026-06-20' }), 1);
+});
+/* computePayslip通し: shahoMult で健保が月数倍(既定1=不変) */
+T('通し: shahoMult=2 で健保が2倍・0で0・既定は不変', function () {
+  function h(mult) {
+    var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 300000 }], birthYmd: '1990-01-01', payYm: '2026-06', healthRate: 0.04925, hyojunBase: 300000, shahoMult: mult });
+    return r.si.health;
+  }
+  var base = h(undefined); // 既定=1
+  ok(base > 0, '健保>0');
+  eq(h(2), base * 2); eq(h(0), 0); eq(h(1), base);
+});
+
 /* ── 在籍判定 ── */
 T('在籍: 日付未設定は常に在籍(従来どおり)', function () {
   eq(Z.isActiveInMonth({}, '2026-06'), true);
