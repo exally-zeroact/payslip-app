@@ -158,8 +158,9 @@
   Store.meisaiAuth = function(token, deviceToken){
     // TODO(supabase): RPC meisai_auth(p_token,p_device) → found/has_password/remembered。
     var f=findPub(token); if(!f.p) return Promise.resolve({ found:false });
-    var docs=mDoc().filter(function(x){ return x.token===token; }); var nm=(docs[0]&&docs[0].name)||'';
     var remembered=!!(deviceToken && (f.p.deviceTokens||[]).indexOf(deviceToken)>=0);
+    var docs=mDoc().filter(function(x){ return x.token===token; });
+    var nm=remembered ? ((docs[0]&&docs[0].name)||'') : ''; // ★氏名は認証済(端末記憶)のみ返す。認証前は個人特定情報を出さない
     return Promise.resolve({ found:true, hasPassword:!!f.p.pwHash, remembered:remembered, name:nm });
   };
   // 従業員: 初回パスワード設定(会社発行の初回コードで本人を縛る)。返り={ok} or {badInit} or {alreadySet}
@@ -168,7 +169,7 @@
     var f=findPub(token); if(!f.p) return Promise.resolve({ ok:false, notFound:true });
     if(f.p.pwHash) return Promise.resolve({ ok:false, alreadySet:true });
     if(String(initCode||'').toUpperCase().trim()!==String(f.p.initCode||'')) return Promise.resolve({ ok:false, badInit:true });
-    if(String(password||'').length<4) return Promise.resolve({ ok:false, weak:true });
+    if(String(password||'').length<8) return Promise.resolve({ ok:false, weak:true });
     f.p.pwHash=hashOf(password); f.p.initCode=null; mPubW(f.pubs);
     return Promise.resolve({ ok:true });
   };
@@ -201,7 +202,7 @@
   // 会社: 初回コード再発行(＝旧パスワード/記憶を無効化・本人が再設定)。返り={ok,initCode}
   Store.reissueMeisaiInit = function(token){
     var f=findPub(token); if(!f.p) return Promise.resolve({ ok:false });
-    f.p.initCode=rndCode(); f.p.pwHash=null; f.p.deviceTokens=[]; mPubW(f.pubs);
+    f.p.initCode=rndCode(); f.p.pwHash=null; f.p.deviceTokens=[]; f.p.consentAt=null; mPubW(f.pubs); // ★同意もリセット=別人が再設定した時に前任者の同意を引き継がない(電子交付要件)
     return Promise.resolve({ ok:true, initCode:f.p.initCode });
   };
   // 従業員: 明細を開いた(openedAt記録)。

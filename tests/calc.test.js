@@ -5,6 +5,14 @@ var PayrollCalc = require('../lib/payroll-calc.js');
 var Densan = require('../lib/shotokuzei-densan.js');
 var SHAKAIHOKEN_HYO = require('../lib/shakaihoken-hyo.js');
 
+/* ---- 無効入力ガード(対立監査L1・2026-07-05) ---- */
+T('扶養マイナスは0にクランプ(甲欄・負値で税額過大化しない)', function () {
+  function emp(fuyou){ return { shikyu:[{label:'基本給',value:300000}], birthYmd:'1990-01-01', payYm:'2026-06', fuyou:fuyou, taxClass:'甲', healthRate:0.04955, hyojunBase:300000 }; }
+  var t0 = PayslipCalc.computePayslip(emp(0)).incomeTax;
+  var tNeg = PayslipCalc.computePayslip(emp(-3)).incomeTax;
+  eq(tNeg, t0); // 扶養-3 は 扶養0 と同じ(負値で税額が増えない)
+});
+
 /* ---- 公式「電算機計算の特例」例(国税庁PDF)・年度自動選択 ---- */
 // 令和8年分(denshi_01) 公式例：基礎控除引上げで令和7より低い
 T('特例R8 公式例1: A=175,000/扶養2 → 210円', function () { eq(Densan.calc(175000, 2, { year: 2026 }), 210); });

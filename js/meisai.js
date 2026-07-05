@@ -39,7 +39,7 @@
     var code=($('setup-code').value||'').trim(), pw=$('setup-pw').value||'', pw2=$('setup-pw2').value||'';
     $('setup-err').textContent='';
     if(!code){ $('setup-err').textContent='会社から渡された初回コードを入力してください。'; return; }
-    if(pw.length<4){ $('setup-err').textContent='パスワードは4文字以上にしてください。'; return; }
+    if(pw.length<8){ $('setup-err').textContent='パスワードは8文字以上にしてください。'; return; }
     if(pw!==pw2){ $('setup-err').textContent='パスワード(確認)が一致しません。'; return; }
     Store.meisaiSetPassword(token, code, pw).then(function(r){
       if(!r || !r.ok){ $('setup-err').textContent = (r&&r.badInit)?'初回コードが違います。':(r&&r.alreadySet)?'すでにパスワードが設定済みです。ログインしてください。':'設定できませんでした。'; if(r&&r.alreadySet)show('sc-login'); return; }

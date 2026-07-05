@@ -155,9 +155,11 @@
   function warimashiOf(e){
     if(!window.Warimashi) return {total:0,lines:[],unit:0};
     if(e.payType==='役員') return {total:0,lines:[],unit:0}; // 役員は割増(残業)の概念なし
-    if(e.payType==='歩合'){ // 出来高払=単価(歩合給÷総労働時間)に時間外+0.25/深夜+0.25/法定休日+0.35の上乗せのみ(1.0は歩合給に内包)
+    if(e.payType==='歩合'){ // 出来高払=単価(基本給÷総労働時間)に時間外+0.25/深夜+0.25/法定休日+0.35の上乗せのみ(1.0は基本給に内包)
       var wc=e.warimashi||{}; var segc={ ot:dmin({h:wc.otH,m:wc.otM}), night:dmin({h:wc.nightH,m:wc.nightM}), holiday:dmin({h:wc.holidayH,m:wc.holidayM}) };
-      return Warimashi.commission({ commissionTotal:num(e.commissionAmt), totalWorkMin:workedMin(e), seg:segc }); }
+      // ★割増の基礎は実際の基本給=高い方(歩合実績 vs 保障給)。保障給が効く月に割増が過小になるのを防ぐ(労基37条)
+      var wmin=workedMin(e); var baseForWari=Warimashi.commissionBasePay(num(e.commissionAmt), e.hourlyGuarantee, wmin);
+      return Warimashi.commission({ commissionTotal:baseForWari, totalWorkMin:wmin, seg:segc }); }
     var co=state.company||{};
     var ah=(e.annualHolidays!=null&&e.annualHolidays!=='')?e.annualHolidays:co.annualHolidays; // 会社規定・従業員で任意上書き
     var dwh=(e.dailyWorkH!=null&&e.dailyWorkH!=='')?e.dailyWorkH:co.dailyWorkH;
@@ -240,11 +242,14 @@
     }
     // 丙欄(日雇い): 所得税=日額表丙欄(日給)×出勤日数。丙は甲乙の算式を使わず表引き(taxClass='hei')
     var heiAmt=null;
-    if(e.taxClass==='hei'){ var SHhei=(typeof ShotokuzeiHei!=='undefined')?ShotokuzeiHei:(window&&window.ShotokuzeiHei); if(SHhei) heiAmt=SHhei.heiTax(num(e.base),{year:parseInt(String(state.month).slice(0,4),10)||2026})*kintaiVal(e,/出勤/); }
+    // 丙(日雇い)は日額表の表引き=「日給(=日額)」前提。丙×非日給は日額でないので甲で計算(silent-wrong防止・UIで警告)
+    var heiActive=(e.taxClass==='hei' && e.payType==='日給');
+    if(heiActive){ var SHhei=(typeof ShotokuzeiHei!=='undefined')?ShotokuzeiHei:(window&&window.ShotokuzeiHei); if(SHhei) heiAmt=SHhei.heiTax(num(e.base),{year:parseInt(String(state.month).slice(0,4),10)||2026})*kintaiVal(e,/出勤/); }
     // 社保の当月/翌月徴収(会社設定 shahoTiming)。既定/'current'=現行(回帰ゼロ)。'next'=入社月0/月末退職2/月中退職1(前月分控除)
     var _tim=(state.company||{}).shahoTiming, _shMult=1, _shMonth=pr.shahoMonth;
     if(_tim==='next'){ var _zk=ZK(); if(_zk&&_zk.shahoChargeMonths) _shMult=_zk.shahoChargeMonths({timing:'next', ym:state.month, joinYmd:e.joinYmd, taishokuYmd:e.taishokuYmd}); _shMonth=true; /* 翌月はmultで表現し旧shahoMonth抑止 */ }
-    return PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:num(e.fuyou), taxClass:e.taxClass, heiTaxAmount:heiAmt, residentTax:residentTaxOf(e), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:apply, extraKojo:e.extraKojo, shahoMonth:_shMonth, shahoMult:_shMult });
+    var effTaxClass=(e.taxClass==='hei' && e.payType!=='日給') ? 'ko' : e.taxClass; // 丙×非日給は甲で計算
+    return PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:num(e.fuyou), taxClass:effTaxClass, heiTaxAmount:heiAmt, residentTax:residentTaxOf(e), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:apply, extraKojo:e.extraKojo, shahoMonth:_shMonth, shahoMult:_shMult });
   }
   function payDateObj(){
     var ym=state.month||'2026-06', y=Number(ym.slice(0,4)), m=Number(ym.slice(5,7)), c=state.company||{};
@@ -389,7 +394,7 @@
       +'<div class="chip-row" style="margin:-2px 0 10px;align-items:center"><span style="font-size:11px;color:#3D6B53;font-weight:700;margin-right:2px">所得税区分</span>'
         +[['ko','甲（通常）'],['otsu','乙（副業）'],['hei','丙（日雇い）']].map(function(o){ var on=(e.taxClass||'ko')===o[0]; return '<span class="chip'+(on?' on':'')+'" data-taxc="'+o[0]+'">'+(on?'✓ ':'')+o[1]+'</span>'; }).join('')
         +'<span class="help-i" data-help="taxclass" style="margin-left:4px">💡</span></div>'
-      +(e.taxClass==='hei'?'<div class="sh-warn" style="margin:-4px 0 10px">丙欄＝<b>日雇い</b>（日々雇い・継続2か月以内）向け。所得税＝<b>日額表 丙欄（令和8年分）×出勤日数</b>で計算します（日給・扶養や甲乙の算式は使いません）。2か月を超えたら甲/乙へ。</div>':'')
+      +(e.taxClass==='hei'?'<div class="sh-warn" style="margin:-4px 0 10px">丙欄＝<b>日雇い</b>（日々雇い・継続2か月以内）向け。所得税＝<b>日額表 丙欄（令和8年分）×出勤日数</b>で計算します（日給・扶養や甲乙の算式は使いません）。2か月を超えたら甲/乙へ。'+(e.payType!=='日給'?'<br><b>⚠ 丙は給与形態＝日給が前提です。現在「'+esc(e.payType)+'」なので丙は適用せず甲欄で計算しています。</b>':'')+'</div>':'')
       +'<div class="frow"><div class="flabel">通勤方法</div><select class="finput m-f" data-f="commuteType"><option value="public"'+(e.commuteType!=='car'?' selected':'')+'>公共交通</option><option value="car"'+(e.commuteType==='car'?' selected':'')+'>マイカー等</option></select></div>'
       +(e.commuteType==='car'?'<div class="frow2"><div class="frow"><div class="flabel">片道距離<span class="hint2">km</span></div><input class="finput num m-f" data-f="commuteKm" value="'+attr(e.commuteKm)+'"></div><div class="frow"><div class="flabel">非課税限度<span class="hint2">自動</span></div><input class="finput num" value="'+yen(commuteLimit(e))+'" readonly style="background:#f7fcf9;color:#3D6B53"></div></div>':'<div class="hint" style="margin:-4px 0 10px">公共交通＝月15万まで非課税。マイカーは距離別（自動）。</div>')
       +'<div class="frow2"><div class="frow"><div class="flabel">住民税<span class="hint2">徴収方法</span></div><select class="finput m-f" data-f="residentTaxMode"><option value="monthly"'+(e.residentTaxMode==='annual'?'':' selected')+'>月額を直接（通知書）</option><option value="annual"'+(e.residentTaxMode==='annual'?' selected':'')+'>年額から自動（12分割）</option></select></div>'
@@ -1169,7 +1174,7 @@
   function saveMonthlyPayslips(){
     if(!(window.Store&&Store.savePayslip)) return; var ym=state.month; if(!ym) return;
     var method=(state.company||{}).paymentDaysMethod||'';
-    activeEmps().forEach(function(e){ try{
+    state.employees.filter(function(e){return isActiveInMonth(e,ym);}).forEach(function(e){ try{ // 母集合を入力/印刷/集計/賃金台帳と統一(退職後/入社前の月を保存しない)
       var r=compute(e);
       var days=(window.PayrollCalc&&PayrollCalc.calcPaymentDays)?PayrollCalc.calcPaymentDays(e,ym,method):0;
       var wc=e.warimashi||{};

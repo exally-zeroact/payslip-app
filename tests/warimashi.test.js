@@ -88,9 +88,10 @@ T('詳細: 時間外43h+時間外深夜2h=90,346（かんたん45h/深夜2hと�
 T('詳細: 全7区分の率が正しく乗る', function () {
   var seg = { ot: 60, otNight: 60, over60: 60, over60Night: 60, night: 60, holiday: 60, holidayNight: 60 }; // 各1h
   var r = W.detail({ base: 260000, annualHolidays: 120, dailyHours: 8, seg: seg });
-  var u = 1592;
-  var exp = W.han50(u * 1.25) + W.han50(u * 1.5) + W.han50(u * 1.5) + W.han50(u * 1.75) + W.han50(u * 0.25) + W.han50(u * 1.35) + W.han50(u * 1.6);
-  eq(r.total, exp);
+  // 単価1592・各1h。割増はhan50Up(基発150号)で: ot1990/otNight2388/over60 2388/over60Night2786/night398/holiday2149(2149.2切捨)/holidayNight2547(2547.2切捨)
+  // ★実数リテラルで固定(被テストと同じhan50/han50Upを使う自己参照にしない)。han50(社保用)と取り違えたら検知される
+  eq(r.total, 1990 + 2388 + 2388 + 2786 + 398 + 2149 + 2547); // = 14646
+  eq(r.total, 14646);
   eq(r.lines.length, 7);
 });
 T('詳細: 法定休日×深夜は1.6', function () {
@@ -163,6 +164,16 @@ T('commissionBasePay: 歩合<保障 → 保障給適用 / 歩合>保障 → 歩�
 T('commissionBasePay: 保障時給未設定(0)なら歩合実績がそのまま基本給', function () {
   eq(W.commissionBasePay(180000, '', 160 * 60), 180000);
   eq(W.commissionBasePay(0, '', 160 * 60), 0);
+});
+/* 対立監査H2(2026-07-05): 保障給が効く月は割増も保障給ベース(高い方)で算定=過小防止(労基37条) */
+T('歩合の割増: 保障給>歩合実績の月は割増単価も保障給ベース(高い方)', function () {
+  // 歩合10万・保障時給1500×総労働200h=30万(=基本給) ・残業20h。割増単価=30万÷200h=1500 → han50Up(1500*0.25*20h)=7500
+  var base = W.commissionBasePay(100000, 1500, 200 * 60); eq(base, 300000);
+  var r = W.commission({ commissionTotal: base, totalWorkMin: 200 * 60, seg: { ot: 20 * 60 } });
+  eq(r.total, 7500);
+  // 旧バグ(生の歩合10万基準)なら単価500→ot=2500と過小だった
+  var bad = W.commission({ commissionTotal: 100000, totalWorkMin: 200 * 60, seg: { ot: 20 * 60 } });
+  eq(bad.total, 2500); ok(r.total > bad.total, '保障給ベースの方が大きい(過小でない)');
 });
 T('最低賃金チェック: 賃金÷総時間 ≧ 地域別最賃', function () {
   // 時給換算 192000/160=1200 → 東京1163以上=OK / 1100基準割れ

@@ -30,6 +30,12 @@ T('健保 令和7 公式値ロック(協会けんぽ2025年度)', function () {
   });
 });
 T('健保 令和7: 47都道府県すべて存在', function () { eq(Object.keys(SH.KENKO_RITSU).length, 47); });
+/* 令和8年度=協会けんぽ公式PDF(R8_*.pdf)機械抽出済。実数リテラルでロック(自己参照でなく) */
+T('健保 令和8 公式値ロック(協会けんぽ2026年度・KENKO_2026)', function () {
+  eq(Object.keys(SH.KENKO_2026).length, 47);
+  var exp = { hokkaido:0.1028, aomori:0.0985, iwate:0.0951, tokyo:0.0985, kanagawa:0.0992, niigata:0.0921, aichi:0.0993, osaka:0.1013, hyogo:0.1012, hiroshima:0.0978, yamaguchi:0.1015, fukuoka:0.1011, saga:0.1055, okinawa:0.0944 };
+  Object.keys(exp).forEach(function (p) { ok(Math.abs(SH.KENKO_2026[p] - exp[p]) < 1e-9, p + ' 令和8=' + SH.KENKO_2026[p] + ' 期待' + exp[p]); });
+});
 T('健保 令和8で東京と新潟で料率が異なる(新潟9.21%)', function () {
   eq(SH.getKenko('niigata', '2026-06').total, 0.0921);
   ok(SH.getKenko('tokyo', '2026-06').total !== SH.getKenko('niigata', '2026-06').total);
