@@ -52,3 +52,27 @@ T('会社独自休を差し引く', function () {
 T('日曜だけ休み(現場系・週休1日)は所定が多い', function () {
   ok(H.scheduledWorkdays('2026-01', [0], []) > H.scheduledWorkdays('2026-01', [0, 6], []));
 });
+
+/* scheduledWorkdaysBetween: [startYmd,endYmd]∩当月 の所定労働日数(産休/育休の不就労日算定用)。
+   2026-06は6/1=月・土日休・祝日なし=所定22日。 */
+T('範囲内所定 2026-06 6/15〜6/30=12日(産休後半・土日休)', function () {
+  eq(H.scheduledWorkdaysBetween('2026-06', [0, 6], [], '2026-06-15', '2026-06-30'), 12);
+});
+T('範囲内所定: 全月を覆う範囲=scheduledWorkdaysと一致(22)', function () {
+  eq(H.scheduledWorkdaysBetween('2026-06', [0, 6], [], '2026-05-01', '2026-07-31'), 22);
+  eq(H.scheduledWorkdays('2026-06', [0, 6], []), 22);
+});
+T('範囲内所定: 月頭からの範囲は1日からclip(6/1〜6/14=10日)', function () {
+  eq(H.scheduledWorkdaysBetween('2026-06', [0, 6], [], '2026-06-01', '2026-06-14'), 10); // 22−12
+});
+T('範囲内所定: 範囲が当月外=0', function () {
+  eq(H.scheduledWorkdaysBetween('2026-06', [0, 6], [], '2026-07-01', '2026-07-31'), 0);
+  eq(H.scheduledWorkdaysBetween('2026-06', [0, 6], [], '2026-04-01', '2026-05-31'), 0);
+});
+T('範囲内所定: 会社独自休を範囲内で除外(6/15平日を休に→11)', function () {
+  eq(H.scheduledWorkdaysBetween('2026-06', [0, 6], ['2026-06-15'], '2026-06-15', '2026-06-30'), 11);
+});
+T('範囲内所定: 日付未設定/空=0(安全側)', function () {
+  eq(H.scheduledWorkdaysBetween('2026-06', [0, 6], [], '', ''), 0);
+  eq(H.scheduledWorkdaysBetween('2026-06', [0, 6], [], null, null), 0);
+});

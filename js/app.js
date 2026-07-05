@@ -186,7 +186,7 @@
   function syncBasePay(e){
     if(!e.shikyu) e.shikyu=[];
     var amt;
-    if(e.workStatus && e.workStatus!=='normal') amt=num(e.leavePay);
+    if(e.workStatus && e.workStatus!=='normal'){ var _lwi=leaveNoWorkInfo(e, state.month); amt=(_lwi&&_lwi.partial)?num(e.base):num(e.leavePay); } // 部分月の産育休=満額(compute側で不就労を欠勤控除)/それ以外=休業中の金額を手入力
     else if(e.payType==='時給') amt=Math.round(num(e.hourly)*workedMin(e)/60);
     else if(e.payType==='日給') amt=Math.round(num(e.base)*effShukkin(e));
     else if(e.payType==='歩合') amt= window.Warimashi?Warimashi.commissionBasePay(e.commissionAmt, e.hourlyGuarantee, workedMin(e)):Math.max(num(e.commissionAmt),Math.round(num(e.hourlyGuarantee)*workedMin(e)/60)); // 歩合実績と保障給(時給×総労働時間)の高い方=労基27条
@@ -207,9 +207,24 @@
   // 勤怠カレンダー: その月の所定労働日数(暦日−休みの曜日−祝日−会社独自休)。祝日エンジン未読込ならnull
   function HD(){ return (typeof Holidays!=='undefined')?Holidays:(window&&window.Holidays); }
   function scheduledDaysOf(ym){ var H=HD(); if(!H)return null; return H.scheduledWorkdays(ym, (state.company&&state.company.holidays)||[], (state.company&&state.company.companyHolidays)||[]); }
+  // 産休/育休が月途中(部分月)のときの当月不就労「所定労働日数」。就労分だけ支払う日割の土台(実務標準=所定労働日方式/freee)。
+  //  対象= workStatus∈{産休,育休} かつ 月給 かつ 完全月給制でない かつ 開始/終了日あり かつ カレンダー可。対象外=null(=従来のleavePay手入力に委ねる=回帰ゼロ)。
+  //  返り値 {total:当月所定, noWork:不就労所定, partial:noWork<total}。partial=false(=全月休業)はleavePay運用。
+  function leaveNoWorkInfo(e, ym){
+    if(!e||!(e.workStatus==='sankyu'||e.workStatus==='ikukyu')) return null;
+    if(e.payType!=='月給') return null;                         // 月給のみ(時給/日給/歩合は実績ベース)
+    if((state.company||{}).kanzenGekkyu) return null;           // 完全月給制は控除しない=従来
+    if(!e.leaveStartYmd || !e.leaveEndYmd) return null;         // 日付未設定=従来フォールバック
+    var H=HD(); if(!H||!H.scheduledWorkdaysBetween) return null; // カレンダー未読込=従来
+    var rest=(state.company&&state.company.holidays)||[], comp=(state.company&&state.company.companyHolidays)||[];
+    var total=H.scheduledWorkdays(ym, rest, comp); if(!(total>0)) return null;
+    var noWork=H.scheduledWorkdaysBetween(ym, rest, comp, e.leaveStartYmd, e.leaveEndYmd);
+    return { total:total, noWork:noWork, partial:(noWork<total) };
+  }
   function compute(e){
     syncCommute(e); syncBasePay(e);
     var pr=prorateInfo(e, state.month); e._prorate=pr;
+    var lw=leaveNoWorkInfo(e, state.month); e._leaveNoWork=lw; // 産休/育休 部分月の不就労所定日数(就労分だけ支払う日割の土台)
     var sb=shahoBasisOf(e);
     // 標準報酬未確定時の暫定基礎は「割増を除く固定支給(通勤含む)」。割増(残業)で社保が膨らまないように。
     var fb=(e.shikyu||[]).reduce(function(a,x){return a+num(x.value);},0);
@@ -232,6 +247,14 @@
         if(kgaku>0) shikyu=shikyu.concat([{label:'欠勤控除',value:-kgaku}]);
       }
     }
+    // 産休/育休が月途中(部分月): 就労分だけ支払う=不就労の所定日数を「所定労働日方式」で控除(実務標準/freee・出典リサーチ)。
+    //  社保は月末基準で別途免除(下)・所得税/雇用保険は残額(支給)に発生。★退職/入社月(pr.prorate)は日割優先で併用しない(二重控除防止)。会社が休業中に払う額はleavePayで加算(任意・通常0)。
+    if(!pr.prorate && lw && lw.partial && !coK.kanzenGekkyu && lw.noWork>0){
+      var lgaku=PayrollCalc.calcKekkin({ base:num(e.base), ym:state.month, kekkinDays:lw.noWork, method:'scheduled', scheduledDays:lw.total });
+      lgaku=Math.min(lgaku, num(e.base)); // 基本給を超えて引かない
+      if(lgaku>0) shikyu=shikyu.concat([{label:(e.workStatus==='ikukyu'?'育休':'産休')+'不就労控除',value:-lgaku}]);
+    }
+    if(lw && lw.partial && num(e.leavePay)>0) shikyu=shikyu.concat([{label:'休業中支給',value:num(e.leavePay)}]); // 会社が休業中に払う額(課税・社保対象・任意)
     // 産休/育休の社保免除を月末在籍基準で当月判定。日付未設定=null→従来(e.applyの全月免除)のまま=回帰ゼロ。
     var apply=e.apply;
     if(e.workStatus==='sankyu'||e.workStatus==='ikukyu'){
@@ -638,9 +661,10 @@
   function setConfirm(id,on){ if(!state.confirmed[state.month])state.confirmed[state.month]={}; if(on)state.confirmed[state.month][id]=true; else delete state.confirmed[state.month][id]; }
   function toast(msg){ try{ var t=document.getElementById('app-toast'); if(!t){ t=document.createElement('div'); t.id='app-toast'; t.style.cssText='position:fixed;left:50%;bottom:88px;transform:translateX(-50%);background:#2E7D54;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 4px 16px rgba(0,0,0,.22);z-index:9999;opacity:0;transition:opacity .25s;pointer-events:none'; document.body.appendChild(t); } t.textContent=msg; t.style.opacity='1'; clearTimeout(t._h); t._h=setTimeout(function(){ t.style.opacity='0'; },2200); }catch(e){} }
   // 入社月/退職月の日割・社保の注記(黄・ブロックしない)
-  function prorateNote(e){ var pr=e._prorate; if(!pr||(!pr.prorate&&pr.shahoMonth)) return ''; var msg=[];
-    if(pr.prorate&&pr.factor<1) msg.push((pr.isJoin&&!pr.isLeave?'入社月':pr.isLeave&&!pr.isJoin?'退職月':'入社/退職月')+'につき在籍'+pr.zd+'日で日割（'+pr.zd+'/'+pr.dim+'日）');
-    if(pr.mid) msg.push('月中退職のため当月の社保（健保・厚年・介護）は徴収しません（資格喪失=退職日翌日・前月分まで／雇用保険は実支払分）');
+  function prorateNote(e){ var pr=e._prorate, lw=e._leaveNoWork; var msg=[];
+    if(pr&&pr.prorate&&pr.factor<1) msg.push((pr.isJoin&&!pr.isLeave?'入社月':pr.isLeave&&!pr.isJoin?'退職月':'入社/退職月')+'につき在籍'+pr.zd+'日で日割（'+pr.zd+'/'+pr.dim+'日）');
+    if(pr&&pr.mid) msg.push('月中退職のため当月の社保（健保・厚年・介護）は徴収しません（資格喪失=退職日翌日・前月分まで／雇用保険は実支払分）');
+    if(!(pr&&pr.prorate)&&lw&&lw.partial&&lw.noWork>0) msg.push((e.workStatus==='ikukyu'?'育休':'産休')+'で当月の所定'+lw.total+'日のうち'+lw.noWork+'日が不就労のため控除（就労'+(lw.total-lw.noWork)+'日分を支給）。社保は月末基準で免除・所得税/雇用保険は就労分に発生');
     return msg.length?'<div class="cr-warn" style="margin:0 12px 10px">⚠ '+msg.join('。')+'。</div>':''; }
   function renderInput(){
     var host=$('#input-list'); if(!host) return; loadPrev();
