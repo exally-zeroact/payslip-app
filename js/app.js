@@ -62,10 +62,10 @@
   // 雇用保険 従業員負担(令和7年度・業種別)
   // 雇用保険 労働者負担(厚労省)。区分は全国共通の3種で網羅。料率は年度で自動選択(所得税と同様)
   var EMPLOY_GYOSHU=[['ippan','一般の事業'],['kensetsu','建設の事業'],['norin','農林水産・清酒製造']];
-  var EMPLOY_RATES={ 2025:{ippan:0.0055,kensetsu:0.0065,norin:0.0065}, 2026:{ippan:0.005,kensetsu:0.006,norin:0.006} }; // 令和7→令和8(引下げ)★厚労省 労働者負担 照合済2026-07(一般5.5→5.0/1000・建設農林6.5→6.0/1000)★
-  // 雇用保険料率は労働保険年度(4/1〜翌3/31)で切替。1〜3月は前年度扱い(例 2026-03=令和7年度)。
-  function employYear(){ var ym=String(state.month||''); var y=parseInt(ym.slice(0,4),10)||2026, m=parseInt(ym.slice(5,7),10)||1; var fy=(m>=4)?y:y-1; return fy>=2026?2026:2025; }
-  function employRateOf(code,year){ var t=EMPLOY_RATES[year||employYear()]||EMPLOY_RATES[2026]; return t[code]!=null?t[code]:t.ippan; }
+  // 雇用保険料率は lib/koyo-hoken.js を単一ソースに(年度別・労働保険年度4月切替・厚労省照合済)。app側は薄いラッパで委譲。
+  function KH(){ return (typeof KoyoHoken!=='undefined')?KoyoHoken:(window&&window.KoyoHoken); }
+  function employYear(){ var k=KH(); return k?k.employYearOfYm(state.month):2026; }
+  function employRateOf(code,year){ var k=KH(); if(!k) return 0.005; return k.employRate(code, year||k.employYearOfYm(state.month)); }
 
   // ライブラリは const SHAKAIHOKEN_HYO 定義で window に付かない→bare参照で取得
   function SHH(){ try{ if(typeof SHAKAIHOKEN_HYO!=='undefined'&&SHAKAIHOKEN_HYO) return SHAKAIHOKEN_HYO; }catch(e){} return (typeof window!=='undefined'&&window.SHAKAIHOKEN_HYO)||null; }
@@ -727,7 +727,7 @@
   // ───────── 賞与(ボーナス)モード ─────────
   function SZ(){ try{ if(typeof ShoyoZei!=='undefined'&&ShoyoZei) return ShoyoZei; }catch(e){} return (typeof window!=='undefined'&&window.ShoyoZei)||null; }
   function bonusYmOf(){ return (state.bonus&&state.bonus.payYm)||state.month; }
-  function employYearOfYm(ym){ var y=parseInt(String(ym||'').slice(0,4),10)||2026, m=parseInt(String(ym||'').slice(5,7),10)||1; var fy=(m>=4)?y:y-1; return fy>=2026?2026:2025; }
+  function employYearOfYm(ym){ var k=KH(); return k?k.employYearOfYm(ym):2026; } // 単一ソース=koyo-hoken(労働保険年度4月切替)
   // 賞与支給月の前月の「社保控除後給与(kazei)」を履歴(pay_payslips)から取得
   function loadBonusPrev(){ if(!(window.Store&&Store.getPayslipsByYm)) return; var pm=prevYmOf(bonusYmOf()); if(state._bonusPrevYm===pm) return; state._bonusPrevYm=pm;
     Store.getPayslipsByYm(pm,pm).then(function(rows){ var m={}; (rows||[]).forEach(function(r){ if(r&&r.data&&r.data.kazei!=null) m[r.employee_id]=num(r.data.kazei); }); state._bonusPrev=m;
