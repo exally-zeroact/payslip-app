@@ -31,6 +31,12 @@ T('乙欄R8: 740,001〜は259,200+超過40.84% / 甲より高い', function () {
   eq(Densan.calcOtsu(800000), Math.floor(259200 + (800000 - 740000) * 0.4084));
   ok(Densan.calcOtsu(300000) > Densan.calc(300000, 0, { year: 2026 }), '乙>甲(扶養0)');
 });
+// 公式(denshi_02)明示アンカー値でロック。★一次情報リテラル(自己参照でない)★
+T('乙欄R8: A=1,710,000は655,400(公式注3が明記)', function () { eq(Densan.calcOtsu(1710000), 655400); });
+T('乙欄R8: A=740,000の計算基準額法は259,200(740,001〜帯の起点と連続)', function () {
+  eq(Densan.calcOtsu(740000), 259200);                       // 計算基準額=740,000特例→259,200
+  eq(Densan.calcOtsu(740001), Math.floor(259200 + 1 * 0.4084)); // 隣接帯の起点も259,200で連続
+});
 T('calcByClass: otsu→乙・既定→甲', function () {
   eq(Densan.calcByClass(100000, 0, 'otsu'), 3063);
   eq(Densan.calcByClass(175000, 2, 'ko', { year: 2026 }), 210);
