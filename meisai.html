@@ -113,9 +113,9 @@ body{font-family:'Noto Sans JP',sans-serif;color:#1a4a2e;background:#F0FAF4;-web
 </div>
 
 <script src="js/render.js"></script>
-<!-- 本番はSupabase(RPC)。ローカル/同一ブラウザ検証はlocalStorage層で動作。 -->
-<!-- <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script> -->
-<!-- <script src="js/supa-config.js"></script> -->
+<!-- 本番はSupabase(RPC)。window.SUPA/supabase未読込ならstore.jsはlocalStorage層にフォールバック。 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supa-config.js"></script>
 <script src="js/store.js"></script>
 <script src="js/meisai.js"></script>
 </body>
