@@ -172,10 +172,24 @@ begin
        or (p_pw is not null and v_pub.pw_hash is not null and v_pub.pw_hash = crypt(p_pw, v_pub.pw_hash));
   if not v_ok then return jsonb_build_object('unauth',true); end if;
   if v_pub.consent_at is null then return jsonb_build_object('need_consent',true); end if;
-  update pay_meisai_docs set opened_at=coalesce(opened_at, now()) where token=p_token;
-  select coalesce(jsonb_agg(jsonb_build_object('id',id,'ym',ym,'kind',kind,'data',data) order by ym desc),'[]') into v_docs
+  -- 既読化は一括でなく mark_meisai_opened で1件ずつ(per-doc未読)。ここでは各docのopened_atを返すだけ。
+  select coalesce(jsonb_agg(jsonb_build_object('id',id,'ym',ym,'kind',kind,'data',data,'openedAt',opened_at) order by ym desc),'[]') into v_docs
     from pay_meisai_docs where token=p_token;
   return jsonb_build_object('docs',v_docs);
+end $$;
+
+-- mark_meisai_opened: 認証(device or pw)確認して その1件だけ 既読化(従業員がタップした月のみ)
+create or replace function mark_meisai_opened(p_token uuid, p_id text, p_device text, p_pw text)
+returns jsonb language plpgsql security definer set search_path=public, extensions as $$
+declare v_pub pay_meisai_pub; v_ok boolean;
+begin
+  select * into v_pub from pay_meisai_pub where token=p_token;
+  if v_pub.token is null then return jsonb_build_object('ok',false); end if;
+  v_ok := (p_device is not null and p_device = any(v_pub.device_tokens))
+       or (p_pw is not null and v_pub.pw_hash is not null and v_pub.pw_hash = crypt(p_pw, v_pub.pw_hash));
+  if not v_ok then return jsonb_build_object('ok',false,'unauth',true); end if;
+  update pay_meisai_docs set opened_at=coalesce(opened_at, now()) where id=p_id and token=p_token;
+  return jsonb_build_object('ok',true);
 end $$;
 
 create or replace function set_meisai_consent(p_token uuid, p_device text, p_pw text)
@@ -191,4 +205,4 @@ begin
   return jsonb_build_object('ok',true);
 end $$;
 -- init_code再発行(会社)はRLSで会社が直接 update pay_meisai_pub set init_code=..., pw_hash=null, device_tokens='{}', fail_count=0, locked_until=null でよい。
-grant execute on function meisai_auth(uuid,text), meisai_set_password(uuid,text,text), meisai_verify(uuid,text), get_meisai(uuid,text,text), set_meisai_consent(uuid,text,text) to anon;
+grant execute on function meisai_auth(uuid,text), meisai_set_password(uuid,text,text), meisai_verify(uuid,text), get_meisai(uuid,text,text), set_meisai_consent(uuid,text,text), mark_meisai_opened(uuid,text,text,text) to anon;

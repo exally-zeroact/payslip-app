@@ -98,7 +98,7 @@
       show('sc-view'); // 先に表示してからフィット(隠れてると幅0で負scaleになる)
       fitFrame(); requestAnimationFrame(fitFrame);
     }catch(e){ show('sc-view'); }
-    if(d.openedAt==null){ Store.markMeisaiOpened(d.id).then(function(){ d.openedAt=new Date().toISOString(); }); }
+    if(d.openedAt==null){ Store.markMeisaiOpened(d.id, token, cred).then(function(){ d.openedAt=new Date().toISOString(); }); }
     window.scrollTo(0,0);
   }
   function fitFrame(){

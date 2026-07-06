@@ -226,8 +226,8 @@
     if(hasSupa){ cred=cred||{};
       return sb.rpc('get_meisai', { p_token:token, p_device:cred.deviceToken||null, p_pw:cred.password||null }).then(function(r){
         var d=r.data||{}; if(d.unauth) return { unauth:true };
-        // get_meisaiはサーバ側でopened_atを既読化するのでcloudは既読扱い(per-doc未読はv2)。氏名は先頭docのdata.personから
-        var ds=(d.docs||[]).map(function(x){ return { id:x.id, ym:x.ym, kind:x.kind, name:(x.data&&x.data.person&&x.data.person.name)||'', data:x.data, openedAt:true }; });
+        // get_meisaiは各docのopened_atを返す(per-doc未読)。既読化はmark_meisai_openedで1件ずつ。氏名は先頭docのdata.personから
+        var ds=(d.docs||[]).map(function(x){ return { id:x.id, ym:x.ym, kind:x.kind, name:(x.data&&x.data.person&&x.data.person.name)||'', data:x.data, openedAt:x.openedAt||null }; });
         var nm=(ds[0]&&ds[0].name)||'';
         if(d.need_consent) return { needConsent:true, name:nm };
         return { name:nm, docs:ds };
@@ -264,9 +264,11 @@
     f.p.initCode=rndCode(); f.p.pwHash=null; f.p.deviceTokens=[]; f.p.consentAt=null; mPubW(f.pubs); // ★同意もリセット=別人が再設定した時に前任者の同意を引き継がない(電子交付要件)
     return Promise.resolve({ ok:true, initCode:f.p.initCode });
   };
-  // 従業員: 明細を開いた(openedAt記録)。★cloudはget_meisai取得時にサーバ側で既読化するのでno-op★
-  Store.markMeisaiOpened = function(docId){
-    if(hasSupa){ return Promise.resolve(true); }
+  // 従業員: 明細を開いた(その1件だけopenedAt記録)。cloud=RPC mark_meisai_opened(認証必須)。cred={deviceToken}|{password}
+  Store.markMeisaiOpened = function(docId, token, cred){
+    if(hasSupa){ cred=cred||{};
+      return sb.rpc('mark_meisai_opened', { p_token:token, p_id:docId, p_device:cred.deviceToken||null, p_pw:cred.password||null }).then(function(r){ return !!(r.data&&r.data.ok); });
+    }
     var docs=mDoc(); var i=docs.findIndex(function(x){ return x.id===docId; });
     if(i>=0 && !docs[i].openedAt){ docs[i].openedAt=new Date().toISOString(); mDocW(docs); }
     return Promise.resolve(true);
