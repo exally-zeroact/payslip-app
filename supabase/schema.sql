@@ -81,7 +81,7 @@ create extension if not exists pgcrypto with schema extensions;
 
 create table if not exists pay_meisai_pub (
   token         uuid primary key default gen_random_uuid(),
-  account_id    uuid not null references auth.users(id) on delete cascade,  -- 発行元の会社
+  account_id    uuid not null default auth.uid() references auth.users(id) on delete cascade,  -- 発行元の会社(RLS with checkのため既定=ログイン中uid)
   employee_id   text not null,
   init_code     text,                              -- 会社発行の初回コード。パスワード設定後はnull
   pw_hash       text,                              -- pgcrypto bcrypt。平文で持たない。null=未設定
@@ -94,7 +94,7 @@ create table if not exists pay_meisai_pub (
 create table if not exists pay_meisai_docs (
   id           text primary key,                   -- 'md_'+token+'_'+ym+'_'+kind
   token        uuid not null references pay_meisai_pub(token) on delete cascade,
-  account_id   uuid not null references auth.users(id) on delete cascade,
+  account_id   uuid not null default auth.uid() references auth.users(id) on delete cascade,
   ym           text not null,                       -- 'YYYY-MM'
   kind         text not null,                       -- 'monthly' | 'bonus'
   data         jsonb not null default '{}'::jsonb,  -- {person, doc, prefer, theme}(render.js用)
