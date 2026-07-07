@@ -126,6 +126,44 @@ T('特定親族特別控除: 62超85万=63万・逓減・123万超0', function (
   eq(N.tokuteiShinzokuKojo(1240000), 0);       // 123万超
 });
 
+/* ── ④ 障害者控除等(恒久額) ── */
+T('障害者控除 一般27/特別40/同居特別75万・寡婦27/ひとり親35/勤労学生27万', function () {
+  eq(N.shougaiKojo('ippan'), 270000);
+  eq(N.shougaiKojo('tokubetsu'), 400000);
+  eq(N.shougaiKojo('doukyo'), 750000);
+  eq(N.KAFU, 270000); eq(N.HITORIOYA, 350000); eq(N.KINROU, 270000);
+});
+
+/* ── ⑤ 算出所得税額の速算表(年調・標準税率・課税給与所得A→算出税額)。Aは1000円未満切捨 ── */
+T('算出所得税額: 各ブラケット(標準速算表)', function () {
+  eq(N.sanshutuShotokuZei(1730000), 86500);         // 5%
+  eq(N.sanshutuShotokuZei(1950000), 97500);         // 5%境界
+  eq(N.sanshutuShotokuZei(3000000), 202500);        // 10%-97500
+  eq(N.sanshutuShotokuZei(5000000), 572500);        // 20%-427500
+  eq(N.sanshutuShotokuZei(8000000), 1204000);       // 23%-636000
+  eq(N.sanshutuShotokuZei(10000000), 1764000);      // 33%-1536000
+  eq(N.sanshutuShotokuZei(1734500), 86700);         // 1000円未満切捨: 1,734,500→1,734,000×5%=86,700
+});
+T('年調年税額: 復興税込1.021・100円未満切捨', function () {
+  // 課税173万→算出86,500→×1.021=88,316.5→100円未満切捨=88,300
+  eq(N.nenchouNenzei(1730000, 0), 88300);
+  // 住宅ローン控除(税額控除)5万→(86500-50000)=36500→×1.021=37,266.5→37,200
+  eq(N.nenchouNenzei(1730000, 50000), 37200);
+});
+
+/* ── 年末調整 総合計算(worked example) ── */
+T('年調 総合: 給与500万・社保75万・生保新10万・基礎104万・源泉9万→還付', function () {
+  var r = N.computeNencho({ kyuyoShunyu: 5000000, shakaiHoken: 750000, seimei: { generalNew: 100000 }, genzenZumi: 90000 });
+  eq(r.kyuyoShotoku, 3560000);                 // 500万-給与所得控除144万
+  eq(r.kojoList.kiso, 1040000);                // 合計所得356万≤489万→基礎104万
+  eq(r.kojoList.seimei, 40000);                // 新10万→控除4万
+  eq(r.kojoGoukei, 1040000 + 750000 + 40000);  // 183万
+  eq(r.kazeiKyuyoShotoku, 1730000);            // 356万-183万=173万
+  eq(r.sanshutuZei, 86500);
+  eq(r.nenchouNenzei, 88300);
+  eq(r.kabusoku, 88300 - 90000);               // -1700(還付1,700)
+});
+
 /* ── 地震保険料控除 No.1145 ──
    地震: 〜50,000=全額 / 50,001〜=50,000。旧長期損害(経過措置): 〜10,000=全額 / 〜20,000=×1/2+5,000 / 20,001〜=15,000。合算上限5万 */
 T('地震保険料控除: 地震のみ / 旧長期のみ / 併用(上限5万)', function () {
