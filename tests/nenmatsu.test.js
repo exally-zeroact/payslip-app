@@ -80,6 +80,52 @@ T('基礎控除R8: 2350万超は改正なし(48/32/16/0万)', function () {
   eq(N.kisoKojoR8(25100000), 0);
 });
 
+/* ── 扶養控除(令和8・恒久額) ── */
+T('扶養控除: 一般38万/特定63万/老人48万/同居老親58万', function () {
+  eq(N.fuyoKojo('ippan'), 380000);
+  eq(N.fuyoKojo('tokutei'), 630000);
+  eq(N.fuyoKojo('roujin'), 480000);
+  eq(N.fuyoKojo('doukyo'), 580000);
+  eq(N.fuyoKojo('x'), 0);
+});
+
+/* ── 配偶者控除(令和8)。本人所得 900以下/900-950/950-1000 → 38/26/13万(老人48/32/16) ── */
+T('配偶者控除: 本人所得別・老人配偶者', function () {
+  eq(N.haiguushaKojo(8000000, false), 380000);
+  eq(N.haiguushaKojo(9200000, false), 260000);
+  eq(N.haiguushaKojo(9800000, false), 130000);
+  eq(N.haiguushaKojo(10000001, false), 0);         // 本人1000万超
+  eq(N.haiguushaKojo(8000000, true), 480000);      // 老人配偶者
+  eq(N.haiguushaKojo(9800000, true), 160000);
+});
+
+/* ── 配偶者特別控除(令和8・9・国税庁改正あらまし目視/テキスト照合) 配偶者所得×本人所得 ── */
+T('配偶者特別控除: 62超95万=38/26/13・逓減・133万超0', function () {
+  eq(N.haiguushaTokubetsuKojo(800000, 8000000), 380000);   // 配偶者80万(62超95)・本人900以下
+  eq(N.haiguushaTokubetsuKojo(800000, 9200000), 260000);   // 本人900-950
+  eq(N.haiguushaTokubetsuKojo(970000, 8000000), 360000);   // 95超100
+  eq(N.haiguushaTokubetsuKojo(1220000, 8000000), 110000);  // 120超125
+  eq(N.haiguushaTokubetsuKojo(1310000, 8000000), 30000);   // 130超133
+  eq(N.haiguushaTokubetsuKojo(1400000, 8000000), 0);       // 133万超
+  eq(N.haiguushaTokubetsuKojo(600000, 8000000), 0);        // 62万以下=配偶者控除の範囲
+  eq(N.haiguushaTokubetsuKojo(800000, 10000001), 0);       // 本人1000万超
+});
+
+/* ── 特定親族特別控除(令和8新設)。特定親族の合計所得 62超123万で逓減・63万〜3万 ── */
+T('特定親族特別控除: 62超85万=63万・逓減・123万超0', function () {
+  eq(N.tokuteiShinzokuKojo(700000), 630000);   // 62超85
+  eq(N.tokuteiShinzokuKojo(880000), 610000);   // 85超90
+  eq(N.tokuteiShinzokuKojo(920000), 510000);   // 90超95
+  eq(N.tokuteiShinzokuKojo(980000), 410000);   // 95超100
+  eq(N.tokuteiShinzokuKojo(1030000), 310000);  // 100超105
+  eq(N.tokuteiShinzokuKojo(1080000), 210000);  // 105超110
+  eq(N.tokuteiShinzokuKojo(1130000), 110000);  // 110超115
+  eq(N.tokuteiShinzokuKojo(1180000), 60000);   // 115超120
+  eq(N.tokuteiShinzokuKojo(1220000), 30000);   // 120超123
+  eq(N.tokuteiShinzokuKojo(600000), 0);        // 62万以下=特定扶養控除63万の範囲
+  eq(N.tokuteiShinzokuKojo(1240000), 0);       // 123万超
+});
+
 /* ── 地震保険料控除 No.1145 ──
    地震: 〜50,000=全額 / 50,001〜=50,000。旧長期損害(経過措置): 〜10,000=全額 / 〜20,000=×1/2+5,000 / 20,001〜=15,000。合算上限5万 */
 T('地震保険料控除: 地震のみ / 旧長期のみ / 併用(上限5万)', function () {
