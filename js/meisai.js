@@ -42,7 +42,7 @@
     if(pw.length<8){ $('setup-err').textContent='パスワードは8文字以上にしてください。'; return; }
     if(pw!==pw2){ $('setup-err').textContent='パスワード(確認)が一致しません。'; return; }
     Store.meisaiSetPassword(token, code, pw).then(function(r){
-      if(!r || !r.ok){ $('setup-err').textContent = (r&&r.badInit)?'初回コードが違います。':(r&&r.alreadySet)?'すでにパスワードが設定済みです。ログインしてください。':'設定できませんでした。'; if(r&&r.alreadySet)show('sc-login'); return; }
+      if(!r || !r.ok){ $('setup-err').textContent = (r&&r.locked)?'初回コードを何度も間違えたため、しばらくロックされています。時間をおいて再度お試しください。':(r&&r.weak)?'パスワードは8文字以上にしてください。':(r&&r.badInit)?('初回コードが違います。'+(r.remaining!=null?'（あと'+r.remaining+'回でロックされます）':'')):(r&&r.alreadySet)?'すでにパスワードが設定済みです。ログインしてください。':'設定できませんでした。'; if(r&&r.alreadySet)show('sc-login'); return; }
       // 設定できたらそのままパスワードでログイン→端末記憶
       loginWith(pw);
     });
@@ -54,7 +54,7 @@
   function loginWith(pw){
     var errEl=$('login-err'); if(errEl)errEl.textContent='';
     Store.meisaiVerifyPassword(token, pw).then(function(r){
-      if(!r || !r.ok){ if(errEl)errEl.textContent='パスワードが違います。'; return; }
+      if(!r || !r.ok){ if(errEl)errEl.textContent = (r&&r.locked)?'パスワードを何度も間違えたため、しばらくロックされています。時間をおいて再度お試しください。':(r&&r.remaining!=null?'パスワードが違います（あと'+r.remaining+'回でロックされます）。':'パスワードが違います。'); return; }
       try{ localStorage.setItem(DEVKEY, r.deviceToken); }catch(e){}   // 端末に記憶(次回からパスワード不要)
       cred={ deviceToken:r.deviceToken };
       afterAuth();

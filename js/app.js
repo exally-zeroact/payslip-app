@@ -64,7 +64,6 @@
   var EMPLOY_GYOSHU=[['ippan','一般の事業'],['kensetsu','建設の事業'],['norin','農林水産・清酒製造']];
   // 雇用保険料率は lib/koyo-hoken.js を単一ソースに(年度別・労働保険年度4月切替・厚労省照合済)。app側は薄いラッパで委譲。
   function KH(){ return (typeof KoyoHoken!=='undefined')?KoyoHoken:(window&&window.KoyoHoken); }
-  function employYear(){ var k=KH(); return k?k.employYearOfYm(state.month):2026; }
   function employRateOf(code,year){ var k=KH(); if(!k) return 0.005; return k.employRate(code, year||k.employYearOfYm(state.month)); }
 
   // ライブラリは const SHAKAIHOKEN_HYO 定義で window に付かない→bare参照で取得
@@ -84,7 +83,16 @@
     else if(e.payType==='歩合'){ var wmw=workedMin(e); var gpw=window.Warimashi?Warimashi.guaranteePay(e.hourlyGuarantee,wmw):Math.round(num(e.hourlyGuarantee)*wmw/60); var bpw=Math.max(num(e.commissionAmt),gpw); hourly= wmw>0? bpw/(wmw/60) : 0; } // 歩合=賃金合計(高い方)÷総労働時間で最賃判定
     else { var ly=parseInt(String(state.month||'').slice(0,4),10)||0; var leap=(ly%4===0&&ly%100!==0)||(ly%400===0); var stdH=window.Warimashi?Warimashi.monthlyStdHours(ah,dwh,leap):0; hourly= stdH>0? num(e.base)/stdH : 0; }
     hourly=Math.floor(hourly);
-    return { hourly:hourly, minWage:mw, prefName:((S.todofuken||{})[e.pref]||{}).name||'', ok:(hourly===0||hourly>=mw) };
+    return { hourly:hourly, minWage:mw, prefName:((S.todofuken||{})[e.pref]||{}).name||'', ok:(hourly===0||hourly>=mw), stale:(S.saiteiStale?S.saiteiStale(state.month):false) };
+  }
+  // 対象月の法定値(社保料率・所得税額表・最低賃金)が未収録年度なら暫定計算の黄警告(silent-wrong防止)。値は捏造せず直近収録値で暫定。
+  function statutoryStaleWarn(){
+    var msgs=[]; var S=SHH();
+    if(S&&S.getKenko){ var k=S.getKenko('tokyo', state.month); if(k&&k.stale) msgs.push('社会保険料率・所得税額表'); }
+    var SA=SAI();
+    if(SA&&SA.saiteiStale&&SA.saiteiStale(state.month)) msgs.push('最低賃金');
+    if(!msgs.length) return '';
+    return '<div class="cr-warn" style="margin:0 0 10px">⚠ 対象月（'+esc(state.month)+'）の <b>'+msgs.join('・')+'</b> は未収録の年度です。直近の収録年度の値で<b>暫定計算</b>しています（公式値が公表されたらデータ更新が必要）。</div>';
   }
   // 経理向け警告(最賃割れ/差引マイナス/休業手当未入力)。従業員に渡す明細でなく集計/Excelに出す。
   function empWarnings(e){
@@ -293,7 +301,7 @@
     $$('.scr-month').forEach(function(m){ m.value=state.month; }); // 対象月はタイトル行(入力/一覧)に表示
     if(id==='scr-settings') renderEmpMaster();
     if(id==='scr-input'){ $('#in-month').textContent=monthLabel(); renderInputArea(); }
-    if(id==='scr-list') renderListView();
+    if(id==='scr-list') renderListActive();
     if(id==='scr-print') renderPrint();
   }
 
@@ -720,7 +728,7 @@
     var confirmBtn='<div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px"><button class="btn-primary" data-confirm-month style="flex:0 0 auto;padding:11px 18px;font-size:14px">今月を確定</button>'
       +(cnt.need>0?'<span style="font-size:11px;color:#92500A;font-weight:700">未確認 '+cnt.need+'名</span>':'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 確認済</span>')
       +'<span style="font-size:10px;color:#7aa08c">確定すると全員を確認済みにして今月分を保存します（あとで直せます）。</span></div>';
-    host.innerHTML=calHTML+progHTML+cards+emptyMsg+confirmBtn;
+    host.innerHTML=statutoryStaleWarn()+calHTML+progHTML+cards+emptyMsg+confirmBtn;
   }
   function refreshCard(i){ var e=state.employees[i]; var card=$('#input-list .acc[data-i="'+i+'"]'); if(!card) return; var r=compute(e); card.querySelector('.acc-net').textContent=yen(r.net); var dw=card.querySelector('.diffb-wrap'); if(dw) dw.innerHTML=diffBadge(e,r); var cw=card.querySelector('.calc-wrap'); if(cw) cw.innerHTML=calcBoxHTML(e); var wr=card.querySelector('.wi-resw'); if(wr) wr.innerHTML=wiResHTML(e); }
 
@@ -806,9 +814,11 @@
   }
 
   /* ---------- 一覧 / 集計 ---------- */
+  // 一覧/集計タブの「表示中サブビュー」を再描画(月変更・タブ再表示で集計/帳票/年末調整も追従=stale防止)
+  function renderListActive(){ var v=state.listView||'list'; if(v==='sum')renderSumView(); else if(v==='cho')renderChoView(); else if(v==='nen')renderNenView(); else renderListView(); }
   function renderListView(){
     var host=$('#view-list'); if(!host) return; loadPrev();
-    host.innerHTML=state.employees.filter(function(e){return isActiveInMonth(e,state.month);}).map(function(e){
+    host.innerHTML=statutoryStaleWarn()+state.employees.filter(function(e){return isActiveInMonth(e,state.month);}).map(function(e){
       var r=compute(e), open=state.open['L'+e.id];
       var pay=r.shikyu.map(function(s){return '<div class="dl"><span>'+esc(s.label)+'</span><span class="v">'+yen(s.value)+'</span></div>';}).join('');
       var ded=r.kojo.map(function(k){return '<div class="dl"><span>'+esc(k.label)+'</span><span class="v">'+yen(k.value)+'</span></div>';}).join('');
@@ -964,11 +974,14 @@
       shougaiKojo:shougai, kafuHitorioyaKojo:kafuHitori, kinrougakuseiKojo:kinrou, jutakuLoan:num(n.jutakuLoan), genzenZumi:genzen });
     return { shunyu:shunyu, genzen:genzen, shaho:shaho, res:res };
   }
-  function nenResHTML(c){
+  function nenResHTML(c, n){
     if(!c) return '<p class="hint">計算エンジン未対応</p>';
-    var r=c.res, k=r.kabusoku;
+    var r=c.res, k=r.kabusoku; n=n||{};
     var badge = k<0 ? '<b style="color:#2E7D54">還付 '+yen(-k)+'</b>' : (k>0 ? '<b style="color:#C0392B">追加徴収 '+yen(k)+'</b>' : '<b>過不足なし</b>');
-    return '<div class="calc-box"><div class="ch">年末調整の結果</div>'
+    // 二重計上ガード: 同じ19-22歳の子は「特定扶養(所得62万以下)」か「特定親族特別控除(62万超123万以下)」のどちらか一方
+    var warn = (num(n.fuyoTokutei)>0 && num(n.tokuteiShinzokuShotoku)>0)
+      ? '<div class="cr-warn" style="margin:0 0 6px">⚠ 「特定19-22(人)」と「特定親族の所得」を両方入力しています。同じお子さんは<b>所得62万以下＝特定扶養／62万超123万以下＝特定親族特別控除</b>のどちらか一方です（二重控除になります）。</div>' : '';
+    return warn+'<div class="calc-box"><div class="ch">年末調整の結果</div>'
       +'<div class="calc-line"><span>課税給与収入(年)</span><span class="v">'+yen(c.shunyu)+'</span></div>'
       +'<div class="calc-line"><span>給与所得</span><span class="v">'+yen(r.kyuyoShotoku)+'</span></div>'
       +'<div class="calc-line"><span>所得控除の合計</span><span class="v">'+yen(r.kojoGoukei)+'</span></div>'
@@ -978,7 +991,7 @@
       +'<div class="calc-line"><span>源泉徴収済(年)</span><span class="v">'+yen(c.genzen)+'</span></div>'
       +'<div class="calc-line net tot"><span>過不足</span><span class="v">'+badge+'</span></div></div>';
   }
-  function nenRefreshEmp(eid){ var host=$('#nen-res-'+eid); if(!host)return; var agg=nenAggregate(state._nenRecs, eid); var n=nenStore(eid); host.innerHTML=nenResHTML(nenCompute(agg,n)); nenTotal(); }
+  function nenRefreshEmp(eid){ var host=$('#nen-res-'+eid); if(!host)return; var agg=nenAggregate(state._nenRecs, eid); var n=nenStore(eid); host.innerHTML=nenResHTML(nenCompute(agg,n), n); nenTotal(); }
   function nenTotal(){ var el=$('#nen-total'); if(!el)return; var t=0, emps=state._nenEmps||[]; emps.forEach(function(e){ var c=nenCompute(nenAggregate(state._nenRecs,e.id), nenStore(e.id)); if(c)t+=c.res.kabusoku; }); el.innerHTML = t<0?'<b style="color:#2E7D54">還付合計 '+yen(-t)+'</b>':(t>0?'<b style="color:#C0392B">追加徴収合計 '+yen(t)+'</b>':'過不足なし'); }
   function nf(eid, field, val, ph, wide){ return '<input class="finput num" data-eid="'+attr(eid)+'" data-nf="'+field+'" inputmode="numeric" value="'+attr(val==null?'':fmtN(val))+'" placeholder="'+(ph||'0')+'" style="'+(wide?'':'max-width:130px;')+'font-size:13px;padding:7px 8px">'; }
   function nenDetailHTML(eid, n, agg){
@@ -1013,15 +1026,17 @@
       +'<button class="btn-ghost" data-ntoggle="'+attr(e.id)+'" style="padding:5px 10px;font-size:12px">年調の申告入力 ▾</button></div>'
       +warn
       +nenDetailHTML(e.id, n, agg)
-      +'<div id="nen-res-'+attr(e.id)+'" style="margin-top:8px">'+nenResHTML(nenCompute(agg,n))+'</div>'
+      +'<div id="nen-res-'+attr(e.id)+'" style="margin-top:8px">'+nenResHTML(nenCompute(agg,n), n)+'</div>'
       +'</div>';
   }
   function nenViewHTML(recs, year){
     state._nenRecs=recs;
     var emps=state.employees.filter(function(e){ return isActiveInMonth(e, year+'-12') || (recs||[]).some(function(r){return r.employee_id===e.id;}); });
     state._nenEmps=emps;
+    var yearGuard = (year<2026||year>2027) ? '<div class="cr-warn" style="margin:0 0 8px">⚠ この年末調整の税額計算は<b>令和8・9年分（2026・2027年）専用</b>です。対象年 '+year+' 年は未対応のため、控除額・税額が正しくない可能性があります（対象月を令和8・9年に設定してください）。</div>' : '';
     var head='<div class="card"><div class="card-h">年末調整 '+year+'年</div>'
-      +'<p class="hint">当年1〜12月の<b>保存済み明細から自動集計</b>し、保険料・扶養などの<b>申告分を入力</b>すると過不足（還付／追加徴収）を計算します。月次を「今月を確定」で保存しておくと収入・源泉・社保が自動で埋まります。令和8年度改正（基礎控除・給与所得控除・特定親族特別控除）に対応。</p>'
+      +yearGuard+statutoryStaleWarn()
+      +'<p class="hint">当年1〜12月の<b>保存済みの月次給与明細から自動集計</b>し、保険料・扶養などの<b>申告分を入力</b>すると過不足（還付／追加徴収）を計算します。月次を「今月を確定」で保存しておくと収入・源泉・社保が自動で埋まります。令和8年度改正（基礎控除・給与所得控除・特定親族特別控除）に対応。<br><b style="color:#92500A">※自動集計は月次給与のみ。賞与や他の所得がある場合は「年調の申告入力 ▾」で 給与収入(年)／源泉徴収済(年)／社保 の欄に賞与分を含めた金額を上書き入力してください。</b></p>'
       +'<div class="pay-row" style="margin-top:6px"><span>全体の過不足</span><span id="nen-total" class="v">—</span></div>'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
       +'<button class="btn-ghost" data-nxlsx="1" style="padding:8px 12px;font-size:12px">年末調整一覧（源泉徴収簿）をExcel出力</button>'
@@ -1168,7 +1183,7 @@
     $('#help-ov').addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); });
     document.addEventListener('change',function(ev){ if(!ev.target.classList.contains('scr-month'))return; state.month=ev.target.value||state.month; state._prevYm=null; state._bonusPrevYm=null; /* 月替わりで前月比/賞与前月キャッシュを更新 */ $$('.scr-month').forEach(function(m){ m.value=state.month; }); updatePaydayPreview();
       if($('#scr-input').classList.contains('active')){$('#in-month').textContent=monthLabel();renderInputArea();}
-      if($('#scr-list').classList.contains('active')) renderListView();
+      if($('#scr-list').classList.contains('active')) renderListActive();
       if($('#scr-print').classList.contains('active')) doPreview(); }); // 印刷の月も対象月に統合(P1-18)
 
     // 入力タブ: 月次給与/賞与 モード切替
@@ -1257,7 +1272,9 @@
       if(t.classList.contains('sh-pay')||t.classList.contains('sh-days')){ var k=+t.dataset.k; emp.shaho.months[k]=emp.shaho.months[k]||{}; emp.shaho.months[k][t.classList.contains('sh-pay')?'pay':'days']=t.value; refreshShaho(i); return; }
       if(t.classList.contains('sh-mikomi')){ emp.shaho.mikomi=t.value; refreshShaho(i); return; }
       if(t.classList.contains('sh-manual')){ emp.shaho.manual=t.value; refreshShaho(i); return; }
-      var f=t.dataset.f; if(f&&!t.matches('select')) emp[f]=t.value; var nm=card.querySelector('.mco-nm'); if(f==='name'&&nm)nm.textContent=t.value||'（無名）'; });
+      var f=t.dataset.f; if(f&&!t.matches('select')) emp[f]=t.value; var nm=card.querySelector('.mco-nm'); if(f==='name'&&nm)nm.textContent=t.value||'（無名）';
+      // 基本給/時給/歩合/通勤等の変更で「社会保険(自動)」ヒーローを即再計算(タブ切替まで古い額が出るのを防ぐ)
+      if(f==='base'||f==='hourly'||f==='commissionAmt'||f==='hourlyGuarantee'||f==='commute'||f==='commuteKm') refreshShaho(i); });
     // 従業員カードを左スワイプで削除
     var swX=0,swY=0,swCard=null;
     el.addEventListener('touchstart',function(ev){ swCard=ev.target.closest('.mco'); if(swCard){ swX=ev.touches[0].clientX; swY=ev.touches[0].clientY; } },{passive:true});
@@ -1290,9 +1307,9 @@
       var g=e.target.dataset.g, ri=+e.target.dataset.ri, f=e.target.dataset.f; if(e.target.classList.contains('ck')){emp[g][ri].hikazei=e.target.checked;refreshCard(ci);return;} if(g&&!isNaN(ri)&&f){emp[g][ri][f]=e.target.value;refreshCard(ci);} });
 
     // 一覧/集計
-    $$('.seg-b[data-view]').forEach(function(b){ b.addEventListener('click',function(){ $$('.seg-b[data-view]').forEach(function(x){x.classList.toggle('on',x===b);}); var v=b.dataset.view; $('#view-list').style.display=v==='list'?'':'none'; $('#view-sum').style.display=v==='sum'?'':'none'; var vc=$('#view-cho'); if(vc)vc.style.display=v==='cho'?'':'none'; var vn=$('#view-nen'); if(vn)vn.style.display=v==='nen'?'':'none'; if(v==='sum')renderSumView(); else if(v==='cho')renderChoView(); else if(v==='nen')renderNenView(); else renderListView(); }); });
+    $$('.seg-b[data-view]').forEach(function(b){ b.addEventListener('click',function(){ $$('.seg-b[data-view]').forEach(function(x){x.classList.toggle('on',x===b);}); var v=b.dataset.view; state.listView=v; $('#view-list').style.display=v==='list'?'':'none'; $('#view-sum').style.display=v==='sum'?'':'none'; var vc=$('#view-cho'); if(vc)vc.style.display=v==='cho'?'':'none'; var vn=$('#view-nen'); if(vn)vn.style.display=v==='nen'?'':'none'; renderListActive(); }); });
     // 年末調整ビュー: 入力(申告)ハンドラ
-    var vnen=$('#view-nen'); if(vnen) vnen.addEventListener('input',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; nenSetField(f.dataset.eid, f.dataset.nf, f.type==='checkbox'?f.checked:f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); });
+    var vnen=$('#view-nen'); if(vnen) vnen.addEventListener('input',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; if(f.tagName==='SELECT'||f.type==='checkbox')return; /* checkbox/selectはchangeに任せ二重発火を防ぐ */ nenSetField(f.dataset.eid, f.dataset.nf, f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); });
     if(vnen) vnen.addEventListener('change',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; if(f.tagName==='SELECT'||f.type==='checkbox'){ nenSetField(f.dataset.eid, f.dataset.nf, f.type==='checkbox'?f.checked:f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); } });
     if(vnen) vnen.addEventListener('click',function(e){ var t=e.target.closest('[data-ntoggle]'); if(t){ var b=$('#nen-detail-'+t.dataset.ntoggle); if(b){ var op=b.style.display==='none'; b.style.display=op?'':'none'; t.textContent=op?'閉じる ▲':'年調の申告入力 ▾'; } return; }
       var x=e.target.closest('[data-nxlsx]'); if(x){ nenDownloadXlsx(); return; }
@@ -1428,12 +1445,32 @@
     if(cs.depts)state.depts=cs.depts; if(cs.roles)state.roles=cs.roles; if(cs.showRetired!=null)state.showRetired=cs.showRetired;
     if(cs.bonus)state.bonus=cs.bonus;
     if(cs.confirmed)state.confirmed=cs.confirmed;
+    if(cs.nencho)state.nencho=cs.nencho; // 年末調整の申告入力もクラウド復元(漏れ修正)
+    state._prevYm=null; state._bonusPrevYm=null; // クラウド復元で前月比キャッシュを無効化(stale防止)
     $$('.scr-month').forEach(function(m){ m.value=state.month; }); fillCompany(); var act=$('.screen.active'); if(act)showScreen(act.id); return true; }
   function reloadCloud(){ if(window.Store&&Store.cloudLoadState){ return Store.cloudLoadState().then(applyCloudState).catch(function(){return false;}); } return Promise.resolve(false); }
   window.PayslipReloadCloud=reloadCloud; window.PayslipPersistSave=persistSave;
 
+  // 中央(Supabase statutory)の法定データをlibに注入=全国ユーザーへ一括反映。取れなければlibのハードコードのまま(フォールバック=オフラインでも動く)。
+  function hydrateStatutory(){
+    if(!(window.Store&&Store.getStatutory)) return Promise.resolve(false);
+    return Store.getStatutory().then(function(rows){
+      if(!rows||!rows.length) return false; // 空=フォールバック
+      var sh=SHH(), sa=SAI(), kh=KH(), applied=0;
+      rows.forEach(function(r){ try{
+        if(r.kind==='saitei_chingin' && sa&&sa.hydrate){ sa.hydrate(r.data); applied++; }
+        else if(r.kind==='shakaihoken' && sh&&sh.hydrate){ sh.hydrate(r.year, r.data); applied++; }
+        else if(r.kind==='koyo' && kh&&kh.hydrate){ kh.hydrate(r.year, r.data); applied++; }
+      }catch(e){} });
+      if(applied){ var act=$('.screen.active'); if(act&&act.id) showScreen(act.id); } // 値が変わった可能性→表示中を再描画
+      return applied>0;
+    }).catch(function(){ return false; });
+  }
+  window.PayslipHydrateStatutory=hydrateStatutory;
+
   /* init */
   persistLoad();
+  hydrateStatutory(); // 中央の法定データを非同期で注入(失敗時はlibのハードコードで動く)
   $$('.scr-month').forEach(function(m){ m.value=state.month; });
   fillCompany(); bind(); showScreen('scr-settings');
   // 変更を自動保存(入力/選択/クリック後・離脱時)

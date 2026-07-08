@@ -32,3 +32,23 @@ T('最賃 最高=東京1226 / 最低=高知・宮崎・沖縄1023(令和7)', fun
   eq(Math.max.apply(null, vals), 1226);
   eq(Math.min.apply(null, vals), 1023);
 });
+
+/* ── 年度追従(最賃は毎年10月改定=会計年度)。値は令和7のまま・未収録年度を検知して暫定警告する仕組み ── */
+T('最賃 最賃年度(10月改定境界): 2025-10/2026-09→2025年度 / 2026-10→2026年度', function () {
+  eq(SC.saiteiNendoOf('2025-10'), 2025);
+  eq(SC.saiteiNendoOf('2026-09'), 2025);   // 令和7年度最賃は2026-09まで有効
+  eq(SC.saiteiNendoOf('2026-10'), 2026);   // 令和8年度最賃(2026-10発効)
+  eq(SC.saiteiNendoOf('2026-06'), 2025);
+});
+T('最賃 未収録年度の検知 saiteiStale(収録=令和7年度2025のみ)', function () {
+  eq(SC.NENDO_YEAR, 2025);
+  eq(SC.saiteiStale('2026-06'), false);    // 令和7年度=収録済
+  eq(SC.saiteiStale('2025-11'), false);
+  eq(SC.saiteiStale('2026-10'), true);     // 令和8年度=未収録→暫定(要更新)
+  eq(SC.saiteiStale('2025-06'), true);     // 令和6年度=未収録
+  eq(SC.saiteiStale(''), false);           // 未指定=従来互換(暫定でない)
+});
+T('最賃 getChingin は ym を渡しても現行(令和7)値を返す(値は捏造しない)', function () {
+  eq(SC.getChingin('tokyo', '2026-10'), 1226);
+  eq(SC.getChingin('tokyo'), 1226);
+});

@@ -274,5 +274,11 @@
     return Promise.resolve(true);
   };
 
+  // 中央の法定データ(statutory テーブル)を取得。全アプリ共通・anon読取可。localやDB無しは[]=libのハードコードで動く(フォールバック)。
+  Store.getStatutory = function(){
+    if(hasSupa){ return sb.from('statutory').select('kind,year,data').then(function(r){ return r.data||[]; }).catch(function(){ return []; }); }
+    return Promise.resolve([]);
+  };
+
   global.Store = Store;
 })(window);
