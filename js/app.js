@@ -1022,7 +1022,8 @@
     state._nenEmps=emps;
     var head='<div class="card"><div class="card-h">年末調整 '+year+'年</div>'
       +'<p class="hint">当年1〜12月の<b>保存済み明細から自動集計</b>し、保険料・扶養などの<b>申告分を入力</b>すると過不足（還付／追加徴収）を計算します。月次を「今月を確定」で保存しておくと収入・源泉・社保が自動で埋まります。令和8年度改正（基礎控除・給与所得控除・特定親族特別控除）に対応。</p>'
-      +'<div class="pay-row" style="margin-top:6px"><span>全体の過不足</span><span id="nen-total" class="v">—</span></div></div>';
+      +'<div class="pay-row" style="margin-top:6px"><span>全体の過不足</span><span id="nen-total" class="v">—</span></div>'
+      +'<button class="btn-ghost" data-nxlsx="1" style="margin-top:8px;padding:8px 12px;font-size:12px">年末調整一覧（源泉徴収簿）をExcel出力</button></div>';
     if(!emps.length) return head+'<div class="card"><p class="hint">対象の従業員がいません。</p></div>';
     return head+emps.map(function(e){ return nenEmpHTML(e, recs); }).join('');
   }
@@ -1032,6 +1033,21 @@
     host.innerHTML='<div class="card"><div class="card-h">年末調整 '+year+'年</div><p class="hint">読込中…</p></div>';
     Store.getPayslipsByYm(year+'-01', year+'-12').then(function(recs){ host.innerHTML=nenViewHTML(recs||[], year); nenTotal(); })
       .catch(function(){ host.innerHTML='<div class="card"><p class="hint">読込に失敗しました。</p></div>'; });
+  }
+  // 年末調整一覧(源泉徴収簿)のExcel出力。年調ビューが描画済み(state._nenEmps/_nenRecs)前提。
+  function nenDownloadXlsx(){
+    if(!(window.PayslipXlsx&&Nen_())) return; var year=nenYear();
+    var aoa=[ ['令和'+(year-2018)+'年分 年末調整一覧（源泉徴収簿）'], [(state.company||{}).name||''], [],
+      ['氏名','支払金額','給与所得控除後','所得控除の合計','源泉徴収税額(年調後)','社会保険料等','生命保険料控除','地震保険料控除','配偶者(特別)控除','扶養親族の数','基礎控除','住宅借入金等特別控除','過不足(還付は△)'] ];
+    var emps=state._nenEmps||[], t={ pay:0,zei:0,kabu:0 };
+    emps.forEach(function(e){ var c=nenCompute(nenAggregate(state._nenRecs,e.id), nenStore(e.id)); if(!c)return;
+      var r=c.res, kl=r.kojoList, n=nenStore(e.id);
+      var fuyoN=num(n.fuyoIppan)+num(n.fuyoTokutei)+num(n.fuyoRoujin)+num(n.fuyoDoukyo);
+      t.pay+=c.shunyu; t.zei+=r.nenchouNenzei; t.kabu+=r.kabusoku;
+      aoa.push([ e.name||'', c.shunyu, r.kyuyoShotoku, r.kojoGoukei, r.nenchouNenzei, kl.shakaiHoken, kl.seimei, kl.jishin, kl.haiguusha+kl.haiTokubetsu, fuyoN, kl.kiso, num(n.jutakuLoan), (r.kabusoku<0?'△'+fmtN(-r.kabusoku):fmtN(r.kabusoku)) ]);
+    });
+    aoa.push(['合計', t.pay, '', '', t.zei, '', '', '', '', '', '', '', (t.kabu<0?'△'+fmtN(-t.kabu):fmtN(t.kabu))]);
+    PayslipXlsx.downloadSheets([{ name:'年末調整一覧', aoa:aoa, cols:[{wch:16},{wch:12},{wch:13},{wch:13},{wch:15},{wch:12},{wch:12},{wch:12},{wch:13},{wch:9},{wch:11},{wch:15},{wch:14}] }], { filename:'年末調整一覧_'+year+'.xlsx' });
   }
 
   /* ---------- 印刷 / PDF ---------- */
@@ -1235,7 +1251,8 @@
     // 年末調整ビュー: 入力(申告)ハンドラ
     var vnen=$('#view-nen'); if(vnen) vnen.addEventListener('input',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; nenSetField(f.dataset.eid, f.dataset.nf, f.type==='checkbox'?f.checked:f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); });
     if(vnen) vnen.addEventListener('change',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; if(f.tagName==='SELECT'||f.type==='checkbox'){ nenSetField(f.dataset.eid, f.dataset.nf, f.type==='checkbox'?f.checked:f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); } });
-    if(vnen) vnen.addEventListener('click',function(e){ var t=e.target.closest('[data-ntoggle]'); if(t){ var b=$('#nen-detail-'+t.dataset.ntoggle); if(b){ var op=b.style.display==='none'; b.style.display=op?'':'none'; t.textContent=op?'閉じる ▲':'年調の申告入力 ▾'; } } });
+    if(vnen) vnen.addEventListener('click',function(e){ var t=e.target.closest('[data-ntoggle]'); if(t){ var b=$('#nen-detail-'+t.dataset.ntoggle); if(b){ var op=b.style.display==='none'; b.style.display=op?'':'none'; t.textContent=op?'閉じる ▲':'年調の申告入力 ▾'; } return; }
+      var x=e.target.closest('[data-nxlsx]'); if(x){ nenDownloadXlsx(); return; } });
     // 帳票のサブ切替(賃金台帳/社保一覧/部署別)＋Excel
     var vcho=$('#view-cho'); if(vcho) vcho.addEventListener('click',function(e){
       var st=e.target.closest('[data-cho]'); if(st){ state.choView=st.dataset.cho; renderChoView(); return; }
