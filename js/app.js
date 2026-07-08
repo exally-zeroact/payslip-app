@@ -1023,7 +1023,9 @@
     var head='<div class="card"><div class="card-h">年末調整 '+year+'年</div>'
       +'<p class="hint">当年1〜12月の<b>保存済み明細から自動集計</b>し、保険料・扶養などの<b>申告分を入力</b>すると過不足（還付／追加徴収）を計算します。月次を「今月を確定」で保存しておくと収入・源泉・社保が自動で埋まります。令和8年度改正（基礎控除・給与所得控除・特定親族特別控除）に対応。</p>'
       +'<div class="pay-row" style="margin-top:6px"><span>全体の過不足</span><span id="nen-total" class="v">—</span></div>'
-      +'<button class="btn-ghost" data-nxlsx="1" style="margin-top:8px;padding:8px 12px;font-size:12px">年末調整一覧（源泉徴収簿）をExcel出力</button></div>';
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
+      +'<button class="btn-ghost" data-nxlsx="1" style="padding:8px 12px;font-size:12px">年末調整一覧（源泉徴収簿）をExcel出力</button>'
+      +'<button class="btn-ghost" data-ngensen="1" style="padding:8px 12px;font-size:12px">源泉徴収票を印刷 / PDF保存</button></div></div>';
     if(!emps.length) return head+'<div class="card"><p class="hint">対象の従業員がいません。</p></div>';
     return head+emps.map(function(e){ return nenEmpHTML(e, recs); }).join('');
   }
@@ -1048,6 +1050,47 @@
     });
     aoa.push(['合計', t.pay, '', '', t.zei, '', '', '', '', '', '', '', (t.kabu<0?'△'+fmtN(-t.kabu):fmtN(t.kabu))]);
     PayslipXlsx.downloadSheets([{ name:'年末調整一覧', aoa:aoa, cols:[{wch:16},{wch:12},{wch:13},{wch:13},{wch:15},{wch:12},{wch:12},{wch:12},{wch:13},{wch:9},{wch:11},{wch:15},{wch:14}] }], { filename:'年末調整一覧_'+year+'.xlsx' });
+  }
+  // 源泉徴収票(従業員配布用の個票)。公式項目を揃えた印刷フォーム→印刷/PDF保存。
+  function nenGensenHTML(e, year){
+    var c=nenCompute(nenAggregate(state._nenRecs,e.id), nenStore(e.id)); if(!c) return '';
+    var r=c.res, kl=r.kojoList, n=nenStore(e.id);
+    var haiUmu = n.haiEnabled ? '有' : '無';
+    var haiGaku = num(kl.haiguusha)+num(kl.haiTokubetsu);
+    var cell=function(lbl,val){ return '<td class="gl">'+esc(lbl)+'</td><td class="gv">'+yen(val)+'</td>'; };
+    return '<div class="gensen">'
+      +'<div class="gt">令和'+(year-2018)+'年分　給与所得の源泉徴収票</div>'
+      +'<table class="gtbl">'
+      +'<tr><td class="gl">支払を受ける者</td><td colspan="3">住所　　　　　　　　　　　　　氏名　<b>'+esc(e.name||'')+'</b></td></tr>'
+      +'<tr><td class="gl">種別</td><td>給与・賞与</td>'+cell('支払金額', c.shunyu)+'</tr>'
+      +'<tr>'+cell('給与所得控除後の金額', r.kyuyoShotoku)+cell('所得控除の額の合計額', r.kojoGoukei)+'</tr>'
+      +'<tr>'+cell('源泉徴収税額', r.nenchouNenzei)+'<td class="gl">(源泉)控除対象配偶者の有無</td><td class="gv">'+haiUmu+'</td></tr>'
+      +'<tr>'+cell('配偶者(特別)控除の額', haiGaku)+'<td class="gl">控除対象扶養親族の数</td><td class="gv" style="text-align:left">特定'+num(n.fuyoTokutei)+'人／老人'+(num(n.fuyoRoujin)+num(n.fuyoDoukyo))+'人／その他'+num(n.fuyoIppan)+'人</td></tr>'
+      +'<tr>'+cell('社会保険料等の金額', kl.shakaiHoken)+cell('生命保険料の控除額', kl.seimei)+'</tr>'
+      +'<tr>'+cell('地震保険料の控除額', kl.jishin)+cell('住宅借入金等特別控除の額', num(n.jutakuLoan))+'</tr>'
+      +'<tr>'+cell('基礎控除の額', kl.kiso)+cell('特定親族特別控除の額', kl.tokuteiShinzoku)+'</tr>'
+      +'<tr><td class="gl">摘要</td><td colspan="3" style="height:34px"></td></tr>'
+      +'<tr><td class="gl">支払者</td><td colspan="3">'+esc((state.company||{}).name||'')+'　'+esc((state.company||{}).addr||'')+'</td></tr>'
+      +'</table></div>';
+  }
+  function nenPrintGensen(){
+    var year=nenYear(); var emps=state._nenEmps||[];
+    if(!emps.length){ alert('対象の従業員がいません。'); return; }
+    var body=emps.map(function(e){ return nenGensenHTML(e, year); }).join('');
+    var css='body{font-family:"Noto Sans JP",sans-serif;color:#1a1a1a;margin:0;padding:12px;}'
+      +'.gensen{border:2px solid #333;border-radius:4px;padding:12px 14px;margin:0 0 16px;page-break-after:always;}'
+      +'.gt{font-size:16px;font-weight:700;text-align:center;margin-bottom:10px;letter-spacing:.08em;}'
+      +'.gtbl{width:100%;border-collapse:collapse;font-size:12px;}'
+      +'.gtbl td{border:1px solid #999;padding:6px 8px;vertical-align:middle;}'
+      +'.gtbl .gl{background:#f2f2f2;font-size:10.5px;color:#333;white-space:nowrap;width:150px;}'
+      +'.gtbl .gv{font-family:"DM Mono",monospace;text-align:right;font-weight:700;}'
+      +'@media print{.gensen{margin:0;border-color:#000;}}';
+    var html='<!doctype html><html><head><meta charset="utf-8"><title>源泉徴収票 '+year+'</title>'
+      +'<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">'
+      +'<style>'+css+'</style></head><body>'+body
+      +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},400);}</scr'+'ipt></body></html>';
+    var w=window.open('', '_blank'); if(!w){ alert('ポップアップがブロックされました。ブラウザの設定で許可してください。'); return; }
+    w.document.open(); w.document.write(html); w.document.close();
   }
 
   /* ---------- 印刷 / PDF ---------- */
@@ -1252,7 +1295,8 @@
     var vnen=$('#view-nen'); if(vnen) vnen.addEventListener('input',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; nenSetField(f.dataset.eid, f.dataset.nf, f.type==='checkbox'?f.checked:f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); });
     if(vnen) vnen.addEventListener('change',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; if(f.tagName==='SELECT'||f.type==='checkbox'){ nenSetField(f.dataset.eid, f.dataset.nf, f.type==='checkbox'?f.checked:f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); } });
     if(vnen) vnen.addEventListener('click',function(e){ var t=e.target.closest('[data-ntoggle]'); if(t){ var b=$('#nen-detail-'+t.dataset.ntoggle); if(b){ var op=b.style.display==='none'; b.style.display=op?'':'none'; t.textContent=op?'閉じる ▲':'年調の申告入力 ▾'; } return; }
-      var x=e.target.closest('[data-nxlsx]'); if(x){ nenDownloadXlsx(); return; } });
+      var x=e.target.closest('[data-nxlsx]'); if(x){ nenDownloadXlsx(); return; }
+      var g=e.target.closest('[data-ngensen]'); if(g){ nenPrintGensen(); return; } });
     // 帳票のサブ切替(賃金台帳/社保一覧/部署別)＋Excel
     var vcho=$('#view-cho'); if(vcho) vcho.addEventListener('click',function(e){
       var st=e.target.closest('[data-cho]'); if(st){ state.choView=st.dataset.cho; renderChoView(); return; }
