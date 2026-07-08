@@ -121,7 +121,7 @@
       rateOt:'', rateHoliday:'', rateNight:'', rateOver60:'', gyoshu:'ippan' },
     month:'2026-06', prefer:'col2_1', theme:{accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}, depts:['営業部'], roles:['課長','主任','一般'],
     employees:[defEmp('山田 太郎')], open:{},
-    inputMode:'monthly', printMode:'monthly', empFilter:'active', bonus:{ payYm:'', payDay:'', byEmp:{} }, confirmed:{} };
+    inputMode:'monthly', printMode:'monthly', empFilter:'active', bonus:{ payYm:'', payDay:'', byEmp:{} }, confirmed:{}, nencho:{} };
 
   // マイカー通勤 1か月非課税限度(片道km・国税庁No.2585 令和8年4月〜)★12区分 公式照合済2026-07★
   function carCommuteNonTax(km){ km=num(km);
@@ -926,6 +926,114 @@
       Store.getPayslipsByYm(year+'-01',year+'-12').then(function(recs){ var L=CD().buildLedger(recs||[],year,state.employees);
         var sheets=PayslipXlsx.chinginDaichoSheets(L, year, CD(), {company:co}); if(!sheets.length){ alert('確定済みの月がありません。'); return; } PayslipXlsx.downloadSheets(sheets,{filename:'賃金台帳_'+year+'.xlsx'}); }); return; } }
 
+  /* ---------- 年末調整(view-nen) ---------- */
+  function Nen_(){ return (typeof Nenmatsu!=='undefined')?Nenmatsu:(window&&window.Nenmatsu); }
+  function nenYear(){ return parseInt(String(state.month||'').slice(0,4),10)||2026; }
+  function nenStore(eid){ var y=nenYear(); if(!state.nencho)state.nencho={}; if(!state.nencho[y])state.nencho[y]={}; if(!state.nencho[y][eid])state.nencho[y][eid]={}; return state.nencho[y][eid]; }
+  function nenSetField(eid, field, val){ nenStore(eid)[field]=val; }
+  // 当年1〜12月の保存履歴から 課税給与収入/源泉徴収税額/社保(天引き) を自動合算
+  function nenAggregate(recs, eid){
+    var rows=(recs||[]).filter(function(r){ return r.employee_id===eid; });
+    var shunyu=0, genzen=0, shaho=0, months=0;
+    rows.forEach(function(r){ var d=r.data||{};
+      var taxable=(d.shikyu&&d.shikyu.length)? d.shikyu.reduce(function(a,x){ return a+(x.hikazei?0:num(x.value)); },0) : num(d.shikyuTotal);
+      shunyu+=taxable; genzen+=num(d.tax);
+      var si=d.si||{}; shaho += (si.health!=null||si.pension!=null)?(num(si.health)+num(si.kaigo)+num(si.pension)+num(si.employ)):num(d.siTotal);
+      months++;
+    });
+    return { shunyu:shunyu, genzen:genzen, shaho:shaho, months:months };
+  }
+  function nenCompute(agg, n){
+    var Nen=Nen_(); if(!Nen) return null;
+    var shunyu=(n.shunyuOverride!=null&&n.shunyuOverride!=='')?num(n.shunyuOverride):agg.shunyu;
+    var genzen=(n.genzenOverride!=null&&n.genzenOverride!=='')?num(n.genzenOverride):agg.genzen;
+    var shahoAuto=(n.shahoOverride!=null&&n.shahoOverride!=='')?num(n.shahoOverride):agg.shaho;
+    var shaho=shahoAuto+num(n.shinkokuShaho);
+    var honnin=Nen.kyuyoShotokuR8(shunyu);
+    var haiKojo=0, haiTok=0;
+    if(n.haiEnabled){ var hs=num(n.haiShotoku); if(hs<=620000) haiKojo=Nen.haiguushaKojo(honnin, !!n.haiRojin); else haiTok=Nen.haiguushaTokubetsuKojo(hs, honnin); }
+    var fuyo=Nen.fuyoKojo('ippan')*num(n.fuyoIppan)+Nen.fuyoKojo('tokutei')*num(n.fuyoTokutei)+Nen.fuyoKojo('roujin')*num(n.fuyoRoujin)+Nen.fuyoKojo('doukyo')*num(n.fuyoDoukyo);
+    var tokShin=num(n.tokuteiShinzokuShotoku)>0?Nen.tokuteiShinzokuKojo(num(n.tokuteiShinzokuShotoku)):0;
+    var shougai=n.shougai?Nen.shougaiKojo(n.shougai):0;
+    var kafuHitori=n.hitorioya?Nen.HITORIOYA:(n.kafu?Nen.KAFU:0);
+    var kinrou=n.kinrou?Nen.KINROU:0;
+    var res=Nen.computeNencho({ kyuyoShunyu:shunyu, shakaiHoken:shaho,
+      seimei:{ generalNew:num(n.seiGeneralNew), generalOld:num(n.seiGeneralOld), kaigo:num(n.seiKaigo), pensionNew:num(n.seiPensionNew), pensionOld:num(n.seiPensionOld) },
+      jishin:{ jishin:num(n.jishinP), kyuChoki:num(n.jishinKyu) }, shokibo:num(n.shokibo),
+      haiguushaKojo:haiKojo, haiguushaTokubetsuKojo:haiTok, fuyoKojo:fuyo, tokuteiShinzokuKojo:tokShin,
+      shougaiKojo:shougai, kafuHitorioyaKojo:kafuHitori, kinrougakuseiKojo:kinrou, jutakuLoan:num(n.jutakuLoan), genzenZumi:genzen });
+    return { shunyu:shunyu, genzen:genzen, shaho:shaho, res:res };
+  }
+  function nenResHTML(c){
+    if(!c) return '<p class="hint">計算エンジン未対応</p>';
+    var r=c.res, k=r.kabusoku;
+    var badge = k<0 ? '<b style="color:#2E7D54">還付 '+yen(-k)+'</b>' : (k>0 ? '<b style="color:#C0392B">追加徴収 '+yen(k)+'</b>' : '<b>過不足なし</b>');
+    return '<div class="calc-box"><div class="ch">年末調整の結果</div>'
+      +'<div class="calc-line"><span>課税給与収入(年)</span><span class="v">'+yen(c.shunyu)+'</span></div>'
+      +'<div class="calc-line"><span>給与所得</span><span class="v">'+yen(r.kyuyoShotoku)+'</span></div>'
+      +'<div class="calc-line"><span>所得控除の合計</span><span class="v">'+yen(r.kojoGoukei)+'</span></div>'
+      +'<div class="calc-line"><span>課税給与所得金額</span><span class="v">'+yen(r.kazeiKyuyoShotoku)+'</span></div>'
+      +'<div class="calc-line"><span>算出所得税額</span><span class="v">'+yen(r.sanshutuZei)+'</span></div>'
+      +'<div class="calc-line"><span>年調年税額(復興税込)</span><span class="v">'+yen(r.nenchouNenzei)+'</span></div>'
+      +'<div class="calc-line"><span>源泉徴収済(年)</span><span class="v">'+yen(c.genzen)+'</span></div>'
+      +'<div class="calc-line net tot"><span>過不足</span><span class="v">'+badge+'</span></div></div>';
+  }
+  function nenRefreshEmp(eid){ var host=$('#nen-res-'+eid); if(!host)return; var agg=nenAggregate(state._nenRecs, eid); var n=nenStore(eid); host.innerHTML=nenResHTML(nenCompute(agg,n)); nenTotal(); }
+  function nenTotal(){ var el=$('#nen-total'); if(!el)return; var t=0, emps=state._nenEmps||[]; emps.forEach(function(e){ var c=nenCompute(nenAggregate(state._nenRecs,e.id), nenStore(e.id)); if(c)t+=c.res.kabusoku; }); el.innerHTML = t<0?'<b style="color:#2E7D54">還付合計 '+yen(-t)+'</b>':(t>0?'<b style="color:#C0392B">追加徴収合計 '+yen(t)+'</b>':'過不足なし'); }
+  function nf(eid, field, val, ph, wide){ return '<input class="finput num" data-eid="'+attr(eid)+'" data-nf="'+field+'" inputmode="numeric" value="'+attr(val==null?'':fmtN(val))+'" placeholder="'+(ph||'0')+'" style="'+(wide?'':'max-width:130px;')+'font-size:13px;padding:7px 8px">'; }
+  function nenDetailHTML(eid, n, agg){
+    function chk(field,label){ return '<label style="font-size:12px;display:inline-flex;align-items:center;gap:4px;margin-right:12px"><input type="checkbox" data-eid="'+attr(eid)+'" data-nf="'+field+'"'+(n[field]?' checked':'')+'>'+label+'</label>'; }
+    var shougaiOpts=[['','障害者なし'],['ippan','一般障害者(27万)'],['tokubetsu','特別障害者(40万)'],['doukyo','同居特別障害者(75万)']].map(function(o){return '<option value="'+o[0]+'"'+((n.shougai||'')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('');
+    return '<div class="nen-detail" id="nen-detail-'+attr(eid)+'" style="display:none;border-top:1px dashed #d4eae0;margin-top:8px;padding-top:8px">'
+      +'<div style="font-size:11px;color:#7aa08c;margin-bottom:6px">自動集計を上書きする場合のみ入力（空欄=履歴から自動）</div>'
+      +'<div class="nrow"><span class="nlbl">給与収入(年)</span>'+nf(eid,'shunyuOverride',n.shunyuOverride,fmtN(agg.shunyu))+'<span class="nlbl">源泉徴収済(年)</span>'+nf(eid,'genzenOverride',n.genzenOverride,fmtN(agg.genzen))+'</div>'
+      +'<div class="nrow"><span class="nlbl">社保(天引・上書)</span>'+nf(eid,'shahoOverride',n.shahoOverride,fmtN(agg.shaho))+'<span class="nlbl">社保(申告追加)</span>'+nf(eid,'shinkokuShaho',n.shinkokuShaho)+'</div>'
+      +'<div class="nsec">生命保険料（支払保険料）</div>'
+      +'<div class="nrow"><span class="nlbl">一般(新)</span>'+nf(eid,'seiGeneralNew',n.seiGeneralNew)+'<span class="nlbl">一般(旧)</span>'+nf(eid,'seiGeneralOld',n.seiGeneralOld)+'</div>'
+      +'<div class="nrow"><span class="nlbl">介護医療(新)</span>'+nf(eid,'seiKaigo',n.seiKaigo)+'</div>'
+      +'<div class="nrow"><span class="nlbl">個人年金(新)</span>'+nf(eid,'seiPensionNew',n.seiPensionNew)+'<span class="nlbl">個人年金(旧)</span>'+nf(eid,'seiPensionOld',n.seiPensionOld)+'</div>'
+      +'<div class="nsec">地震保険料</div>'
+      +'<div class="nrow"><span class="nlbl">地震保険料</span>'+nf(eid,'jishinP',n.jishinP)+'<span class="nlbl">旧長期損害</span>'+nf(eid,'jishinKyu',n.jishinKyu)+'</div>'
+      +'<div class="nsec">配偶者・扶養</div>'
+      +'<div class="nrow">'+chk('haiEnabled','配偶者あり')+chk('haiRojin','老人配偶者(70歳)')+'<span class="nlbl">配偶者の合計所得</span>'+nf(eid,'haiShotoku',n.haiShotoku)+'</div>'
+      +'<div class="nrow"><span class="nlbl">一般扶養(人)</span>'+nf(eid,'fuyoIppan',n.fuyoIppan)+'<span class="nlbl">特定19-22(人)</span>'+nf(eid,'fuyoTokutei',n.fuyoTokutei)+'</div>'
+      +'<div class="nrow"><span class="nlbl">老人扶養(人)</span>'+nf(eid,'fuyoRoujin',n.fuyoRoujin)+'<span class="nlbl">同居老親(人)</span>'+nf(eid,'fuyoDoukyo',n.fuyoDoukyo)+'</div>'
+      +'<div class="nrow"><span class="nlbl">特定親族の所得<span class="hint2">62超123万で控除</span></span>'+nf(eid,'tokuteiShinzokuShotoku',n.tokuteiShinzokuShotoku)+'</div>'
+      +'<div class="nsec">その他控除</div>'
+      +'<div class="nrow"><span class="nlbl">小規模企業共済等</span>'+nf(eid,'shokibo',n.shokibo)+'<span class="nlbl">住宅ローン控除</span>'+nf(eid,'jutakuLoan',n.jutakuLoan)+'</div>'
+      +'<div class="nrow"><select class="finput m-f" data-eid="'+attr(eid)+'" data-nf="shougai" style="max-width:220px;font-size:13px">'+shougaiOpts+'</select></div>'
+      +'<div class="nrow">'+chk('kafu','寡婦(27万)')+chk('hitorioya','ひとり親(35万)')+chk('kinrou','勤労学生(27万)')+'</div>'
+      +'</div>';
+  }
+  function nenEmpHTML(e, recs){
+    var agg=nenAggregate(recs, e.id), n=nenStore(e.id);
+    var warn = agg.months===0 ? '<div class="cr-warn" style="margin:6px 0 0">⚠ 当年の保存済み明細がありません。「今月を確定」で月次を保存するか、下の「年調の申告入力」で収入・源泉を手入力してください。</div>' : (agg.months<12?'<div class="hint" style="margin:4px 0 0;color:#92500A">保存済み '+agg.months+'/12か月分から集計中（不足月は手入力で補完可）</div>':'');
+    return '<div class="card" style="margin-bottom:10px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>'+esc(e.name||'(無名)')+'</b>'
+      +'<button class="btn-ghost" data-ntoggle="'+attr(e.id)+'" style="padding:5px 10px;font-size:12px">年調の申告入力 ▾</button></div>'
+      +warn
+      +nenDetailHTML(e.id, n, agg)
+      +'<div id="nen-res-'+attr(e.id)+'" style="margin-top:8px">'+nenResHTML(nenCompute(agg,n))+'</div>'
+      +'</div>';
+  }
+  function nenViewHTML(recs, year){
+    state._nenRecs=recs;
+    var emps=state.employees.filter(function(e){ return isActiveInMonth(e, year+'-12') || (recs||[]).some(function(r){return r.employee_id===e.id;}); });
+    state._nenEmps=emps;
+    var head='<div class="card"><div class="card-h">年末調整 '+year+'年</div>'
+      +'<p class="hint">当年1〜12月の<b>保存済み明細から自動集計</b>し、保険料・扶養などの<b>申告分を入力</b>すると過不足（還付／追加徴収）を計算します。月次を「今月を確定」で保存しておくと収入・源泉・社保が自動で埋まります。令和8年度改正（基礎控除・給与所得控除・特定親族特別控除）に対応。</p>'
+      +'<div class="pay-row" style="margin-top:6px"><span>全体の過不足</span><span id="nen-total" class="v">—</span></div></div>';
+    if(!emps.length) return head+'<div class="card"><p class="hint">対象の従業員がいません。</p></div>';
+    return head+emps.map(function(e){ return nenEmpHTML(e, recs); }).join('');
+  }
+  function renderNenView(){
+    var host=$('#view-nen'); if(!host)return; var year=nenYear();
+    if(!(window.Store&&Store.getPayslipsByYm&&Nen_())){ host.innerHTML='<div class="card"><p class="hint">履歴保存または計算エンジンが未対応です。</p></div>'; return; }
+    host.innerHTML='<div class="card"><div class="card-h">年末調整 '+year+'年</div><p class="hint">読込中…</p></div>';
+    Store.getPayslipsByYm(year+'-01', year+'-12').then(function(recs){ host.innerHTML=nenViewHTML(recs||[], year); nenTotal(); })
+      .catch(function(){ host.innerHTML='<div class="card"><p class="hint">読込に失敗しました。</p></div>'; });
+  }
+
   /* ---------- 印刷 / PDF ---------- */
   function buildPeople(emps){ return emps.map(function(e){ var r=compute(e); var k=(e.kintai||[]).filter(function(x){ if(/代休取得|振替休日/.test(x.label||'')) return num(x.value)>0; return true; }); var oi=k.findIndex(function(x){return /出勤/.test(x.label||'');}); var wt={label:'労働時間',value:workedLabel(e)}; if(oi>=0)k.splice(oi+1,0,wt); else k.unshift(wt); return { name:e.name, company:state.company.name, payDate:payDateStr(), kintai:k, shikyu:r.shikyu, kojo:r.kojo, net:r.net, shikyuTotal:r.shikyuTotal, kojoTotal:r.kojoTotal, warnings:empWarnings(e) }; }); }
   // 賞与明細用: 月次明細と同じテンプレ/テーマ(ユーザー選択)で 勤怠なし・支給=賞与/控除=賞与社保+源泉
@@ -1123,7 +1231,11 @@
       var g=e.target.dataset.g, ri=+e.target.dataset.ri, f=e.target.dataset.f; if(e.target.classList.contains('ck')){emp[g][ri].hikazei=e.target.checked;refreshCard(ci);return;} if(g&&!isNaN(ri)&&f){emp[g][ri][f]=e.target.value;refreshCard(ci);} });
 
     // 一覧/集計
-    $$('.seg-b[data-view]').forEach(function(b){ b.addEventListener('click',function(){ $$('.seg-b[data-view]').forEach(function(x){x.classList.toggle('on',x===b);}); var v=b.dataset.view; $('#view-list').style.display=v==='list'?'':'none'; $('#view-sum').style.display=v==='sum'?'':'none'; var vc=$('#view-cho'); if(vc)vc.style.display=v==='cho'?'':'none'; if(v==='sum')renderSumView(); else if(v==='cho')renderChoView(); else renderListView(); }); });
+    $$('.seg-b[data-view]').forEach(function(b){ b.addEventListener('click',function(){ $$('.seg-b[data-view]').forEach(function(x){x.classList.toggle('on',x===b);}); var v=b.dataset.view; $('#view-list').style.display=v==='list'?'':'none'; $('#view-sum').style.display=v==='sum'?'':'none'; var vc=$('#view-cho'); if(vc)vc.style.display=v==='cho'?'':'none'; var vn=$('#view-nen'); if(vn)vn.style.display=v==='nen'?'':'none'; if(v==='sum')renderSumView(); else if(v==='cho')renderChoView(); else if(v==='nen')renderNenView(); else renderListView(); }); });
+    // 年末調整ビュー: 入力(申告)ハンドラ
+    var vnen=$('#view-nen'); if(vnen) vnen.addEventListener('input',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; nenSetField(f.dataset.eid, f.dataset.nf, f.type==='checkbox'?f.checked:f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); });
+    if(vnen) vnen.addEventListener('change',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; if(f.tagName==='SELECT'||f.type==='checkbox'){ nenSetField(f.dataset.eid, f.dataset.nf, f.type==='checkbox'?f.checked:f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); } });
+    if(vnen) vnen.addEventListener('click',function(e){ var t=e.target.closest('[data-ntoggle]'); if(t){ var b=$('#nen-detail-'+t.dataset.ntoggle); if(b){ var op=b.style.display==='none'; b.style.display=op?'':'none'; t.textContent=op?'閉じる ▲':'年調の申告入力 ▾'; } } });
     // 帳票のサブ切替(賃金台帳/社保一覧/部署別)＋Excel
     var vcho=$('#view-cho'); if(vcho) vcho.addEventListener('click',function(e){
       var st=e.target.closest('[data-cho]'); if(st){ state.choView=st.dataset.cho; renderChoView(); return; }
@@ -1228,7 +1340,7 @@
   var PKEY='payslip_state_v1';
   // 保存時はcomputeが書く一時フィールド(_prorate/_wari/_shahoExemptThisMonth等)を除外→DB/LS汚染防止(in-memoryは描画用に保持)
   function stripTransient(e){ var o={}; for(var k in e){ if(Object.prototype.hasOwnProperty.call(e,k)&&k.charAt(0)!=='_') o[k]=e[k]; } return o; }
-  function snapshot(){ return { v:1, company:state.company, employees:(state.employees||[]).map(stripTransient), month:state.month, theme:state.theme, prefer:state.prefer, depts:state.depts, roles:state.roles, showRetired:state.showRetired, bonus:state.bonus, confirmed:state.confirmed }; }
+  function snapshot(){ return { v:1, company:state.company, employees:(state.employees||[]).map(stripTransient), month:state.month, theme:state.theme, prefer:state.prefer, depts:state.depts, roles:state.roles, showRetired:state.showRetired, bonus:state.bonus, confirmed:state.confirmed, nencho:state.nencho }; }
   var _saveT=null;
   function persistSave(){ try{ localStorage.setItem(PKEY, JSON.stringify(snapshot())); }catch(e){} if(window.Store&&Store.cloudSaveState){ try{ Store.cloudSaveState(snapshot()); }catch(e){} } try{ saveMonthlyPayslips(); }catch(e){}
     try{ var d=new Date(); state._savedAt=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); var ss=document.getElementById('save-status'); if(ss) ss.textContent='自動保存済 '+state._savedAt; }catch(e){} }
@@ -1244,6 +1356,7 @@
       if(s.depts) state.depts=s.depts; if(s.roles) state.roles=s.roles; if(s.showRetired!=null) state.showRetired=s.showRetired;
       if(s.bonus) state.bonus=s.bonus;
       if(s.confirmed) state.confirmed=s.confirmed;
+      if(s.nencho) state.nencho=s.nencho;
     }
     // クラウド(Supabase)が有効なら後から読み込んで上書き＋再描画
     reloadCloud();

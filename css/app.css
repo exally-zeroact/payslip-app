@@ -307,3 +307,9 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .bn.on{color:#3D9E72;}
 
 @media(min-width:880px){ .main{padding-bottom:84px;} }
+
+/* 年末調整(view-nen) 申告入力フォーム */
+.nen-detail .nsec{font-size:12px;font-weight:700;color:#2E7D54;margin:10px 0 4px;border-bottom:1px solid #eef3f0;padding-bottom:2px;}
+.nen-detail .nrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:5px 0;}
+.nen-detail .nlbl{font-size:11.5px;color:#3D6B53;min-width:96px;}
+.nen-detail .nlbl .hint2{display:block;font-size:9.5px;color:#9bb5a8;font-weight:400;}
