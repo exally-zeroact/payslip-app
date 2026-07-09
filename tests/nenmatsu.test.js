@@ -175,3 +175,30 @@ T('地震保険料控除: 地震のみ / 旧長期のみ / 併用(上限5万)', 
   eq(N.jishinKojo({ jishin: 40000, kyuChoki: 30000 }), 50000); // 40000+15000=55000→上限50000
   eq(N.jishinKojo({}), 0);
 });
+
+/* ── hydrate(中央上書き)→反映 / 不正はフォールバック / 令和8数値表のみ対象 ── */
+T('nenmatsu hydrate: 基礎控除表を中央値で上書き→computeに反映、正規値で復元=回帰ゼロ', function () {
+  var before = N.kisoKojoR8(3560000); // ≤489万→104万
+  eq(before, 1040000);
+  N.hydrate(2026, { kisoKojo: [{ upto: null, flat: 0 }] }); // 全域 基礎控除0
+  eq(N.kisoKojoR8(3560000), 0);
+  // 正規の令和8 基礎控除で復元
+  N.hydrate(2026, { kisoKojo: [{ upto: 4890000, flat: 1040000 }, { upto: 6550000, flat: 670000 }, { upto: 23500000, flat: 620000 }, { upto: 24000000, flat: 480000 }, { upto: 24500000, flat: 320000 }, { upto: 25000000, flat: 160000 }, { upto: null, flat: 0 }] });
+  eq(N.kisoKojoR8(3560000), before);
+});
+T('nenmatsu hydrate: 速算表を上書き→sanshutuShotokuZeiに反映、復元', function () {
+  var before = N.sanshutuShotokuZei(1730000); // 173万×5%=86500
+  eq(before, 86500);
+  N.hydrate(2026, { sanshutu: [{ upto: null, rate: 0.10, sub: 0 }] }); // 全域10%
+  eq(N.sanshutuShotokuZei(1730000), Math.floor(1730000 * 0.10));
+  N.hydrate(2026, { sanshutu: [{ upto: 1950000, rate: 0.05, sub: 0 }, { upto: 3300000, rate: 0.10, sub: 97500 }, { upto: 6950000, rate: 0.20, sub: 427500 }, { upto: 9000000, rate: 0.23, sub: 636000 }, { upto: 18000000, rate: 0.33, sub: 1536000 }, { upto: null, rate: 0.40, sub: 2796000 }] });
+  eq(N.sanshutuShotokuZei(1730000), before);
+});
+T('nenmatsu hydrate: 不正/部分/令和7以前は無視=フォールバック維持', function () {
+  var before = N.kisoKojoR8(3560000);
+  N.hydrate(2026, { kisoKojo: 'garbage' });
+  N.hydrate(2026, { kyuyoKojo: [] });
+  N.hydrate(2026, null);
+  N.hydrate(2025, { kisoKojo: [{ upto: null, flat: 0 }] }); // 令和7以前→no-op
+  eq(N.kisoKojoR8(3560000), before);
+});

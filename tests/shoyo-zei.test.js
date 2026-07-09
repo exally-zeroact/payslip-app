@@ -106,3 +106,64 @@ T('統合: 前月給与が無い(0)と源泉はspecialフラグ=自動算出し�
   var tax = SZ.calcBonusTax({ bonus: 500000, bonusSI: 77500, prevSalary: 0, prevSI: 0, fuyou: 0, payYm: '2026-12' });
   eq(tax.special, true); eq(tax.tax, 0);
 });
+
+/* ── hydrate(中央データ上書き・不正はフォールバック・回帰ゼロ) ── */
+T('hydrate rates: 率ラダー差替でbonusRateに反映・restoreで戻る', function () {
+  var base = SZ.bonusRate(290000, 0, { year: 2026 }).rate; // 6.126
+  eq(base, 6.126);
+  // idx=3 の率だけ 99.999 に差替(他の全率は不変にして境界維持)
+  var changed = [0.000, 2.042, 4.084, 99.999, 8.168, 10.210, 12.252, 14.294, 16.336, 18.378, 20.420, 22.462, 24.504, 26.546, 28.588, 30.630, 32.672, 35.735, 38.798, 41.861, 45.945];
+  var official = [0.000, 2.042, 4.084, 6.126, 8.168, 10.210, 12.252, 14.294, 16.336, 18.378, 20.420, 22.462, 24.504, 26.546, 28.588, 30.630, 32.672, 35.735, 38.798, 41.861, 45.945];
+  SZ.hydrate(2026, { rates: changed });
+  eq(SZ.bonusRate(290000, 0, { year: 2026 }).rate, 99.999); // idx=3 (260≤290<309)
+  SZ.hydrate(2026, { rates: official }); // restore
+  eq(SZ.bonusRate(290000, 0, { year: 2026 }).rate, 6.126); // 戻った
+});
+T('hydrate kou: 年度別扶養テーブル差替→率選択が変わる・restore', function () {
+  var origF0 = [0, 82, 94, 260, 309, 342, 372, 402, 433, 520, 605, 684, 715, 752, 795, 854, 922, 1318, 1521, 2621, 3495];
+  // 前月290千円で idx=3(6.126%)を、しきい値を上げて idx=2(4.084%)にする
+  var newKou = { 0: [0, 82, 94, 999, 309, 342, 372, 402, 433, 520, 605, 684, 715, 752, 795, 854, 922, 1318, 1521, 2621, 3495],
+    1: origF0, 2: origF0, 3: origF0, 4: origF0, 5: origF0, 6: origF0, 7: origF0 };
+  SZ.hydrate(2027, { kou: newKou });
+  eq(SZ.bonusRate(290000, 0, { year: 2027 }).rate, 4.084); // 94≤290<999
+  eq(SZ.bonusRate(290000, 0, { year: 2026 }).rate, 6.126); // 2026は不変
+});
+T('hydrate otsu: 乙欄テーブル差替・restore', function () {
+  SZ.hydrate(2028, { otsu: [[0, 11.111], [500, 22.222]] });
+  eq(SZ.bonusRate(100000, 0, { taxClass: 'otsu', year: 2028 }).rate, 11.111);
+  eq(SZ.bonusRate(600000, 0, { taxClass: 'otsu', year: 2028 }).rate, 22.222);
+  eq(SZ.bonusRate(100000, 0, { taxClass: 'otsu', year: 2026 }).rate, 10.210); // 2026不変
+});
+T('hydrate caps: kenpo_year_cap/kosei_per_cap 差替→calcBonusSIに反映・restore', function () {
+  SZ.hydrate(null, { kenpo_year_cap: 1000000, kosei_per_cap: 800000 });
+  var r = SZ.calcBonusSI({ bonus: 2000000, healthRate: 0.04955 });
+  eq(r.koseiBase, 800000);   // 上限差替
+  eq(r.kenpoBase, 1000000);  // 上限差替
+  // restore 公式値
+  SZ.hydrate(null, { kenpo_year_cap: 5730000, kosei_per_cap: 1500000 });
+  var r2 = SZ.calcBonusSI({ bonus: 2000000, healthRate: 0.04955 });
+  eq(r2.koseiBase, 1500000); eq(r2.kenpoBase, 2000000);
+});
+T('hydrate 不正/部分欠落はフォールバック(回帰ゼロ)', function () {
+  var before = SZ.bonusRate(290000, 0, { year: 2026 }).rate;
+  SZ.hydrate(2026, { rates: 'nope' });            // 非配列→skip
+  SZ.hydrate(2026, { rates: [1, 'x', 3] });        // 要素非number→skip
+  SZ.hydrate(2026, { kou: { 0: 'bad' } });         // 扶養1..7欠落→skip
+  SZ.hydrate(2026, { otsu: [[0]] });               // 2要素でない→skip
+  SZ.hydrate(2026, null);                          // null→no-op
+  SZ.hydrate(2026, { kenpo_year_cap: 'x' });       // 非number→skip
+  eq(SZ.bonusRate(290000, 0, { year: 2026 }).rate, before); // 不変
+  var r = SZ.calcBonusSI({ bonus: 2000000, healthRate: 0.04955 });
+  eq(r.kenpoBase, 2000000); eq(r.koseiBase, 1500000); // 上限フォールバック維持
+});
+T('hydrate kosei_ritsu_jugyoin: 上書き可・既定は0.0915のまま(shakaihoken-hyoロック維持)', function () {
+  // 既定確認(公式値ロック)
+  var d = SZ.calcBonusSI({ bonus: 500000, healthRate: 0.04955 });
+  eq(d.pension, SZ.han50(500000 * 0.0915));
+  // 上書き可能
+  SZ.hydrate(null, { kosei_ritsu_jugyoin: 0.10 });
+  eq(SZ.calcBonusSI({ bonus: 500000, healthRate: 0.04955 }).pension, SZ.han50(500000 * 0.10));
+  // restore 公式値
+  SZ.hydrate(null, { kosei_ritsu_jugyoin: 0.0915 });
+  eq(SZ.calcBonusSI({ bonus: 500000, healthRate: 0.04955 }).pension, SZ.han50(500000 * 0.0915));
+});

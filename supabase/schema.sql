@@ -206,3 +206,27 @@ begin
 end $$;
 -- init_code再発行(会社)はRLSで会社が直接 update pay_meisai_pub set init_code=..., pw_hash=null, device_tokens='{}', fail_count=0, locked_until=null でよい。
 grant execute on function meisai_auth(uuid,text), meisai_set_password(uuid,text,text), meisai_verify(uuid,text), get_meisai(uuid,text,text), set_meisai_consent(uuid,text,text), mark_meisai_opened(uuid,text,text,text) to anon;
+
+-- ================================================================
+-- 法定データ 中央テーブル(statutory) — 全アプリ(payslip-app/Exally)共通の単一ソース。
+--   kind×year で1行(jsonb)。司さん(ベンダー)が中央を1回更新→全国ユーザーへ一括反映(freee型)。
+--   各アプリは起動時に anon で読み、libの hydrate() でハードコード既定を上書き(取れなければフォールバック)。
+--   ★書込みは service_role/postgres のみ(=中央管理)。全ユーザーは読むだけ。
+--   収録kind: shakaihoken/saitei_chingin/koyo/shotokuzei_densan/shotokuzei_hei/shoyo/nenmatsu/warimashi/shouhizei
+--   ★seed(実値の投入)は scripts/statutory-migrate.mjs / statutory-migrate2.mjs が payslip-app の検証済みlibから流し込む(捏造なし・追記式)。
+--     新規Supabaseプロジェクトでは このDDL適用後に両スクリプトを1回実行すること(未実行時は各アプリがlibのハードコードで動く)。
+-- ================================================================
+create table if not exists statutory (
+  kind        text not null,
+  year        int  not null,
+  data        jsonb not null default '{}'::jsonb,
+  source_url  text,
+  verified_at date default now(),
+  updated_at  timestamptz not null default now(),
+  primary key (kind, year)
+);
+
+alter table statutory enable row level security;
+drop policy if exists statutory_read on statutory;
+create policy statutory_read on statutory for select using (true); -- 全員読取可(法定データは公開情報)
+grant select on statutory to anon, authenticated;                  -- 書込みGRANTは無し=service_role/postgresのみ更新

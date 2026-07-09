@@ -254,3 +254,41 @@ T('空入力 → 割増0', function () {
   var r = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8 });
   eq(r.total, 0); eq(r.lines.length, 0);
 });
+
+/* ── hydrate(中央データで法定率を上書き=将来の法改正配信) ── */
+T('hydrate: 正常データ(ot:1.30)でRATE/resolveRates/detailに反映→復元', function () {
+  eq(W.RATE.ot, 1.25); // 上書き前
+  W.hydrate({ ot: 1.30 });
+  eq(W.RATE.ot, 1.30, 'RATE.otが上書き');
+  eq(W.resolveRates().ot, 1.30, 'resolveRates既定もRATE参照で1.30');
+  // detailの時間外区分にも反映(合成式ot=RATE.ot)
+  var c = W.detailComponents({ ot: 60 });
+  var otLine = c.find(function (x) { return x.key === 'ot'; });
+  eq(otLine.rate, 1.30, 'detailComponentsのot率も1.30');
+  W.hydrate({ ot: 1.25 }); // 復元
+  eq(W.RATE.ot, 1.25); eq(W.resolveRates().ot, 1.25);
+});
+T('hydrate: 全キー(over60Add含む)上書き可→復元', function () {
+  W.hydrate({ ot: 1.5, otNight: 1.8, over60: 1.6, over60Night: 1.9, night: 0.3, holiday: 1.4, holidayNight: 1.7, over60Add: 0.35 });
+  eq(W.RATE.ot, 1.5); eq(W.RATE.otNight, 1.8); eq(W.RATE.over60, 1.6); eq(W.RATE.over60Night, 1.9);
+  eq(W.RATE.night, 0.3); eq(W.RATE.holiday, 1.4); eq(W.RATE.holidayNight, 1.7); eq(W.RATE.over60Add, 0.35);
+  eq(W.resolveRates().over60Add, 0.35, 'over60Add既定もRATE参照');
+  W.hydrate({ ot: 1.25, otNight: 1.5, over60: 1.5, over60Night: 1.75, night: 0.25, holiday: 1.35, holidayNight: 1.6, over60Add: 0.25 }); // 復元
+  eq(W.RATE.ot, 1.25); eq(W.RATE.over60Add, 0.25);
+});
+T('hydrate: 不正データ(null/非object/非数値/NaN/文字列)はフォールバック=RATE不変', function () {
+  W.hydrate(null); eq(W.RATE.ot, 1.25);
+  W.hydrate(undefined); eq(W.RATE.ot, 1.25);
+  W.hydrate('bad'); eq(W.RATE.ot, 1.25);
+  W.hydrate(42); eq(W.RATE.ot, 1.25);
+  W.hydrate({ ot: '1.30' }); eq(W.RATE.ot, 1.25, '文字列は非数値で無視');
+  W.hydrate({ ot: NaN }); eq(W.RATE.ot, 1.25, 'NaNは無視');
+  W.hydrate({ ot: null, holiday: 1.40 }); // 混在: 不正なotは無視・正常なholidayのみ適用
+  eq(W.RATE.ot, 1.25, '不正キーは維持'); eq(W.RATE.holiday, 1.40, '正常キーは適用');
+  W.hydrate({ holiday: 1.35 }); eq(W.RATE.holiday, 1.35); // 復元
+});
+T('hydrate: 未知キーは無視(RATEに存在するキーのみ)', function () {
+  W.hydrate({ bogus: 99, ot: 1.28 });
+  eq(W.RATE.ot, 1.28); eq(W.RATE.bogus, undefined, '未知キーは追加されない');
+  W.hydrate({ ot: 1.25 }); eq(W.RATE.ot, 1.25); // 復元
+});

@@ -1457,10 +1457,22 @@
     return Store.getStatutory().then(function(rows){
       if(!rows||!rows.length) return false; // 空=フォールバック
       var sh=SHH(), sa=SAI(), kh=KH(), applied=0;
+      // 数値表libのbare参照(index.htmlで先にロード済み・calc.js等は同一オブジェクト参照なので変異が伝播)
+      var dn=(typeof ShotokuzeiDensan!=='undefined'?ShotokuzeiDensan:window.ShotokuzeiDensan);
+      var hi=(typeof ShotokuzeiHei!=='undefined'?ShotokuzeiHei:window.ShotokuzeiHei);
+      var sz=(typeof SZ==='function'?SZ():(window.ShoyoZei));
+      var nn=(typeof Nen_==='function'?Nen_():(window.Nenmatsu));
+      var wm=(typeof Warimashi!=='undefined'?Warimashi:window.Warimashi);
       rows.forEach(function(r){ try{
         if(r.kind==='saitei_chingin' && sa&&sa.hydrate){ sa.hydrate(r.data); applied++; }
         else if(r.kind==='shakaihoken' && sh&&sh.hydrate){ sh.hydrate(r.year, r.data); applied++; }
         else if(r.kind==='koyo' && kh&&kh.hydrate){ kh.hydrate(r.year, r.data); applied++; }
+        else if(r.kind==='shotokuzei_densan' && dn&&dn.hydrate){ dn.hydrate(r.year, r.data); applied++; }
+        else if(r.kind==='shotokuzei_hei' && hi&&hi.hydrate){ hi.hydrate(r.year, r.data); applied++; }
+        else if(r.kind==='shoyo' && sz&&sz.hydrate){ sz.hydrate(r.year, r.data); applied++; }
+        else if(r.kind==='nenmatsu' && nn&&nn.hydrate){ nn.hydrate(r.year, r.data); applied++; }
+        else if(r.kind==='warimashi' && wm&&wm.hydrate){ wm.hydrate(r.data); applied++; }
+        // shouhizei(消費税)は給与明細では未使用(請求/見積=Exally側)
       }catch(e){} });
       if(applied){ var act=$('.screen.active'); if(act&&act.id) showScreen(act.id); } // 値が変わった可能性→表示中を再描画
       return applied>0;
