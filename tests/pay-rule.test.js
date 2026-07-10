@@ -17,6 +17,20 @@ T('evalPart 売上×率: 売上100万×35%=350000', function () {
   eq(P.evalPart({ type: 'rate', amount: 35 }, { sales: 1000000 }), 350000);
   eq(P.evalPart({ type: 'rate', amount: 3.5 }, { sales: 1000000 }), 35000); // 3.5%
 });
+T('evalPart 件数×単価: 1件1500円×80件=120000', function () {
+  eq(P.evalPart({ type: 'piece', amount: 1500 }, { count: 80 }), 120000);
+  eq(P.evalPart({ type: 'piece', amount: 1500 }, { count: 0 }), 0);
+});
+T('件数×単価は出来高性=歩合割増側(固定+件数×単価)', function () {
+  // 固定8万 + 件数×単価(1500×80=12万)=20万。件数分は歩合上乗せ側・固定は通常割増側
+  var r = P.basePay({ fixed: 80000, variable: { mode: 'one', parts: [{ type: 'piece', amount: 1500 }] } }, { count: 80 });
+  eq(r.base, 200000); eq(r.chosenType, 'piece'); eq(r.fixedForWari, 80000); eq(r.pieceworkForWari, 120000);
+});
+T('件数×単価 vs 時給保障 の高い方', function () {
+  // 件数1500×80=12万 vs 時給1200×160h=19.2万 → 高い方19.2万(保障)
+  var r = P.basePay({ fixed: 0, variable: { mode: 'max', parts: [{ type: 'piece', amount: 1500 }, { type: 'hourly', amount: 1200 }] } }, { count: 80, workMin: 9600 });
+  eq(r.base, 192000); eq(r.chosenType, 'hourly'); eq(r.pieceworkForWari, 0);
+});
 
 /* ── 基本給(固定+変動) ── */
 T('月給: 固定250000・変動なし', function () {

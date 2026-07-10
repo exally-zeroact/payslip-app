@@ -31,8 +31,30 @@
   // カスタム給の既定spec(固定 +「歩合 か 時給×時間 の高い方」)。payType=カスタムに切替時にlazy初期化。
   function defPayRule(){ return { fixed:'', variable:{ mode:'max', parts:[{type:'commission',amount:'',label:''},{type:'hourly',amount:'',label:''}] } }; }
   function ensurePayRule(e){ if(!e.payRule||!e.payRule.variable) e.payRule=defPayRule(); if(!e.payRule.variable.parts) e.payRule.variable.parts=[]; return e.payRule; }
+  // ── 給与パターン(テンプレ): 給料の「決め方＋既定の支給/控除項目」を名前付きで保存→他の従業員に適用 ──
+  //  ★人ごとの値(氏名/生年月日/扶養/都道府県/通勤/歩合額/売上等)は含めない=給与"構造"だけをテンプレ化★
+  var PAY_PATTERN_FIELDS=['payType','base','hourly','hourlyGuarantee','annualHolidays','dailyWorkH','dailyWorkM','minashiH'];
+  function makePayPattern(e,name){
+    var p={ id:uid(), name:(name||'パターン'), pay:{} };
+    PAY_PATTERN_FIELDS.forEach(function(k){ p.pay[k]=e[k]; });
+    p.pay.payRule = e.payRule?JSON.parse(JSON.stringify(e.payRule)):null;
+    p.pay.shikyuTpl=(e.shikyu||[]).filter(function(x){return !/基本給/.test(x.label||'');}).map(function(x){return x.label;}); // 基本給(自動)除く支給ラベル
+    p.pay.kojoTpl=(e.extraKojo||[]).map(function(x){return x.label;});
+    p.pay.wbInclude=(e.wbInclude||[]).slice(); p.pay.wbExclude=(e.wbExclude||[]).slice();
+    return p;
+  }
+  function applyPayPattern(e,p){
+    if(!p||!p.pay)return; var pay=p.pay;
+    PAY_PATTERN_FIELDS.forEach(function(k){ if(k in pay) e[k]=pay[k]; });
+    e.payRule = pay.payRule?JSON.parse(JSON.stringify(pay.payRule)):e.payRule;
+    var base=(e.shikyu||[]).filter(function(x){return /基本給/.test(x.label||'');}); // 既存の基本給(自動)は保持
+    e.shikyu=base.concat((pay.shikyuTpl||[]).map(function(lab){return {label:lab,value:'0'};}));
+    e.extraKojo=(pay.kojoTpl||[]).map(function(lab){return {label:lab,value:'0'};});
+    e.wbInclude=(pay.wbInclude||[]).slice(); e.wbExclude=(pay.wbExclude||[]).slice();
+    syncBasePay(e);
+  }
   // spec+当月コンテキストで基本給を評価(PayRule)。ctx=労働時間/出勤日数/売上。
-  function payRuleCtx(e){ return { workMin:workedMin(e), workDays:kintaiVal(e,/出勤/), sales:num(e.salesAmt), commission:num(e.commissionAmt) }; }
+  function payRuleCtx(e){ return { workMin:workedMin(e), workDays:kintaiVal(e,/出勤/), sales:num(e.salesAmt), commission:num(e.commissionAmt), count:num(e.pieceCount) }; }
   function payRuleResult(e){ var pr=PR(); if(!pr)return null; return pr.basePay(e.payRule||{}, payRuleCtx(e)); }
   // 就業状況。産休/育休=社保免除(自動off・上書き可)、介護休/病休=社保継続、休業=会社都合(休業手当)
   var WORK_STATUS=[['normal','通常'],['sankyu','産休'],['ikukyu','育休'],['kaigokyu','介護休'],['byoukyu','病気休職'],['kyugyo','休業(会社都合)']];
@@ -120,7 +142,7 @@
 
   function defEmp(name){
     return { id:uid(), name:name||'山田 太郎', no:'', birthYmd:'1980-05-15', dept:'', role:'',
-      payType:'月給', base:'250000', hourly:'1200', commissionAmt:'', hourlyGuarantee:'', salesAmt:'', payRule:null, fuyou:'1', pref:'tokyo', commute:'8400', commuteType:'public', commuteKm:'', residentTax:'12500', residentTaxMode:'monthly', residentTaxAnnual:'', residentTaxIkkatsu:false, bank:'',
+      payType:'月給', base:'250000', hourly:'1200', commissionAmt:'', hourlyGuarantee:'', salesAmt:'', pieceCount:'', payRule:null, fuyou:'1', pref:'tokyo', commute:'8400', commuteType:'public', commuteKm:'', residentTax:'12500', residentTaxMode:'monthly', residentTaxAnnual:'', residentTaxIkkatsu:false, bank:'',
       furiBankName:'', furiBankNo:'', furiBranchName:'', furiBranchNo:'', furiYokin:'普通', furiAccount:'', furiKana:'',
       annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0',
       kintai:[{label:'出勤日数',value:'21'},{label:'欠勤日数',value:'0'},{label:'有給取得',value:'1'}],
@@ -143,7 +165,7 @@
   var state={ company: defCompany(),
     month:'2026-06', prefer:'col2_1', theme:{accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}, depts:['営業部'], roles:['課長','主任','一般'],
     employees:[defEmp('山田 太郎')], open:{},
-    inputMode:'monthly', printMode:'monthly', empFilter:'active', bonus:{ payYm:'', payDay:'', byEmp:{} }, confirmed:{}, nencho:{}, onboardDone:false };
+    inputMode:'monthly', printMode:'monthly', empFilter:'active', bonus:{ payYm:'', payDay:'', byEmp:{} }, confirmed:{}, nencho:{}, onboardDone:false, payPatterns:[] };
 
   // マイカー通勤 1か月非課税限度(片道km・国税庁No.2585 令和8年4月〜)★12区分 公式照合済2026-07★
   function carCommuteNonTax(km){ km=num(km);
@@ -435,8 +457,8 @@
   // カスタム給の「決め方」編集UI(固定給 + 変動{なし/1つ/高い方} + 部品)。歩合額/売上は毎月「入力」タブ。
   function payRuleEditor(e,i){
     var pr=ensurePayRule(e); var v=pr.variable||{mode:'none',parts:[]};
-    var TYPES=[['hourly','時給×時間'],['daily','日給×日数'],['commission','歩合(出来高)'],['rate','売上×率(%)'],['fixed','固定額']];
-    var amtPh=function(t){ return t==='hourly'?'時給':t==='daily'?'日給':t==='rate'?'率%':t==='fixed'?'金額':''; };
+    var TYPES=[['hourly','時給×時間'],['daily','日給×日数'],['piece','件数×単価'],['commission','歩合(出来高)'],['rate','売上×率(%)'],['fixed','固定額']];
+    var amtPh=function(t){ return t==='hourly'?'時給':t==='daily'?'日給':t==='piece'?'単価':t==='rate'?'率%':t==='fixed'?'金額':''; };
     var partsHtml=(v.parts||[]).map(function(p,idx){ var isCom=(p.type==='commission');
       return '<div class="bx-row">'
         +'<select class="finput pr-type" data-prtype="'+i+':'+idx+'" style="flex:1.3;min-width:0">'+TYPES.map(function(t){return '<option value="'+t[0]+'"'+(p.type===t[0]?' selected':'')+'>'+t[1]+'</option>';}).join('')+'</select>'
@@ -452,6 +474,15 @@
       +'<div class="ri-note" style="margin:4px 2px 0">例）固定18万＋「売上×率35% か 時給1200×時間 の高い方」＝固定給18万・決め方「高い方」・部品〔売上×率:35〕〔時給×時間:1200〕。歩合額・売上は毎月「入力」タブで。</div>'
       +'</div>';
   }
+  // 給与パターンの適用select＋保存ボタン(従業員カード基本欄)
+  function payPatternRow(e,i){
+    var pats=state.payPatterns||[];
+    return '<div class="frow"><div class="flabel">給与パターン<span class="hint2">任意</span></div>'
+      +'<div style="display:flex;gap:6px;align-items:center">'
+      +(pats.length?'<select class="finput pat-apply" data-i="'+i+'" style="flex:1"><option value="">— 選んで適用 —</option>'+pats.map(function(p){return '<option value="'+attr(p.id)+'">'+esc(p.name)+'</option>';}).join('')+'</select>':'<span style="flex:1;font-size:11px;color:#8FA89A">まだパターンがありません</span>')
+      +'<button class="btn-ghost pat-save" data-i="'+i+'" style="padding:9px 10px;white-space:nowrap;font-size:12px">この設定を保存</button></div></div>'
+      +'<div class="hint" style="margin:2px 2px 8px">'+(pats.length?'選ぶと 給与形態・決め方・支給/控除項目 をこの人に反映（氏名・扶養・通勤などは変わりません）。':'「この設定を保存」で いまの給与形態・決め方・項目 を"パターン"化 → 他の人へ一括適用できます。')+'</div>';
+  }
   function empCardBody(e,i){
     var dOpen=!!state.open['D'+e.id];
     var payField=(e.payType==='時給'?'hourly':e.payType==='歩合'?'hourlyGuarantee':'base');
@@ -464,6 +495,7 @@
         : '<div class="frow2"><div class="frow"><div class="flabel">給与形態</div><select class="finput m-f" data-f="payType">'+PAYTYPES.map(function(p){return '<option'+(p===e.payType?' selected':'')+'>'+p+'</option>';}).join('')+'</select></div>'
           +'<div class="frow"><div class="flabel">'+amtLabel+'<span class="hint2">円'+(e.payType==='歩合'?'/時':'')+'</span></div><input class="finput num m-f" data-f="'+payField+'" inputmode="numeric" value="'+attr(fmtN(e[payField]))+'"></div></div>'
           +(e.payType==='歩合'?'<div class="ri-note" style="margin:-4px 2px 8px">歩合給額は毎月「入力」タブで。基本給＝歩合実績と保障給（保障時給×総労働時間）の高い方（労基27条）。割増は歩合給÷総労働時間に上乗せ。</div>':''))
+      +payPatternRow(e,i)
       +(function(){ var mw=minWageInfo(e); if(!mw||mw.ok) return ''; return '<div class="cr-warn" style="margin:0 2px 8px">⚠ 最低賃金（'+esc(mw.prefName)+' 時給'+fmtN(mw.minWage)+'円）を下回っています（約'+fmtN(mw.hourly)+'円）</div>'; })()
       +'<div class="frow2"><div class="frow"><div class="flabel">都道府県<span class="hint2">健保率</span></div><select class="finput m-f" data-f="pref">'+prefOptions(e.pref)+'</select></div>'
         +'<div class="frow"><div class="flabel">通勤手当<span class="hint2">円/月</span><span class="help-i" data-help="commute">💡</span></div><input class="finput num m-f" data-f="commute" inputmode="numeric" value="'+attr(fmtN(e.commute))+'"></div></div>';
@@ -606,7 +638,9 @@
     var groups={}; var order=[];
     state.employees.forEach(function(e,i){ if(!empMatchesFilter(e)) return; var g=e.dept||'未分類'; if(!groups[g]){groups[g]=[];order.push(g);} groups[g].push(i); });
     var html='<div class="emp-filter">'+FILTERS.map(function(f){ return '<b class="ef-b'+(filt===f[0]?' on':'')+'" data-empfilter="'+f[0]+'">'+f[1]+'<span class="ef-n">'+f[2]+'</span></b>'; }).join('')+'</div>';
-    html+='<div class="hint" style="margin:0 2px 8px">カードを左にスワイプ＝削除（または開いて下の「削除」）。休暇・退職もここで（カードを開いて設定）。</div>';
+    var pats=state.payPatterns||[];
+    if(pats.length) html+='<div class="pat-strip"><span class="pat-strip-l">給与パターン</span>'+pats.map(function(p){ return '<span class="pat-chip">'+esc(p.name)+'<b class="pat-del" data-patdel="'+attr(p.id)+'">×</b></span>'; }).join('')+'</div>';
+    html+='<div class="hint" style="margin:0 2px 8px">カードを左にスワイプ＝削除（または開いて下の「削除」）。休暇・退職もここで（カードを開いて設定）。'+(pats.length?'給与パターンは各カードの「給与パターン」で適用/保存。':'')+'</div>';
     if(!order.length) html+='<p class="hint" style="margin:8px 2px">この絞り込みに該当する人はいません。</p>';
     order.forEach(function(g){
       if(anyDept) html+='<div class="grp-hd">'+esc(g)+'（'+groups[g].length+'名）</div>';
@@ -712,9 +746,10 @@
         +'<div class="basepay-note">'+basePayNoteOnly(e)+'</div>'
         +'<div style="font-size:10px;color:#7aa08c;margin:-4px 2px 8px">保障給の時給は「設定▸従業員マスタ」で。割増は下の「歩合の上乗せ」で。</div></div>'; }
     if(e.payType==='カスタム'){ var spc=ensurePayRule(e); var prts=(spc.variable&&spc.variable.parts)||[];
-      var hasCom=prts.some(function(p){return p.type==='commission';}), hasRate=prts.some(function(p){return p.type==='rate';});
+      var hasCom=prts.some(function(p){return p.type==='commission';}), hasRate=prts.some(function(p){return p.type==='rate';}), hasPiece=prts.some(function(p){return p.type==='piece';});
       var hh='<div class="grp"><div class="grp-h">給与（カスタム）</div>';
       if(hasCom) hh+='<label class="ic-f ic-f2"><span>歩合額<small>円</small></span><input class="finput num cm-f ic-in" data-cmf="commissionAmt" inputmode="numeric" placeholder="0" value="'+attr(fmtN(e.commissionAmt))+'"></label>';
+      if(hasPiece) hh+='<label class="ic-f ic-f2"><span>当月の件数<small>件</small></span><input class="finput num cm-f ic-in" data-cmf="pieceCount" inputmode="numeric" placeholder="0" value="'+attr(fmtN(e.pieceCount))+'"></label>';
       if(hasRate) hh+='<label class="ic-f ic-f2"><span>当月の売上<small>円</small></span><input class="finput num cm-f ic-in" data-cmf="salesAmt" inputmode="numeric" placeholder="0" value="'+attr(fmtN(e.salesAmt))+'"></label>';
       hh+='<div class="basepay-note">'+basePayNoteOnly(e)+'</div>';
       hh+='<div style="font-size:10px;color:#7aa08c;margin:-4px 2px 8px">決め方（固定・時給・率など）は「設定▸従業員マスタ」で。割増は下で。</div></div>';
@@ -1520,6 +1555,7 @@
       var md=ev.target.closest('[data-movedn]'); if(md){ moveEmp(+md.dataset.movedn,1); return; }
       if(ev.target.dataset.goleave!=null){ var gl=+ev.target.dataset.goleave; var ge=state.employees[gl]; state.open[ge.id]=true; state.open['D'+ge.id]=true; renderEmpMaster(); return; } // カードの詳細(就業状況)を開く=1経路に集約
       if(ev.target.dataset.goretire!=null){ var gr=+ev.target.dataset.goretire; if(activeEmps().length<=1){ uiAlert('稼働中は最低1名必要です'); return; } uiConfirm((state.employees[gr].name||'この従業員')+' を退職にします。給与計算・印刷の対象から外れます（データは残ります）。').then(function(ok){ if(!ok)return; state.employees[gr].retired=true; state.employees[gr].retiredYmd=state.month; renderEmpMaster(); }); return; }
+      var pdl=ev.target.closest('[data-patdel]'); if(pdl){ var pdid=pdl.dataset.patdel; uiConfirm('この給与パターンを削除しますか？（適用済みの従業員の設定は変わりません）').then(function(ok){ if(!ok)return; state.payPatterns=(state.payPatterns||[]).filter(function(x){return x.id!==pdid;}); renderEmpMaster(); if(window.persistSaveDebounced)persistSaveDebounced(); }); return; } // パターン削除
       var card=ev.target.closest('.mco');
       var tg=ev.target.closest('[data-toggle]');
       if(tg){ var ti=+tg.dataset.toggle; var e=state.employees[ti]; state.open[e.id]=!state.open[e.id]; renderEmpMaster(); return; }
@@ -1537,6 +1573,7 @@
         renderEmpMaster(); return; }
       if(ev.target.classList.contains('chip')){ var key=ev.target.dataset.chip, lab=ev.target.dataset.lab; var arr=emp[key]; var idx=arr.findIndex(function(x){return x.label===lab;}); if(idx>=0)arr.splice(idx,1); else arr.push({label:lab,value:'0'}); renderEmpMaster(); return; }
       if(ev.target.classList.contains('ac-btn')){ var g=ev.target.dataset.g; var inp=ev.target.previousElementSibling; var val=(inp.value||'').trim(); if(val){ emp[g].push({label:val,value:'0'}); renderEmpMaster(); } return; }
+      if(ev.target.classList.contains('pat-save')){ uiPrompt('パターン名を入力','','例：ドライバー・事務・バイト').then(function(nm){ nm=(nm||'').trim(); if(!nm)return; if(!state.payPatterns)state.payPatterns=[]; state.payPatterns.push(makePayPattern(emp,nm)); renderEmpMaster(); if(window.persistSaveDebounced)persistSaveDebounced(); toast('パターン「'+nm+'」を保存しました'); }); return; } // 給与パターン保存
       if(ev.target.closest('[data-pradd]')){ ensurePayRule(emp).variable.parts.push({type:'hourly',amount:''}); renderEmpMaster(); return; } // カスタム給: 部品追加
       var prd=ev.target.closest('[data-prdel]'); if(prd){ ensurePayRule(emp).variable.parts.splice(+String(prd.dataset.prdel).split(':')[1],1); renderEmpMaster(); return; } // 部品削除
       if(ev.target.classList.contains('m-retire')){ if(!emp.retired){ uiConfirm((emp.name||'この従業員')+' を退職にします。給与計算・印刷の対象から外れます（データは残ります）。').then(function(ok){ if(!ok)return; emp.retired=true; emp.retiredYmd=state.month; state.open[emp.id]=false; renderEmpMaster(); }); } else { emp.retired=false; renderEmpMaster(); } return; }
@@ -1545,6 +1582,7 @@
     el.addEventListener('change',function(ev){
       var card=ev.target.closest('.mco'); if(!card)return; var i=+card.dataset.i; var emp=state.employees[i];
       if(ev.target.classList.contains('sh-days')){ renderEmpMaster(); return; }
+      if(ev.target.classList.contains('pat-apply')){ var pid=ev.target.value; if(!pid){ renderEmpMaster(); return; } var pat=(state.payPatterns||[]).find(function(x){return x.id===pid;}); if(pat){ uiConfirm('「'+pat.name+'」を '+(emp.name||'この従業員')+' に適用します。給与形態・決め方・支給/控除項目が置き換わります（氏名・扶養・通勤などは変わりません）。よろしいですか？').then(function(ok){ if(!ok){ renderEmpMaster(); return; } applyPayPattern(emp,pat); renderEmpMaster(); if(window.persistSaveDebounced)persistSaveDebounced(); toast('「'+pat.name+'」を適用しました'); }); } return; } // 給与パターン適用
       // カスタム給の決め方(mode/部品type/固定給/部品金額)。data-f無しなので先に処理
       if(ev.target.dataset.prmode!=null){ ensurePayRule(emp).variable.mode=ev.target.value; renderEmpMaster(); return; }
       var prt=ev.target.closest('[data-prtype]'); if(prt){ var _pt=ensurePayRule(emp).variable.parts[+String(prt.dataset.prtype).split(':')[1]]; if(_pt)_pt.type=prt.value; renderEmpMaster(); return; }
@@ -1728,7 +1766,7 @@
   var PKEY='payslip_state_v1';
   // 保存時はcomputeが書く一時フィールド(_prorate/_wari/_shahoExemptThisMonth等)を除外→DB/LS汚染防止(in-memoryは描画用に保持)
   function stripTransient(e){ var o={}; for(var k in e){ if(Object.prototype.hasOwnProperty.call(e,k)&&k.charAt(0)!=='_') o[k]=e[k]; } return o; }
-  function snapshot(){ return { v:1, company:state.company, employees:(state.employees||[]).map(stripTransient), month:state.month, theme:state.theme, prefer:state.prefer, depts:state.depts, roles:state.roles, showRetired:state.showRetired, bonus:state.bonus, confirmed:state.confirmed, nencho:state.nencho, onboardDone:state.onboardDone }; }
+  function snapshot(){ return { v:1, company:state.company, employees:(state.employees||[]).map(stripTransient), month:state.month, theme:state.theme, prefer:state.prefer, depts:state.depts, roles:state.roles, showRetired:state.showRetired, bonus:state.bonus, confirmed:state.confirmed, nencho:state.nencho, onboardDone:state.onboardDone, payPatterns:state.payPatterns }; }
   var _saveT=null;
   function persistSave(){ try{ localStorage.setItem(PKEY, JSON.stringify(snapshot())); }catch(e){} if(window.Store&&Store.cloudSaveState){ try{ Store.cloudSaveState(snapshot()); }catch(e){} } try{ saveMonthlyPayslips(); }catch(e){}
     try{ var d=new Date(); state._savedAt=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); var ss=document.getElementById('save-status'); if(ss) ss.textContent='自動保存済 '+state._savedAt; }catch(e){} }
@@ -1745,6 +1783,7 @@
       if(s.bonus) state.bonus=s.bonus;
       if(s.confirmed) state.confirmed=s.confirmed;
       if(s.nencho) state.nencho=s.nencho;
+      if(s.payPatterns) state.payPatterns=s.payPatterns;
       if(s.onboardDone) state.onboardDone=true;
     }
     // クラウド(Supabase)が有効なら後から読み込んで上書き＋再描画
@@ -1757,6 +1796,7 @@
     if(cs.bonus)state.bonus=cs.bonus;
     if(cs.confirmed)state.confirmed=cs.confirmed;
     if(cs.nencho)state.nencho=cs.nencho; // 年末調整の申告入力もクラウド復元(漏れ修正)
+    if(cs.payPatterns)state.payPatterns=cs.payPatterns;
     if(cs.onboardDone)state.onboardDone=true;
     state._prevYm=null; state._bonusPrevYm=null; // クラウド復元で前月比キャッシュを無効化(stale防止)
     $$('.scr-month').forEach(function(m){ m.value=state.month; }); fillCompany(); var act=$('.screen.active'); if(act)showScreen(act.id); return true; }

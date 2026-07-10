@@ -223,6 +223,12 @@ input[type="date"].finput:not(.finput-sm),input[type="month"].finput:not(.finput
 .pr-box{border:1px dashed #cfe6da;border-radius:10px;padding:8px 10px 10px;margin:2px 0 10px;background:#fafdfb;}
 .pr-box .frow{margin-bottom:7px;}
 .pr-type{font-size:12px;padding:7px 8px;}
+/* 給与パターンの管理ストリップ */
+.pat-strip{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 2px 8px;}
+.pat-strip-l{font-size:11px;color:#7aa08c;font-weight:700;}
+.pat-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;background:#EAF4EE;color:#2E7D54;border-radius:14px;padding:4px 6px 4px 11px;font-weight:700;}
+.pat-chip .pat-del{color:#8FB3A1;cursor:pointer;font-weight:700;width:18px;height:18px;line-height:18px;text-align:center;border-radius:50%;}
+.pat-chip .pat-del:active{background:#d7ebe0;}
 .hint{font-size:11px;color:#7aa08c;line-height:1.6;margin-top:6px;}
 
 /* ---- buttons / chips ---- */
