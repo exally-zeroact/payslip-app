@@ -69,6 +69,7 @@
     <div class="scr-head"><span class="scr-sub scr-period" id="in-month"></span><div class="scr-month-wrap"><label>対象月</label><input type="month" class="finput finput-sm scr-month"></div></div>
     <div class="imode-seg"><b class="imode on" data-imode="monthly">月次給与</b><b class="imode" data-imode="bonus">賞与</b></div>
     <p class="hint" id="in-hint">従業員をタップすると当月の変動値（勤怠・時数・変動手当）を入力できます。法定控除（健保/厚年/介護/雇用/所得税）は自動計算されます。</p>
+    <input type="file" id="kintai-file" accept=".csv,text/csv" style="display:none">
     <div id="input-list"></div>
     <div id="bonus-view" style="display:none"></div>
   </section>
@@ -140,6 +141,7 @@
 <script src="lib/saitei-chingin.js"></script>
 <script src="lib/nenmatsu.js"></script>
 <script src="lib/zengin.js"></script>
+<script src="lib/kintai-csv.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="lib/payslip-xlsx.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

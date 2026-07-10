@@ -31,6 +31,7 @@
   var WORK_STATUS=[['normal','通常'],['sankyu','産休'],['ikukyu','育休'],['kaigokyu','介護休'],['byoukyu','病気休職'],['kyugyo','休業(会社都合)']];
   var WS_LABEL=function(k){ var f=WORK_STATUS.find(function(x){return x[0]===k;}); return f?f[1]:'通常'; };
   var HELP={
+    kintaicsv:{ t:'💡 勤怠CSV取込', b:'他社の勤怠システム（KING OF TIME・ジョブカン勤怠など）や自作Excelから出した<b>勤怠CSV</b>を取り込んで、当月の入力に反映します。<b>打刻機能は持ちません</b>（集計済みCSVを流し込むだけ）。\n\n● 取り込む列（見出しで自動判定・表記ゆれOK）：氏名／出勤日数／欠勤／有給／労働時間／残業／深夜／休日。\n● 氏名で従業員に自動照合（「従業員番号」列があればそれを優先）。一致しない人は反映されず一覧で表示します。\n● 労働/残業/深夜/休日の時間は「160:30」「160.5」「160」どれでもOK。\n● 反映後も各自 手修正できます（上書きされるのは取り込んだ項目だけ）。\n\n※CSVはExcel(Shift-JIS)・UTF-8どちらも自動判別します。' },
     furidata:{ t:'💡 総合振込データ（全銀ファイル）', b:'給与を銀行の<b>「総合振込」</b>でまとめて振り込むためのデータです。\n\n● <b>全銀ファイル</b>＝銀行のインターネットバンキング等に取り込む固定長データ（全銀協規定形式・Shift-JIS）。手入力の振込を無くせます。\n● <b>振込一覧Excel</b>＝銀行のWeb画面に手で入れる場合や、確認用の一覧。\n\n【必要な準備】\n① 各従業員の<b>設定 ▸ 従業員マスタ ▸ 総合振込データ用</b>に、銀行コード(4桁)・支店コード(3桁)・科目・口座番号(7桁)・受取人名(半角ｶﾅ)を入力。\n② ここの<b>委託者情報</b>（委託者コード・自社の銀行/支店/口座）を入力。値は取引銀行から通知されます。\n\n※振込金額＝各人の<b>差引支給額（手取り）</b>。振込先が未入力の人は全銀ファイルから除外されます（一覧Excelには載ります）。' },
     bonusPrev:{ t:'💡 賞与の所得税と「前月の給与（社保後）」', b:'賞与（ボーナス）の所得税は、月給とは別の<b>「賞与に対する源泉徴収税額の算出率の表」</b>で決まります。\n\n● 使う数字＝<b>前月の給与から社会保険料（健保・厚年・雇用・介護）を引いた後の金額</b>と<b>扶養人数</b>。\n● この2つで「税率（％）」が決まり、賞与額（社保を引いた後）にかけて所得税を出します。\n● 前月の給与をこのアプリで計算・保存していれば<b>自動</b>で入ります。無ければ手入力してください（給与明細の「差引」ではなく、社会保険料を引いた額）。\n\n【特例＝手計算になる場合】\n● 前月に給与が無い、または\n● 賞与（社保後）が前月給与（社保後）の<b>10倍を超える</b>とき\n→ この表が使えず、<b>月額表</b>で計算します（税額が変わるため手計算が必要）。' },
     fuyou:{ t:'💡 扶養人数とは？（配偶者含む）', b:'所得税の計算に使う「扶養親族等の数」です。次の合計人数を入れます。\n\n● <b>源泉控除対象配偶者</b>：1人と数える\n　＝あなたが扶養している配偶者で、配偶者の年収が約150万円以下が目安。\n● <b>控除対象扶養親族</b>：16歳以上で扶養している家族（子・親など）の人数。\n\n※年齢はその年の<b>12月31日時点</b>で判定。<b>16歳未満は数えません（0人）</b>。\n※共働きで配偶者に十分な収入がある場合、配偶者は0。\n\n例）専業主婦の妻＋高校生1人＋5歳の子 → <b>2</b>（妻1＋高校生1。5歳は16歳未満で0）' },
@@ -687,6 +688,45 @@
     if(pr&&pr.mid) msg.push('月中退職のため当月の社保（健保・厚年・介護）は徴収しません（資格喪失=退職日翌日・前月分まで／雇用保険は実支払分）');
     if(!(pr&&pr.prorate)&&lw&&lw.partial&&lw.noWork>0) msg.push((e.workStatus==='ikukyu'?'育休':'産休')+'で当月の所定'+lw.total+'日のうち'+lw.noWork+'日が不就労のため控除（就労'+(lw.total-lw.noWork)+'日分を支給）。社保は月末基準で免除・所得税/雇用保険は就労分に発生');
     return msg.length?'<div class="cr-warn" style="margin:0 12px 10px">⚠ '+msg.join('。')+'。</div>':''; }
+  // ── 勤怠CSV取込(他社勤怠/Excel→当月の給与入力へ。打刻は作らない) ──
+  function findEmpForKintai(row){
+    var emps=state.employees.filter(function(e){ return isActiveInMonth(e,state.month); });
+    if(row.no){ var byNo=emps.filter(function(e){ return String(e.no||'').trim()!=='' && String(e.no).trim()===String(row.no).trim(); })[0]; if(byNo) return byNo; }
+    var nm=String(row.name||'').replace(/\s|　/g,''); if(!nm) return null;
+    return emps.filter(function(e){ return String(e.name||'').replace(/\s|　/g,'')===nm; })[0]||null;
+  }
+  function setKintaiVal(e, re, label, v){ if(v==null) return; var k=e.kintai||(e.kintai=[]); var it=null; for(var i=0;i<k.length;i++){ if(re.test(k[i].label||'')){ it=k[i]; break; } } if(it) it.value=String(v); else k.push({label:label,value:String(v)}); }
+  function applyKintaiRows(rows){
+    var applied=[], unmatched=[];
+    rows.forEach(function(row){ var e=findEmpForKintai(row); if(!e){ unmatched.push(row.name); return; }
+      setKintaiVal(e,/出勤/,'出勤日数',row.shukkin); setKintaiVal(e,/欠勤/,'欠勤日数',row.kekkin); setKintaiVal(e,/有給|有休/,'有給取得',row.yukyu);
+      if(row.workedMin!=null){ e.workedH=String(Math.floor(row.workedMin/60)); e.workedM=String(row.workedMin%60); }
+      if(row.otMin!=null||row.nightMin!=null||row.holidayMin!=null){ e.warimashi=e.warimashi||{}; e.warimashi.mode='easy';
+        if(row.otMin!=null){ e.warimashi.otH=String(Math.floor(row.otMin/60)); e.warimashi.otM=String(row.otMin%60); }
+        if(row.nightMin!=null){ e.warimashi.nightH=String(Math.floor(row.nightMin/60)); e.warimashi.nightM=String(row.nightMin%60); }
+        if(row.holidayMin!=null){ e.warimashi.holidayH=String(Math.floor(row.holidayMin/60)); e.warimashi.holidayM=String(row.holidayMin%60); }
+      }
+      applied.push(e.name);
+    });
+    return { applied:applied, unmatched:unmatched };
+  }
+  function importKintaiCsv(text){
+    if(typeof KintaiCsv==='undefined'){ alert('CSVモジュールが読み込まれていません'); return; }
+    var r=KintaiCsv.parse(text);
+    if(r.warnings.length){ alert('取り込めません:\n'+r.warnings.join('\n')); return; }
+    if(!r.rows.length){ alert('データ行がありません。'); return; }
+    var matched=0, unmatched=[]; r.rows.forEach(function(row){ if(findEmpForKintai(row)) matched++; else unmatched.push(row.name); });
+    var FN={shukkin:'出勤日数',kekkin:'欠勤日数',yukyu:'有給',worked:'労働時間',ot:'残業',night:'深夜',holiday:'休日'};
+    var cols=r.recognized.filter(function(f){ return f!=='name'&&f!=='no'; }).map(function(f){ return FN[f]||f; }).join('・')||'(なし)';
+    var msg='勤怠CSVを取り込みます（対象月 '+state.month+'）。\n\n認識した項目: '+cols+'\n反映される人: '+matched+'名'
+      +(unmatched.length?'\n⚠ 未一致（氏名が従業員と不一致）: '+unmatched.slice(0,10).join('・')+(unmatched.length>10?' 他':''):'')
+      +'\n\nこの内容で反映しますか？（反映後も各自 手修正できます）';
+    if(matched===0){ alert('一致する従業員がいません。CSVの氏名と従業員マスタの氏名を合わせてください。\n未一致: '+unmatched.join('・')); return; }
+    if(!confirm(msg)) return;
+    var ap=applyKintaiRows(r.rows);
+    renderInput(); persistSaveDebounced();
+    toast(ap.applied.length+'名の勤怠を反映しました'+(ap.unmatched.length?'（未一致 '+ap.unmatched.length+'名）':''));
+  }
   function renderInput(){
     var host=$('#input-list'); if(!host) return; loadPrev();
     var sche=scheduledDaysOf(state.month), H=HD();
@@ -698,6 +738,7 @@
         +'<b style="color:#2E7D54;font-size:13px">当月の所定労働日数 '+sche+'日</b>'
         +'<span style="font-size:10.5px;color:#7aa08c">（休みの曜日・祝日・会社休を除く）</span>'
         +'<button class="cal-fill" data-fillsche="'+sche+'" style="margin-left:auto;padding:7px 12px;border:1px solid #3D9E72;background:#fff;color:#2E7D54;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer">全員の出勤を所定('+sche+'日)で埋める</button>'
+        +'<button data-csvimport="1" style="padding:7px 12px;border:1px solid #C8ECD8;background:#fff;color:#3D6B53;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer" title="他社勤怠システム/Excelの勤怠CSVを取り込む">📄 勤怠CSV取込 <span class="help-i" data-help="kintaicsv" style="cursor:help">💡</span></button>'
       +'</div>'
       +'<div style="font-size:10.5px;color:#3D6B53;margin-top:5px">祝日: '+esc(holStr)+'</div>'
       +'<div style="font-size:10px;color:#7aa08c;margin-top:3px">出勤日数は所定を初期表示。各自で手修正できます（赤で止めません）。会社独自の休みは「設定▸会社の決まり」で追加できます。</div>'
@@ -1362,6 +1403,7 @@
         var hasManual=state.employees.some(function(emp){ if(!isActiveInMonth(emp,state.month))return false; var mi=kinIdx(emp,/出勤/); return mi>=0 && emp.kintai[mi].value!=='' && emp.kintai[mi].value!=null && String(emp.kintai[mi].value)!==String(sd); });
         if(hasManual && !confirm('手入力した出勤日数がある人も含めて、全員の出勤を所定（'+sd+'日）で上書きします。よろしいですか？')) return;
         state.employees.forEach(function(emp){ if(!isActiveInMonth(emp,state.month))return; ensureKintai(emp); var oi=kinIdx(emp,/出勤/); if(oi>=0) emp.kintai[oi].value=sd; }); renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
+      if(e.target.closest('[data-csvimport]')){ var kf=$('#kintai-file'); if(kf){ kf.value=''; kf.click(); } return; }
       var tg=e.target.closest('[data-toggle]');
       if(tg){ var i=+tg.dataset.toggle; var emp=state.employees[i]; state.open['I'+emp.id]=!state.open['I'+emp.id]; il.querySelector('.acc[data-i="'+i+'"]').classList.toggle('open'); return; }
       var wm=e.target.closest('.wi-mode'); if(wm){ var c1=e.target.closest('.acc'); var ci1=+c1.dataset.i; var em1=state.employees[ci1]; if(!em1.warimashi)em1.warimashi={}; em1.warimashi.mode=wm.dataset.wm; renderInput(); return; }
@@ -1406,6 +1448,16 @@
       function setFc(ev){ var el=ev.target.closest&&ev.target.closest('[data-fc]'); if(el){ state.company[el.getAttribute('data-fc')]=el.value; persistSaveDebounced(); } }
       fb.addEventListener('input', setFc); fb.addEventListener('change', setFc);
       fb.addEventListener('click', function(ev){ if(ev.target.closest('#b-zengin')){ downloadZengin(); } else if(ev.target.closest('#b-furixlsx')){ downloadFuriExcel(); } });
+    })();
+    // 勤怠CSV: ファイル選択→UTF-8で読み、文字化け/日本語なしならShift-JISで再デコード→取込
+    (function(){ var kf=$('#kintai-file'); if(!kf) return;
+      kf.addEventListener('change', function(ev){ var f=ev.target.files&&ev.target.files[0]; if(!f) return;
+        var rd=new FileReader(); rd.onload=function(){ var buf=rd.result, text='';
+          try{ text=new TextDecoder('utf-8',{fatal:false}).decode(buf); if(/�/.test(text) || !/[ぁ-んァ-ヴ一-龠]/.test(text)){ text=new TextDecoder('shift-jis').decode(buf); } }
+          catch(e){ try{ text=new TextDecoder('shift-jis').decode(buf); }catch(_){ text=''; } }
+          importKintaiCsv(text);
+        }; rd.readAsArrayBuffer(f);
+      });
     })();
     // モバイルの回転/リサイズでプレビューを再フィット(再描画せず軽く)
     var _fitT; window.addEventListener('resize',function(){ if(!$('#scr-print')||!$('#scr-print').classList.contains('active'))return; clearTimeout(_fitT); _fitT=setTimeout(fitPreview,120); });
