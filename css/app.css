@@ -206,7 +206,13 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .ui-modal-btn{flex:1;padding:11px;background:#EAF4EE;color:#3D6B53;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;}
 .ui-modal-btn.primary{background:#3D9E72;color:#fff;}
 .ui-modal-btn:active{filter:brightness(.95);}
-.finput-sm{padding:5px 8px;font-size:13px;width:auto;}
+.finput-sm{padding:5px 8px;font-size:13px;width:auto;min-height:36px;box-sizing:border-box;}
+/* スマホ全画面サイズ対応: タップ領域/native部品の正規化(iPhone WebKit/Android共通) */
+main input[type="checkbox"]{width:20px;height:20px;min-width:20px;accent-color:#3D9E72;cursor:pointer;vertical-align:middle;}
+/* native日付/月は iOS Safari で高さが潰れやすい→最低高さを固定して不揃いを防ぐ(finput-smの縮小版は除く) */
+input[type="date"].finput:not(.finput-sm),input[type="month"].finput:not(.finput-sm){min-height:44px;box-sizing:border-box;}
+/* 並べ替え矢印のタップ領域拡大(旧22x15=小) */
+.mco-ord .ord-b{width:30px;height:26px;font-size:11px;}
 .hint{font-size:11px;color:#7aa08c;line-height:1.6;margin-top:6px;}
 
 /* ---- buttons / chips ---- */

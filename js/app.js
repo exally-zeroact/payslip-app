@@ -594,8 +594,8 @@
       var hz='';
       if(g==='shikyu'){
         hz = labelAuto
-          ? '<label class="row-hz" title="項目名から自動で非課税" style="font-size:10px;color:#3D9E72;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:2px"><input type="checkbox" checked disabled style="width:13px;height:13px">非課税</label>'
-          : '<label title="チェックで所得税の非課税にする(社保は対象)" style="font-size:10px;color:'+(it.hikazei?'#3D9E72':'#A9C4B6')+';font-weight:'+(it.hikazei?'700':'400')+';white-space:nowrap;display:inline-flex;align-items:center;gap:2px"><input type="checkbox" class="ck" data-g="shikyu" data-ri="'+ri+'"'+(it.hikazei?' checked':'')+' style="width:13px;height:13px">非課税</label>';
+          ? '<label class="row-hz" title="項目名から自動で非課税" style="font-size:10px;color:#3D9E72;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:2px"><input type="checkbox" checked disabled>非課税</label>'
+          : '<label title="チェックで所得税の非課税にする(社保は対象)" style="font-size:10px;color:'+(it.hikazei?'#3D9E72':'#A9C4B6')+';font-weight:'+(it.hikazei?'700':'400')+';white-space:nowrap;display:inline-flex;align-items:center;gap:2px"><input type="checkbox" class="ck" data-g="shikyu" data-ri="'+ri+'"'+(it.hikazei?' checked':'')+'>非課税</label>';
       }
       return '<div class="row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px"><input class="finput" data-g="'+g+'" data-ri="'+ri+'" data-f="label" value="'+attr(it.label)+'" style="flex:1.3" placeholder="項目"><input class="finput num" data-g="'+g+'" data-ri="'+ri+'" data-f="value" value="'+attr(it.value)+'" style="flex:1" placeholder="'+(g==='kintai'?'値':'金額')+'">'+hz+'<button class="b-del m-del" data-g="'+g+'" data-ri="'+ri+'">×</button></div>';
     }).join('');
@@ -794,7 +794,7 @@
       +'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">'
         +'<b style="color:#2E7D54;font-size:13px">確認 '+cnt.done+'/'+cnt.total+'名</b>'
         +(cnt.need>0?'<span style="background:#fff8e1;border:1px solid #F4D8A8;color:#92500A;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">未確認 '+cnt.need+'名</span>':'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 全員確認済</span>')
-        +'<label style="font-size:11px;color:#3D6B53;display:inline-flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" data-reviewonly'+(reviewOnly?' checked':'')+' style="width:13px;height:13px">要確認だけ表示</label>'
+        +'<label style="font-size:11px;color:#3D6B53;display:inline-flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" data-reviewonly'+(reviewOnly?' checked':'')+'>要確認だけ表示</label>'
         +'<span id="save-status" style="margin-left:auto;font-size:10.5px;color:#A9C4B6">'+(state._savedAt?'自動保存済 '+esc(state._savedAt):'')+'</span>'
       +'</div>'
       +'<div style="font-size:10px;color:#7aa08c;margin-top:4px">前月と変わった人だけ「確認」を。変わっていない人は自動で確認済み扱いです。</div>'
@@ -808,8 +808,8 @@
       var open=state.open['I'+e.id], mw=minWageInfo(e);
       var cf=empConfirmed(e), nr=empNeedsReview(e,r);
       var confHTML = cf
-        ? '<label class="emp-conf" style="font-size:10.5px;color:#3D9E72;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:2px;cursor:pointer"><input type="checkbox" class="econf" data-econf="'+i+'" checked style="width:13px;height:13px">確認済</label>'
-        : nr ? '<label class="emp-conf" style="font-size:10.5px;color:#92500A;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:2px;cursor:pointer"><input type="checkbox" class="econf" data-econf="'+i+'" style="width:13px;height:13px">確認</label>'
+        ? '<label class="emp-conf" style="font-size:10.5px;color:#3D9E72;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:2px;cursor:pointer"><input type="checkbox" class="econf" data-econf="'+i+'" checked>確認済</label>'
+        : nr ? '<label class="emp-conf" style="font-size:10.5px;color:#92500A;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:2px;cursor:pointer"><input type="checkbox" class="econf" data-econf="'+i+'">確認</label>'
         : '';
       return '<div class="acc icard'+(open?' open':'')+'" data-i="'+i+'">'
         +'<div class="ic-top"><span class="acc-nm">'+esc(e.name)+wsBadge(e)+'</span><span class="acc-net">'+yen(r.net)+'</span><span class="diffb-wrap">'+diffBadge(e,r)+'</span>'+confHTML+'<button class="ic-detail" data-toggle="'+i+'">詳細<span class="acc-cv">▾</span></button></div>'
