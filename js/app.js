@@ -169,17 +169,17 @@
   function warimashiOf(e){
     if(!window.Warimashi) return {total:0,lines:[],unit:0};
     if(e.payType==='役員') return {total:0,lines:[],unit:0}; // 役員は割増(残業)の概念なし
-    if(e.payType==='歩合'){ // 出来高払=単価(基本給÷総労働時間)に時間外+0.25/深夜+0.25/法定休日+0.35の上乗せのみ(1.0は基本給に内包)
+    var co=state.company||{};
+    var pctRate=function(v){ return (v!=null&&v!=='')?num(v)/100:undefined; };
+    var rates={ ot:pctRate(co.rateOt), holiday:pctRate(co.rateHoliday), night:pctRate(co.rateNight), over60Add:pctRate(co.rateOver60) };
+    if(e.payType==='歩合'){ // 出来高払=単価(基本給÷総労働時間)に時間外+0.25/深夜+0.25/法定休日+0.35の上乗せのみ(1.0は基本給に内包)。会社の率上書きは歩合にも反映(rates)
       var wc=e.warimashi||{}; var segc={ ot:dmin({h:wc.otH,m:wc.otM}), night:dmin({h:wc.nightH,m:wc.nightM}), holiday:dmin({h:wc.holidayH,m:wc.holidayM}) };
       // ★割増の基礎は実際の基本給=高い方(歩合実績 vs 保障給)。保障給が効く月に割増が過小になるのを防ぐ(労基37条)
       var wmin=workedMin(e); var baseForWari=Warimashi.commissionBasePay(num(e.commissionAmt), e.hourlyGuarantee, wmin);
-      return Warimashi.commission({ commissionTotal:baseForWari, totalWorkMin:wmin, seg:segc }); }
-    var co=state.company||{};
+      return Warimashi.commission({ commissionTotal:baseForWari, totalWorkMin:wmin, seg:segc, rates:rates }); }
     var ah=(e.annualHolidays!=null&&e.annualHolidays!=='')?e.annualHolidays:co.annualHolidays; // 会社規定・従業員で任意上書き
     var dwh=(e.dailyWorkH!=null&&e.dailyWorkH!=='')?e.dailyWorkH:co.dailyWorkH;
     var dwm=(e.dailyWorkM!=null&&e.dailyWorkM!=='')?e.dailyWorkM:co.dailyWorkM;
-    var pctRate=function(v){ return (v!=null&&v!=='')?num(v)/100:undefined; };
-    var rates={ ot:pctRate(co.rateOt), holiday:pctRate(co.rateHoliday), night:pctRate(co.rateNight), over60Add:pctRate(co.rateOver60) };
     var ly=parseInt(String(state.month||'').slice(0,4),10)||0; var leap=(ly%4===0&&ly%100!==0)||(ly%400===0); // 対象月の年が閏年なら年間日数366(月平均所定の分母)
     var mh=(e.minashiH!=null&&e.minashiH!=='')?e.minashiH:co.minashiH; var minashiMin=num(mh)*60; // 固定残業(みなし)時間=会社規定・従業員で上書き可。時間外の基本割増から控除
     var w=e.warimashi||{}, common={ base:warimashiBasis(e), annualHolidays:ah, dailyHours:num(dwh)+num(dwm)/60, rates:rates, leap:leap };

@@ -175,6 +175,29 @@ T('歩合の割増: 保障給>歩合実績の月は割増単価も保障給ベ�
   var bad = W.commission({ commissionTotal: 100000, totalWorkMin: 200 * 60, seg: { ot: 20 * 60 } });
   eq(bad.total, 2500); ok(r.total > bad.total, '保障給ベースの方が大きい(過小でない)');
 });
+/* M2(2026-07-10): 会社の割増率上書きが歩合にも効く(silent-wrong修正・労基37条)。増分=R.ot-1/R.night/R.holiday-1 */
+T('歩合の割増率上書き: 会社が残業率1.30なら歩合の時間外増分0.30', function () {
+  // 単価1250・時間外10h。既定0.25→3125 / 上書き1.30→増分0.30→1250*0.30*10=3750
+  var d = W.commission({ commissionTotal: 200000, totalWorkMin: 160 * 60, seg: { ot: 10 * 60 } });
+  eq(d.total, 3125);
+  var r = W.commission({ commissionTotal: 200000, totalWorkMin: 160 * 60, seg: { ot: 10 * 60 }, rates: { ot: 1.30 } });
+  eq(r.total, 3750);
+});
+T('歩合の割増率上書き: 法定休日1.40=増分0.40・深夜0.30', function () {
+  // 単価1250・休日8h・深夜2h。上書き holiday1.40→0.40→1250*0.40*8=4000 / night0.30→1250*0.30*2=750
+  var r = W.commission({ commissionTotal: 200000, totalWorkMin: 160 * 60, seg: { holiday: 8 * 60, night: 2 * 60 }, rates: { holiday: 1.40, night: 0.30 } });
+  eq(r.total, 4000 + 750);
+});
+T('歩合の割増率: rates未指定/空は法定下限(0.25/0.25/0.35)=回帰ゼロ', function () {
+  var a = W.commission({ commissionTotal: 200000, totalWorkMin: 160 * 60, seg: { ot: 10 * 60, night: 2 * 60, holiday: 8 * 60 } });
+  var b = W.commission({ commissionTotal: 200000, totalWorkMin: 160 * 60, seg: { ot: 10 * 60, night: 2 * 60, holiday: 8 * 60 }, rates: {} });
+  eq(a.total, b.total);
+  eq(a.total, 3125 + 625 + 3500); // 既定=時間外3125+深夜625+休日3500
+});
+T('歩合の割増率: 不正な率<1.0(残業100%等)は増分0にクランプ=負の割増を防ぐ', function () {
+  var r = W.commission({ commissionTotal: 200000, totalWorkMin: 160 * 60, seg: { ot: 10 * 60, holiday: 8 * 60 }, rates: { ot: 1.00, holiday: 0.50 } });
+  eq(r.total, 0); // 増分 max(0,0)=0 / max(0,-0.5)=0 → 割増ゼロ(負にならない)
+});
 T('最低賃金チェック: 賃金÷総時間 ≧ 地域別最賃', function () {
   // 時給換算 192000/160=1200 → 東京1163以上=OK / 1100基準割れ
   eq(W.minWageOk(192000, 160 * 60, 1163), true);
