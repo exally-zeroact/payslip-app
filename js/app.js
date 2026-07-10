@@ -583,7 +583,7 @@
           +(op?empCardBody(e,i):'')+'</div>';
       });
     });
-    host.innerHTML=html;
+    var _sy=window.scrollY; host.innerHTML=html; if(_sy) window.scrollTo(0,_sy); // 全再描画でスクロール位置が飛ぶのを防ぐ(H2)
   }
 
   /* ---------- 入力（自動計算） ---------- */
@@ -800,9 +800,9 @@
           +'<div class="calc-wrap">'+calcBoxHTML(e)+'</div></div></div>';
     }).join('');
     var emptyMsg=(reviewOnly && !cards) ? '<p class="hint" style="text-align:center;padding:18px 0">要確認の人はいません（全員確認済み）。</p>' : '';
-    var confirmBtn='<div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px"><button class="btn-primary" data-confirm-month style="flex:0 0 auto;padding:11px 18px;font-size:14px">今月を確定</button>'
+    var confirmBtn='<div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px"><button class="btn-primary" data-confirm-month style="flex:0 0 auto;padding:11px 18px;font-size:14px">今月を確定（台帳・年調に反映）</button>'
       +(cnt.need>0?'<span style="font-size:11px;color:#92500A;font-weight:700">未確認 '+cnt.need+'名</span>':'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 確認済</span>')
-      +'<span style="font-size:10px;color:#7aa08c">確定すると全員を確認済みにして今月分を保存します（あとで直せます）。</span></div>';
+      +'<span style="font-size:10px;color:#7aa08c"><b>保存は自動</b>です。「確定」は全員を確認済みにし、<b>賃金台帳・年末調整の集計対象</b>として今月を記録します（あとで直せます）。</span></div>';
     host.innerHTML=statutoryStaleWarn()+calHTML+progHTML+cards+emptyMsg+confirmBtn;
   }
   function refreshCard(i){ var e=state.employees[i]; var card=$('#input-list .acc[data-i="'+i+'"]'); if(!card) return; var r=compute(e); card.querySelector('.acc-net').textContent=yen(r.net); var dw=card.querySelector('.diffb-wrap'); if(dw) dw.innerHTML=diffBadge(e,r); var cw=card.querySelector('.calc-wrap'); if(cw) cw.innerHTML=calcBoxHTML(e); var wr=card.querySelector('.wi-resw'); if(wr) wr.innerHTML=wiResHTML(e); }
