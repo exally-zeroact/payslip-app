@@ -31,6 +31,7 @@
   var WORK_STATUS=[['normal','通常'],['sankyu','産休'],['ikukyu','育休'],['kaigokyu','介護休'],['byoukyu','病気休職'],['kyugyo','休業(会社都合)']];
   var WS_LABEL=function(k){ var f=WORK_STATUS.find(function(x){return x[0]===k;}); return f?f[1]:'通常'; };
   var HELP={
+    furidata:{ t:'💡 総合振込データ（全銀ファイル）', b:'給与を銀行の<b>「総合振込」</b>でまとめて振り込むためのデータです。\n\n● <b>全銀ファイル</b>＝銀行のインターネットバンキング等に取り込む固定長データ（全銀協規定形式・Shift-JIS）。手入力の振込を無くせます。\n● <b>振込一覧Excel</b>＝銀行のWeb画面に手で入れる場合や、確認用の一覧。\n\n【必要な準備】\n① 各従業員の<b>設定 ▸ 従業員マスタ ▸ 総合振込データ用</b>に、銀行コード(4桁)・支店コード(3桁)・科目・口座番号(7桁)・受取人名(半角ｶﾅ)を入力。\n② ここの<b>委託者情報</b>（委託者コード・自社の銀行/支店/口座）を入力。値は取引銀行から通知されます。\n\n※振込金額＝各人の<b>差引支給額（手取り）</b>。振込先が未入力の人は全銀ファイルから除外されます（一覧Excelには載ります）。' },
     bonusPrev:{ t:'💡 賞与の所得税と「前月の給与（社保後）」', b:'賞与（ボーナス）の所得税は、月給とは別の<b>「賞与に対する源泉徴収税額の算出率の表」</b>で決まります。\n\n● 使う数字＝<b>前月の給与から社会保険料（健保・厚年・雇用・介護）を引いた後の金額</b>と<b>扶養人数</b>。\n● この2つで「税率（％）」が決まり、賞与額（社保を引いた後）にかけて所得税を出します。\n● 前月の給与をこのアプリで計算・保存していれば<b>自動</b>で入ります。無ければ手入力してください（給与明細の「差引」ではなく、社会保険料を引いた額）。\n\n【特例＝手計算になる場合】\n● 前月に給与が無い、または\n● 賞与（社保後）が前月給与（社保後）の<b>10倍を超える</b>とき\n→ この表が使えず、<b>月額表</b>で計算します（税額が変わるため手計算が必要）。' },
     fuyou:{ t:'💡 扶養人数とは？（配偶者含む）', b:'所得税の計算に使う「扶養親族等の数」です。次の合計人数を入れます。\n\n● <b>源泉控除対象配偶者</b>：1人と数える\n　＝あなたが扶養している配偶者で、配偶者の年収が約150万円以下が目安。\n● <b>控除対象扶養親族</b>：16歳以上で扶養している家族（子・親など）の人数。\n\n※年齢はその年の<b>12月31日時点</b>で判定。<b>16歳未満は数えません（0人）</b>。\n※共働きで配偶者に十分な収入がある場合、配偶者は0。\n\n例）専業主婦の妻＋高校生1人＋5歳の子 → <b>2</b>（妻1＋高校生1。5歳は16歳未満で0）' },
     shaho:{ t:'💡 社会保険（標準報酬月額）とは？', b:'毎月の健康保険・厚生年金・介護は「標準報酬月額」という<b>基準額×料率</b>で決まり、<b>原則1年は固定</b>（残業が多い月でも変わりません）。決め方は4つ：\n\n● <b>毎年の見直し(定時決定)</b>…毎年4〜6月の総支給の平均で決定（支払基礎日数17日以上の月で平均）。9月分〜翌8月分に適用。\n● <b>入社したばかり(資格取得)</b>…実績が無いので入社時の見込み月額で決定。\n● <b>給料が変わった(随時改定)</b>…固定給が変わり3か月平均で2等級以上動いたら途中改定。\n● <b>金額が分かる(直接入力)</b>…決定通知書・額表の額をそのまま。\n\n※支払基礎日数＝給料を払った対象日数。月給は原則その月の暦日数。17日未満の月は平均から外します。' },
@@ -111,6 +112,7 @@
   function defEmp(name){
     return { id:uid(), name:name||'山田 太郎', no:'', birthYmd:'1980-05-15', dept:'', role:'',
       payType:'月給', base:'250000', hourly:'1200', commissionAmt:'', hourlyGuarantee:'', fuyou:'1', pref:'tokyo', commute:'8400', commuteType:'public', commuteKm:'', residentTax:'12500', residentTaxMode:'monthly', residentTaxAnnual:'', residentTaxIkkatsu:false, bank:'',
+      furiBankName:'', furiBankNo:'', furiBranchName:'', furiBranchNo:'', furiYokin:'普通', furiAccount:'', furiKana:'',
       annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0',
       kintai:[{label:'出勤日数',value:'21'},{label:'欠勤日数',value:'0'},{label:'有給取得',value:'1'}],
       shikyu:[{label:'基本給',value:'250000'},{label:'住宅手当',value:'10000'}],
@@ -127,7 +129,8 @@
   function defCompany(){ return { name:'株式会社 ゼロアクト',addr:'',close:'末日',paydayRel:'next',paydayDay:'25',
       holidays:[0], dailyWorkH:'8', dailyWorkM:'0', annualHolidays:'120',
       ruleOn:{teikyu:true,shotei:true,annual:true,warimashiRate:true,koyoGyoshu:true},
-      rateOt:'', rateHoliday:'', rateNight:'', rateOver60:'', gyoshu:'ippan' }; }
+      rateOt:'', rateHoliday:'', rateNight:'', rateOver60:'', gyoshu:'ippan',
+      furiCode:'', furiName:'', furiBankNo:'', furiBankName:'', furiBranchNo:'', furiBranchName:'', furiYokin:'普通', furiAccount:'', furiDate:'' }; }
   var state={ company: defCompany(),
     month:'2026-06', prefer:'col2_1', theme:{accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}, depts:['営業部'], roles:['課長','主任','一般'],
     employees:[defEmp('山田 太郎')], open:{},
@@ -440,7 +443,15 @@
           +((e.taishokuYmd&&/^\d{4}-(0[6-9]|1[0-2])/.test(e.taishokuYmd))?' <span class="chip'+(e.residentTaxIkkatsu?' on':'')+'" data-rtik="1" style="cursor:pointer">'+(e.residentTaxIkkatsu?'✓ ':'')+'退職時に残額を一括</span>':'')
           +'<div style="color:#92500A;margin-top:3px">特別徴収は6月〜翌5月。<b>通知書の額が正</b>（自動は端数を6月に合算した概算）。1〜4月退職は残額一括（法定）、6〜12月退職は普通徴収へ（申出で一括）。</div></div>'
         : '')
-      +'<div class="frow"><div class="flabel">振込先<span class="hint2">任意</span></div><input class="finput m-f" data-f="bank" value="'+attr(e.bank)+'" placeholder="○○銀行 普通 1234567"></div>'
+      +'<div class="frow"><div class="flabel">振込先<span class="hint2">明細に表示・任意</span></div><input class="finput m-f" data-f="bank" value="'+attr(e.bank)+'" placeholder="○○銀行 普通 1234567"></div>'
+      +'<div class="sec-lb" style="border-top:1px dashed #d4eae0">総合振込データ用<span class="hint2">銀行に送る全銀ファイル用・任意</span></div>'
+      +'<div class="frow2"><div class="frow"><div class="flabel">銀行名</div><input class="finput m-f" data-f="furiBankName" value="'+attr(e.furiBankName)+'" placeholder="ﾐｽﾞﾎ"></div>'
+        +'<div class="frow"><div class="flabel">銀行コード<span class="hint2">4桁</span></div><input class="finput m-f" data-f="furiBankNo" inputmode="numeric" maxlength="4" value="'+attr(e.furiBankNo)+'" placeholder="0001"></div></div>'
+      +'<div class="frow2"><div class="frow"><div class="flabel">支店名</div><input class="finput m-f" data-f="furiBranchName" value="'+attr(e.furiBranchName)+'" placeholder="ﾎﾝﾃﾝ"></div>'
+        +'<div class="frow"><div class="flabel">支店コード<span class="hint2">3桁</span></div><input class="finput m-f" data-f="furiBranchNo" inputmode="numeric" maxlength="3" value="'+attr(e.furiBranchNo)+'" placeholder="001"></div></div>'
+      +'<div class="frow2"><div class="frow"><div class="flabel">科目</div><select class="finput m-f" data-f="furiYokin"><option'+((e.furiYokin==='普通'||!e.furiYokin)?' selected':'')+'>普通</option><option'+(e.furiYokin==='当座'?' selected':'')+'>当座</option><option'+(e.furiYokin==='貯蓄'?' selected':'')+'>貯蓄</option></select></div>'
+        +'<div class="frow"><div class="flabel">口座番号<span class="hint2">7桁</span></div><input class="finput m-f" data-f="furiAccount" inputmode="numeric" maxlength="7" value="'+attr(e.furiAccount)+'" placeholder="1234567"></div></div>'
+      +'<div class="frow"><div class="flabel">受取人名（半角ｶﾅ）<span class="hint2">空欄なら氏名から自動変換</span></div><input class="finput m-f" data-f="furiKana" value="'+attr(e.furiKana)+'" placeholder="ﾔﾏﾀﾞ ﾊﾅｺ"></div>'
       +shahoSection(e)
       +'<div class="sec-lb" style="border-top:1px dashed #d4eae0">法定控除（使わないものは外せる）<span class="help-i" data-help="legalkojo">💡</span></div>'
       +'<div class="chip-row">'+LEGAL_KOJO.map(function(lk){
@@ -1154,7 +1165,63 @@
     updatePrintMonthUI();
     var sel=$('#p-emp'); sel.innerHTML='<option value="__all">全員</option>'+state.employees.map(function(e,i){return isActiveInMonth(e,state.month)?'<option value="'+i+'">'+esc(e.name)+'</option>':'';}).join('');
     renderWebMeisai();
+    renderFuri();
     doPreview();
+  }
+  // ── 総合振込データ(全銀ファイル + 振込一覧Excel) ──
+  function buildTransfers(){
+    return state.employees.filter(function(e){ return isActiveInMonth(e,state.month) && !e.retired; }).map(function(e){
+      var net=0; try{ net=compute(e).net; }catch(_){}
+      var ready=!!(String(e.furiBankNo||'').trim() && String(e.furiBranchNo||'').trim() && String(e.furiAccount||'').trim() && net>0);
+      return { emp:e, name:(e.furiKana||e.name), bankNo:e.furiBankNo, bankName:e.furiBankName, branchNo:e.furiBranchNo, branchName:e.furiBranchName, yokin:e.furiYokin, account:e.furiAccount, amount:net, ready:ready };
+    });
+  }
+  function renderFuri(){
+    var box=$('#furi-box'); if(!box) return;
+    if((state.printMode||'monthly')==='bonus'){ box.innerHTML='<p class="hint" style="margin:0">総合振込データは「月次給与」で作成します。</p>'; return; }
+    var c=state.company, tr=buildTransfers();
+    var ready=tr.filter(function(t){return t.ready;}), notReady=tr.filter(function(t){return !t.ready && t.amount>0;});
+    function fi(k,ph,extra){ return '<input class="finput" data-fc="'+k+'" value="'+attr(c[k])+'" placeholder="'+ph+'" '+(extra||'')+'>'; }
+    var committer='<div class="sec-lb" style="margin-top:0">委託者情報（自社・銀行から通知される値）</div>'
+      +'<div class="frow2"><div class="frow"><div class="flabel">委託者コード<span class="hint2">10桁</span></div>'+fi('furiCode','0000000000','inputmode="numeric" maxlength="10"')+'</div>'
+        +'<div class="frow"><div class="flabel">委託者名（半角ｶﾅ）</div>'+fi('furiName','ｶ)ｾﾞﾛｱｸﾄ','maxlength="40"')+'</div></div>'
+      +'<div class="frow2"><div class="frow"><div class="flabel">自社 銀行名</div>'+fi('furiBankName','ﾐｽﾞﾎ')+'</div>'
+        +'<div class="frow"><div class="flabel">銀行コード<span class="hint2">4桁</span></div>'+fi('furiBankNo','0001','inputmode="numeric" maxlength="4"')+'</div></div>'
+      +'<div class="frow2"><div class="frow"><div class="flabel">支店名</div>'+fi('furiBranchName','ﾎﾝﾃﾝ')+'</div>'
+        +'<div class="frow"><div class="flabel">支店コード<span class="hint2">3桁</span></div>'+fi('furiBranchNo','001','inputmode="numeric" maxlength="3"')+'</div></div>'
+      +'<div class="frow2"><div class="frow"><div class="flabel">科目</div><select class="finput" data-fc="furiYokin"><option'+((c.furiYokin==='普通'||!c.furiYokin)?' selected':'')+'>普通</option><option'+(c.furiYokin==='当座'?' selected':'')+'>当座</option></select></div>'
+        +'<div class="frow"><div class="flabel">口座番号<span class="hint2">7桁</span></div>'+fi('furiAccount','1234567','inputmode="numeric" maxlength="7"')+'</div></div>'
+      +'<div class="frow"><div class="flabel">振込指定日</div><input class="finput" type="date" data-fc="furiDate" value="'+attr(c.furiDate)+'"></div>';
+    var listHTML='<div class="sec-lb">振込対象（'+esc(state.month)+'・差引支給額）</div>';
+    if(!tr.length){ listHTML+='<p class="hint" style="margin:0">対象月に在籍する従業員がいません。</p>'; }
+    else {
+      listHTML+='<div style="font-size:12.5px">'+ready.map(function(t){ return '<div class="dl"><span>'+esc(t.emp.name)+'（'+esc(t.bankName||'')+' '+esc(t.branchName||'')+' '+esc(t.account||'')+'）</span><span class="v">'+yen(t.amount)+'</span></div>'; }).join('')+'</div>';
+      if(notReady.length) listHTML+='<div class="cr-warn" style="margin:8px 0 0">⚠ '+notReady.map(function(t){return esc(t.emp.name);}).join('・')+' は振込先(銀行/支店/口座)が未入力のため全銀ファイルから除外。設定 ▸ 従業員マスタ ▸ 総合振込データ用 で入力してください（振込一覧Excelには載ります）。</div>';
+    }
+    var total=ready.reduce(function(a,t){return a+t.amount;},0);
+    var btns='<div class="btn-row" style="margin-top:10px"><button class="btn-primary" id="b-zengin"'+(ready.length?'':' disabled')+'>全銀ファイル（'+ready.length+'件 '+yen(total)+'）</button><button class="btn-ghost" id="b-furixlsx">振込一覧Excel</button></div>'
+      +'<p class="hint" style="margin:6px 0 0">全銀ファイル=銀行の「総合振込」に取り込む固定長データ（Shift-JIS）。銀行/支店コードは通帳や銀行サイトで確認してください。</p>';
+    box.innerHTML=committer+listHTML+btns;
+  }
+  function dlBytes(bytes, filename, type){ try{ var blob=new Blob([bytes],{type:type||'application/octet-stream'}); var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(url); if(a.parentNode)a.parentNode.removeChild(a); },200); }catch(e){ alert('ダウンロードに失敗しました'); } }
+  function downloadZengin(){
+    if(typeof Zengin==='undefined'){ alert('全銀モジュールが読み込まれていません'); return; }
+    var c=state.company; var d=(c.furiDate&&/^\d{4}-\d{2}-\d{2}$/.test(c.furiDate))?c.furiDate.slice(5,7)+c.furiDate.slice(8,10):'';
+    var committer={ code:c.furiCode, name:c.furiName, torikumiMMDD:d, bankNo:c.furiBankNo, bankName:c.furiBankName, branchNo:c.furiBranchNo, branchName:c.furiBranchName, yokin:c.furiYokin, account:c.furiAccount };
+    var tr=buildTransfers().filter(function(t){return t.ready;});
+    if(!tr.length){ alert('振込対象がありません。従業員マスタの「総合振込データ用」に銀行/支店/口座を入力してください。'); return; }
+    var r=Zengin.build(committer, tr);
+    dlBytes(r.bytes, 'furikomi_'+state.month+'.txt', 'text/plain');
+    toast('全銀ファイルを作成しました（'+r.count+'件・'+yen(r.total)+'）');
+  }
+  function downloadFuriExcel(){
+    if(typeof PayslipXlsx==='undefined'||!PayslipXlsx.downloadSheets){ alert('Excelモジュールが読み込まれていません'); return; }
+    var tr=buildTransfers().filter(function(t){return t.amount>0;});
+    if(!tr.length){ alert('対象がありません。'); return; }
+    var aoa=[['氏名','受取人名(ｶﾅ)','銀行名','銀行コード','支店名','支店コード','科目','口座番号','差引支給額']];
+    tr.forEach(function(t){ aoa.push([t.emp.name, t.name, t.bankName||'', t.bankNo||'', t.branchName||'', t.branchNo||'', t.yokin||'', t.account||'', t.amount]); });
+    aoa.push(['合計','','','','','','','', tr.reduce(function(a,t){return a+t.amount;},0)]);
+    PayslipXlsx.downloadSheets([{ name:'振込一覧', aoa:aoa, cols:[{wch:14},{wch:16},{wch:12},{wch:10},{wch:12},{wch:10},{wch:6},{wch:12},{wch:12}] }], { filename:'振込一覧_'+state.month+'.xlsx' });
   }
   function doPreview(){
     var v=$('#p-emp').value; var emps=v==='__all'?state.employees.filter(function(e){return isActiveInMonth(e,state.month);}):[state.employees[+v]];
@@ -1334,6 +1401,12 @@
       var tg=e.target.closest('.cp-toggle:not(.cp-reset)'); if(tg){ state._oc=(state._oc===tg.dataset.cpk)?null:tg.dataset.cpk; renderDesign(); return; }
       var w=e.target.closest('.cw'); if(w){ state.theme[w.dataset.ck]=w.dataset.col; state._oc=null; afterDesign(); } });
     $('#b-print').addEventListener('click',function(){ var f=$('#frame'); try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} });
+    // 総合振込データ(委託者入力の保存 + 全銀/Excel ダウンロード)。#furi-boxは静的なので委譲で1回だけ配線。
+    (function(){ var fb=$('#furi-box'); if(!fb) return;
+      function setFc(ev){ var el=ev.target.closest&&ev.target.closest('[data-fc]'); if(el){ state.company[el.getAttribute('data-fc')]=el.value; persistSaveDebounced(); } }
+      fb.addEventListener('input', setFc); fb.addEventListener('change', setFc);
+      fb.addEventListener('click', function(ev){ if(ev.target.closest('#b-zengin')){ downloadZengin(); } else if(ev.target.closest('#b-furixlsx')){ downloadFuriExcel(); } });
+    })();
     // モバイルの回転/リサイズでプレビューを再フィット(再描画せず軽く)
     var _fitT; window.addEventListener('resize',function(){ if(!$('#scr-print')||!$('#scr-print').classList.contains('active'))return; clearTimeout(_fitT); _fitT=setTimeout(fitPreview,120); });
     $('#b-xlsx').addEventListener('click',function(){ if(!window.PayslipXlsx)return; var v=$('#p-emp').value; var emps=(v==='__all')?state.employees.filter(function(e){return isActiveInMonth(e,state.month);}):[state.employees[+v]];
