@@ -64,3 +64,12 @@ T('densan hydrate: 不正/部分/未収録年は無視=フォールバック維�
   D.hydrate(9999, { kiso: [{ upto: null, flat: 0 }] }); // 現行モデル外の年→no-op
   eq(D.calc(300000, 0, { year: 2026 }), before);
 });
+T('densan hydrate: 行の中身が不正(upto非数値/flat欠落/rate欠落)なら表ごと破棄=フォールバック維持', function () {
+  var before = D.calc(300000, 0, { year: 2026 }); eq(before, 7910);
+  D.hydrate(2026, { kyuyo: [{ upto: 158333, flat: 54167 }, { upto: 'garbage', rate: 0.3, add: 6667 }] }); // upto非数値の行
+  eq(D.calc(300000, 0, { year: 2026 }), before, 'kyuyo不正行→破棄');
+  D.hydrate(2026, { kiso: [{ upto: 2120833 }] }); // flat欠落(rate/addも無し)
+  eq(D.calc(300000, 0, { year: 2026 }), before, 'kiso不正行→破棄');
+  D.hydrate(2026, { zeiKo: [{ upto: null, rate: 0.5 }] }); // sub欠落
+  eq(D.calc(300000, 0, { year: 2026 }), before, 'zeiKo不正行→破棄');
+});

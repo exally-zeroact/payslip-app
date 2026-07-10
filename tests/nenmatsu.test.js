@@ -202,3 +202,21 @@ T('nenmatsu hydrate: 不正/部分/令和7以前は無視=フォールバック�
   N.hydrate(2025, { kisoKojo: [{ upto: null, flat: 0 }] }); // 令和7以前→no-op
   eq(N.kisoKojoR8(3560000), before);
 });
+T('nenmatsu hydrate: 不正オブジェクト表/短い配列/不正行は表ごと破棄=他キー保持=フォールバック維持', function () {
+  var fuyoTok = N.fuyoKojo('tokutei');      // 630000
+  var shougaiDoukyo = N.shougaiKojo('doukyo'); // 750000
+  var hai = N.haiguushaKojo(9800000, false);   // tier2の値
+  var san = N.sanshutuShotokuZei(1730000);     // 86500
+  var kiso = N.kisoKojoR8(3560000);            // 1040000
+  N.hydrate(2026, { fuyoKojo: { ippan: 'abc' } }); // 不正値+キー欠落→破棄(他キー消えない)
+  eq(N.fuyoKojo('tokutei'), fuyoTok, 'fuyoKojo不正→破棄・他キー保持');
+  eq(N.fuyoKojo('ippan'), 380000);
+  N.hydrate(2026, { shougai: { ippan: 'x' } });
+  eq(N.shougaiKojo('doukyo'), shougaiDoukyo, 'shougai不正→破棄');
+  N.hydrate(2026, { haiguusha: { normal: [380000], rojin: [480000] } }); // 短い配列(tier2でOOB)
+  eq(N.haiguushaKojo(9800000, false), hai, 'haiguusha短配列→破棄');
+  N.hydrate(2026, { sanshutu: [{ upto: null, sub: 0 }] }); // rate欠落
+  eq(N.sanshutuShotokuZei(1730000), san, 'sanshutu不正→破棄');
+  N.hydrate(2026, { kisoKojo: [{ upto: 2120833 }] }); // flat欠落
+  eq(N.kisoKojoR8(3560000), kiso, 'kisoKojo不正行→破棄');
+});

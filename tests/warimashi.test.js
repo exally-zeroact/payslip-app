@@ -268,13 +268,29 @@ T('hydrate: 正常データ(ot:1.30)でRATE/resolveRates/detailに反映→復�
   W.hydrate({ ot: 1.25 }); // 復元
   eq(W.RATE.ot, 1.25); eq(W.resolveRates().ot, 1.25);
 });
-T('hydrate: 全キー(over60Add含む)上書き可→復元', function () {
-  W.hydrate({ ot: 1.5, otNight: 1.8, over60: 1.6, over60Night: 1.9, night: 0.3, holiday: 1.4, holidayNight: 1.7, over60Add: 0.35 });
-  eq(W.RATE.ot, 1.5); eq(W.RATE.otNight, 1.8); eq(W.RATE.over60, 1.6); eq(W.RATE.over60Night, 1.9);
-  eq(W.RATE.night, 0.3); eq(W.RATE.holiday, 1.4); eq(W.RATE.holidayNight, 1.7); eq(W.RATE.over60Add, 0.35);
+T('hydrate: 基本率(ot/holiday/night/over60Add)上書き→合成率は派生で追従→復元', function () {
+  W.hydrate({ ot: 1.5, night: 0.3, holiday: 1.4, over60Add: 0.35 });
+  eq(W.RATE.ot, 1.5); eq(W.RATE.night, 0.3); eq(W.RATE.holiday, 1.4); eq(W.RATE.over60Add, 0.35);
+  // 合成率は基本率から派生(単独設定でなく計算)
+  eq(W.RATE.otNight, 1.8, 'otNight=ot+night=1.5+0.3');
+  eq(W.RATE.over60, 1.85, 'over60=ot+over60Add=1.5+0.35');
+  eq(W.RATE.over60Night, 2.15, 'over60Night=ot+over60Add+night');
+  eq(W.RATE.holidayNight, 1.7, 'holidayNight=holiday+night=1.4+0.3');
   eq(W.resolveRates().over60Add, 0.35, 'over60Add既定もRATE参照');
-  W.hydrate({ ot: 1.25, otNight: 1.5, over60: 1.5, over60Night: 1.75, night: 0.25, holiday: 1.35, holidayNight: 1.6, over60Add: 0.25 }); // 復元
-  eq(W.RATE.ot, 1.25); eq(W.RATE.over60Add, 0.25);
+  W.hydrate({ ot: 1.25, night: 0.25, holiday: 1.35, over60Add: 0.25 }); // 復元
+  eq(W.RATE.ot, 1.25); eq(W.RATE.otNight, 1.5); eq(W.RATE.over60, 1.5); eq(W.RATE.over60Night, 1.75); eq(W.RATE.holidayNight, 1.6);
+});
+T('hydrate: 部分上書き(otだけ)でも合成率が計算値と乖離しない(P1修正)', function () {
+  W.hydrate({ ot: 1.30 });
+  eq(W.RATE.otNight, 1.55, '表示RATE.otNightがot+nightに追従=1.55');
+  var c = W.detailComponents({ otNight: 60 }); // ratesは既定=RATE参照
+  var by = {}; c.forEach(function (x) { by[x.key] = x.rate; });
+  eq(by.otNight, W.RATE.otNight, '表示RATE.otNight = 実計算otNight(乖離ゼロ)');
+  W.hydrate({ ot: 1.25 }); eq(W.RATE.otNight, 1.5); // 復元
+});
+T('hydrate: 合成率キー(otNight/over60等)を直接渡しても無視=基本率から派生(不整合防止)', function () {
+  W.hydrate({ otNight: 9.9, over60: 9.9, over60Night: 9.9, holidayNight: 9.9 });
+  eq(W.RATE.otNight, 1.5, 'otNight直接指定は無視'); eq(W.RATE.over60, 1.5); eq(W.RATE.over60Night, 1.75); eq(W.RATE.holidayNight, 1.6);
 });
 T('hydrate: 不正データ(null/非object/非数値/NaN/文字列)はフォールバック=RATE不変', function () {
   W.hydrate(null); eq(W.RATE.ot, 1.25);
