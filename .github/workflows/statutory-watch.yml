@@ -1,0 +1,63 @@
+name: Statutory watch
+
+# 法定データ(最賃/健保/雇用/所得税)の年度更新を「日付ベース」で堅牢に催促する週次watcher。
+#  ・毎週月曜 00:00 UTC(=月曜09:00 JST)に scripts/statutory-reminder.mjs を実行。
+#  ・役所HTMLのスクレイプに依存しない(様式変更で壊れない)。lib自身のstale判定+適用/公表時期のみで判定。
+#  ・更新が必要(exit 10)なら GitHub Issue を作成 or 既存Issueにコメント(ラベルで重複防止)。
+#    → GitHub が owner にメール通知(LINE公式アカウント整備までの暫定通知)。
+#  ・更新不要(exit 0)で既存の更新Issueが開いていれば自動クローズ。
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: 法定データ更新リマインダー
+        id: check
+        run: |
+          set +e
+          OUT=$(node scripts/statutory-reminder.mjs)
+          CODE=$?
+          echo "$OUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          {
+            echo 'body<<EOF'
+            echo "$OUT"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Issue作成/更新(要更新のとき)
+        if: steps.check.outputs.code == '10'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BODY: ${{ steps.check.outputs.body }}
+        run: |
+          TITLE="法定データの年度更新が必要です"
+          NUM=$(gh issue list --state open --label statutory-update --json number --jq '.[0].number // empty')
+          FULL=$(printf '%s\n\n---\n_このIssueは週次watcher(statutory-watch.yml)が自動作成。更新完了後にクローズしてください。_' "$BODY")
+          if [ -n "$NUM" ]; then
+            gh issue comment "$NUM" --body "$FULL"
+          else
+            gh label create statutory-update --color d93f0b --description "法定数値表の年度更新催促" 2>/dev/null || true
+            gh issue create --title "$TITLE" --label statutory-update --body "$FULL"
+          fi
+      - name: 更新不要ならIssueクローズ
+        if: steps.check.outputs.code == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NUM=$(gh issue list --state open --label statutory-update --json number --jq '.[0].number // empty')
+          if [ -n "$NUM" ]; then
+            gh issue close "$NUM" --comment "全法定データが最新のため自動クローズ(statutory-watch.yml)。"
+          fi
