@@ -841,14 +841,23 @@
     Store.getPayslipsByYm(pm,pm).then(function(rows){ var m={}; (rows||[]).forEach(function(r){ if(r&&r.data&&r.data.kind!=='bonus'&&r.data.kazei!=null) m[r.employee_id]=num(r.data.kazei); }); state._bonusPrev=m; // 賞与税率の基準は前月「給与」(社保後)=賞与レコード除外
       if($('#scr-input')&&$('#scr-input').classList.contains('active')&&state.inputMode==='bonus') renderBonus(); }).catch(function(){});
   }
-  function bonusEntry(e){ var b=state.bonus||(state.bonus={payYm:'',payDay:'',byEmp:{}}); if(!b.byEmp)b.byEmp={}; if(!b.byEmp[e.id])b.byEmp[e.id]={amount:'',prevAfter:'',ytd:''}; return b.byEmp[e.id]; }
+  function bonusEntry(e){ var b=state.bonus||(state.bonus={payYm:'',payDay:'',byEmp:{}}); if(!b.byEmp)b.byEmp={}; if(!b.byEmp[e.id])b.byEmp[e.id]={amount:'',prevAfter:'',ytd:''};
+    var en=b.byEmp[e.id]; if(!en.addShikyu)en.addShikyu=[]; if(!en.addKojo)en.addKojo=[]; return en; } // addShikyu=追加支給[{label,value,hikazei}]・addKojo=任意控除[{label,value}]
   function computeBonus(e){
     var SZl=SZ(), S=SHH(), ym=bonusYmOf(), en=bonusEntry(e);
     var bonus=num(en.amount), prevMap=state._bonusPrev||{};
+    // 追加支給: 課税分は賞与額に合算して社保/源泉の基準に(賞与性の支給=標準賞与額に含む)。非課税分は表示のみ(手取りには加算)。任意控除は手取りから差引。
+    var addShikyu=(en.addShikyu||[]).map(function(it){ return { label:it.label, value:num(it.value), hikazei:!!it.hikazei }; });
+    var addKojo=(en.addKojo||[]).map(function(it){ return { label:it.label, value:num(it.value) }; });
+    var addTaxable=addShikyu.reduce(function(a,it){ return a+(it.hikazei?0:it.value); },0);
+    var addNonTax=addShikyu.reduce(function(a,it){ return a+(it.hikazei?it.value:0); },0);
+    var addKojoTotal=addKojo.reduce(function(a,it){ return a+it.value; },0);
+    var base=bonus+addTaxable;               // 課税賞与総額=社保/源泉の基準
+    var totalGross=bonus+addTaxable+addNonTax; // 総支給
     var manualPrev=(en.prevAfter!=null&&en.prevAfter!==''), histPrev=(e.id in prevMap);
     var prevAfter=manualPrev?num(en.prevAfter):(histPrev?prevMap[e.id]:null);
     var hasKaigo=(window.PayrollCalc&&PayrollCalc.isKaigoTarget)?PayrollCalc.isKaigoTarget(e.birthYmd,ym):false;
-    var si=SZl?SZl.calcBonusSI({ bonus:bonus, healthRate:prefRate(e.pref,ym), kaigoRate:(S&&S.getKaigo)?S.getKaigo(ym).jugyoin:0.00795, hasKaigo:hasKaigo, employRate:employRateOf((state.company||{}).gyoshu, employYearOfYm(ym)), ytdKenpoBonus:num(en.ytd) }):{total:0,health:0,pension:0,kaigo:0,employ:0,hyojun:0,kenpoBase:0,koseiBase:0};
+    var si=SZl?SZl.calcBonusSI({ bonus:base, healthRate:prefRate(e.pref,ym), kaigoRate:(S&&S.getKaigo)?S.getKaigo(ym).jugyoin:0.00795, hasKaigo:hasKaigo, employRate:employRateOf((state.company||{}).gyoshu, employYearOfYm(ym)), ytdKenpoBonus:num(en.ytd) }):{total:0,health:0,pension:0,kaigo:0,employ:0,hyojun:0,kenpoBase:0,koseiBase:0};
     // 産休/育休の賞与社保免除(産休=賞与月末が産休中/育休=連続1か月超)。日付未設定=従来(workStatusで全免除)。雇用保険は実支払×率で残す。
     var bonusExempt=false;
     if(e.workStatus==='sankyu'||e.workStatus==='ikukyu'){
@@ -860,9 +869,10 @@
     e._bonusExempt=bonusExempt;
     var tax={tax:0}, noPrev=false;
     if(prevAfter==null) noPrev=true;
-    else if(SZl) tax=SZl.calcBonusTax({ bonus:bonus, bonusSI:si.total, prevSalary:prevAfter, prevSI:0, fuyou:num(e.fuyou), taxClass:e.taxClass, payYm:ym });
+    else if(SZl) tax=SZl.calcBonusTax({ bonus:base, bonusSI:si.total, prevSalary:prevAfter, prevSI:0, fuyou:num(e.fuyou), taxClass:e.taxClass, payYm:ym });
     var taxAmt=noPrev?0:(tax.tax||0);
-    return { bonus:bonus, prevAfter:prevAfter, fromHistory:(!manualPrev&&histPrev), noPrev:noPrev, si:si, tax:tax, taxAmt:taxAmt, net:bonus-si.total-taxAmt };
+    return { bonus:bonus, base:base, totalGross:totalGross, addShikyu:addShikyu, addKojo:addKojo, addTaxable:addTaxable, addNonTax:addNonTax, addKojoTotal:addKojoTotal,
+      prevAfter:prevAfter, fromHistory:(!manualPrev&&histPrev), noPrev:noPrev, si:si, tax:tax, taxAmt:taxAmt, net:totalGross-si.total-taxAmt-addKojoTotal };
   }
   function renderBonus(){
     var host=$('#bonus-view'); if(!host) return; loadBonusPrev();
@@ -887,20 +897,39 @@
       if(c.noPrev){ taxLine='<div class="calc-line"><span>源泉所得税</span><span class="v">前月給与の入力待ち</span></div>'; }
       else if(c.tax.special){ taxLine='<div class="calc-line"><span>源泉所得税</span><span class="v">月額表で要計算</span></div>'; warn='<div class="cr-warn" style="margin:6px 0">⚠ この賞与は<b>特例</b>です（前月に給与がない、または賞与が前月給与（社保後）の<b>10倍超</b>）。通常の算出率表が使えず<b>月額表</b>で計算するため、源泉所得税は手計算してください。<span class="help-i" data-help="bonusPrev">💡</span></div>'; }
       else { taxLine='<div class="calc-line"><span>源泉所得税（率 '+c.tax.rate+'%'+(c.tax.otsu?'・乙欄':'')+'）</span><span class="v">'+yen(c.taxAmt)+'</span></div>'; }
+      // 追加支給/任意控除の編集UI(月次と同じ自由度)。data-bs*/bk*=賞与の追加項目
+      var sItems=(en.addShikyu||[]).map(function(it,idx){ return '<div class="bx-row">'
+        +'<input class="finput bx-lbl" data-bsl="'+e.id+':'+idx+'" value="'+attr(it.label)+'" placeholder="項目名">'
+        +'<input class="finput num bx-val" data-bsv="'+e.id+':'+idx+'" inputmode="numeric" value="'+attr(fmtN(it.value))+'" placeholder="円">'
+        +'<label class="bx-hik"><input type="checkbox" data-bsh="'+e.id+':'+idx+'"'+(it.hikazei?' checked':'')+'>非課税</label>'
+        +'<button class="btn-ghost bx-del" data-bsx="'+e.id+':'+idx+'">×</button></div>'; }).join('');
+      var kItems=(en.addKojo||[]).map(function(it,idx){ return '<div class="bx-row">'
+        +'<input class="finput bx-lbl" data-bkl="'+e.id+':'+idx+'" value="'+attr(it.label)+'" placeholder="項目名">'
+        +'<input class="finput num bx-val" data-bkv="'+e.id+':'+idx+'" inputmode="numeric" value="'+attr(fmtN(it.value))+'" placeholder="円">'
+        +'<button class="btn-ghost bx-del" data-bkx="'+e.id+':'+idx+'">×</button></div>'; }).join('');
+      var editor='<div class="sec-lb" style="font-size:11px;margin-top:10px">追加の支給項目<span class="hint2">賞与に上乗せ・任意</span></div>'+sItems
+        +'<div class="addcustom"><input class="finput ac-inp" data-bsaddl="'+e.id+'" placeholder="例：特別賞与・寸志"><button class="btn-ghost" data-bsadd="'+e.id+'" style="padding:9px 12px">＋支給</button></div>'
+        +'<div class="sec-lb" style="font-size:11px">任意の控除項目<span class="hint2">法定は自動・これは任意分</span></div>'+kItems
+        +'<div class="addcustom"><input class="finput ac-inp" data-bkaddl="'+e.id+'" placeholder="例：親睦会費・貸付金返済"><button class="btn-ghost" data-bkadd="'+e.id+'" style="padding:9px 12px">＋控除</button></div>';
+      var addSLines=(c.addShikyu||[]).map(function(it){ return '<div class="calc-line"><span>'+esc(it.label||'追加支給')+(it.hikazei?'（非課税）':'')+'</span><span class="v">'+yen(it.value)+'</span></div>'; }).join('');
+      var addKLines=(c.addKojo||[]).map(function(it){ return '<div class="calc-line"><span>'+esc(it.label||'控除')+'</span><span class="v">'+yen(it.value)+'</span></div>'; }).join('');
       return '<div class="acc icard'+(num(en.amount)>0?' open':'')+'">'
         +'<div class="ic-top"><span class="acc-nm">'+esc(e.name)+'</span><span class="acc-net">'+yen(c.net)+'</span></div>'
         +'<div style="padding:0 12px 12px">'
         +'<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><span style="font-size:12px;color:#2E7D54;font-weight:700;min-width:54px">賞与額</span><input class="finput num" data-ba="'+e.id+'" inputmode="numeric" value="'+attr(en.amount)+'" placeholder="円" style="flex:1"></div>'
         +prevBox
         +'<div style="font-size:11px;color:#4b6b58;margin:5px 0">本年度の既往賞与（標準賞与額）累計 <input class="finput num" data-by="'+e.id+'" inputmode="numeric" value="'+attr(en.ytd)+'" placeholder="0" style="width:110px"> 円 <span style="color:#8FA89A">（2回目以降のみ・健保 年573万上限用）</span></div>'
+        +editor
         +(caps?'<div style="margin:4px 0">'+caps+'</div>':'')+warn
         +'<div class="calc-box"><div class="ch">賞与の自動計算（標準賞与額 '+yen(hyojun)+'）</div>'
           +'<div class="calc-line"><span>賞与額</span><span class="v">'+yen(c.bonus)+'</span></div>'
+          +addSLines
           +'<div class="calc-line"><span>健康保険</span><span class="v">'+yen(c.si.health)+'</span></div>'
           +(c.si.kaigo>0?'<div class="calc-line"><span>介護保険</span><span class="v">'+yen(c.si.kaigo)+'</span></div>':'')
           +'<div class="calc-line"><span>厚生年金</span><span class="v">'+yen(c.si.pension)+'</span></div>'
           +'<div class="calc-line"><span>雇用保険</span><span class="v">'+yen(c.si.employ)+'</span></div>'
           +taxLine
+          +addKLines
           +'<div class="calc-line net tot"><span>差引支給額（手取り）</span><span class="v">'+yen(c.net)+'</span></div></div>'
         +'</div></div>';
     }).join('');
@@ -918,8 +947,9 @@
     state.employees.filter(function(e){ return isActiveInMonth(e,ym); }).forEach(function(e){
       var en=bonusEntry(e); if(num(en.amount)<=0) return;
       try{ var c=computeBonus(e); var si=c.si||{};
-        Store.savePayslip(ym, e.id, { name:e.name, shikyuTotal:c.bonus, kazei:c.bonus, net:c.net,
-          shikyu:[{label:'賞与',value:c.bonus,hikazei:false}], tax:num(c.taxAmt),
+        var shikyu=[{label:'賞与',value:c.bonus,hikazei:false}]; (c.addShikyu||[]).forEach(function(it){ shikyu.push({label:it.label||'追加支給',value:it.value,hikazei:!!it.hikazei}); }); // 課税/非課税を保持=年調の課税集計が正確に
+        Store.savePayslip(ym, e.id, { name:e.name, shikyuTotal:c.totalGross, kazei:c.base, net:c.net,
+          shikyu:shikyu, tax:num(c.taxAmt),
           siTotal:si.total||0, si:{ health:num(si.health), kaigo:num(si.kaigo), pension:num(si.pension), employ:num(si.employ) },
           dept:(e.dept||'') }, 'bonus');
       }catch(_e){}
@@ -1231,7 +1261,11 @@
   function buildPeople(emps){ return emps.map(function(e){ var r=compute(e); var k=(e.kintai||[]).filter(function(x){ if(/代休取得|振替休日/.test(x.label||'')) return num(x.value)>0; return true; }); var oi=k.findIndex(function(x){return /出勤/.test(x.label||'');}); var wt={label:'労働時間',value:workedLabel(e)}; if(oi>=0)k.splice(oi+1,0,wt); else k.unshift(wt); return { name:e.name, company:state.company.name, payDate:payDateStr(), kintai:k, shikyu:r.shikyu, kojo:r.kojo, net:r.net, shikyuTotal:r.shikyuTotal, kojoTotal:r.kojoTotal, warnings:empWarnings(e) }; }); }
   // 賞与明細用: 月次明細と同じテンプレ/テーマ(ユーザー選択)で 勤怠なし・支給=賞与/控除=賞与社保+源泉
   function bonusMonthLabel(){ var ym=bonusYmOf(); var y=Number(ym.slice(0,4)), m=Number(ym.slice(5,7)); var k=['','一','二','三','四','五','六','七','八','九','十','十一','十二']; return '令 和 '+(y-2018)+' 年 '+(k[m]||m)+' 月 賞 与'; }
-  function buildBonusPeople(emps){ return emps.map(function(e){ var c=computeBonus(e); var kojo=[{label:'健康保険',value:c.si.health}]; if(c.si.kaigo>0) kojo.push({label:'介護保険',value:c.si.kaigo}); kojo.push({label:'厚生年金',value:c.si.pension}); kojo.push({label:'雇用保険',value:c.si.employ}); kojo.push({label:'源泉所得税',value:c.taxAmt}); return { name:e.name, company:state.company.name, payDate:(state.bonus&&state.bonus.payDay)||payDateStr(), kintai:[], shikyu:[{label:'賞与',value:c.bonus}], kojo:kojo, net:c.net, shikyuTotal:c.bonus, kojoTotal:c.si.total+c.taxAmt }; }); }
+  function buildBonusPeople(emps){ return emps.map(function(e){ var c=computeBonus(e);
+    var shikyu=[{label:'賞与',value:c.bonus}]; (c.addShikyu||[]).forEach(function(it){ shikyu.push({label:it.label||'追加支給',value:it.value}); }); // 賞与+追加支給
+    var kojo=[{label:'健康保険',value:c.si.health}]; if(c.si.kaigo>0) kojo.push({label:'介護保険',value:c.si.kaigo}); kojo.push({label:'厚生年金',value:c.si.pension}); kojo.push({label:'雇用保険',value:c.si.employ}); kojo.push({label:'源泉所得税',value:c.taxAmt});
+    (c.addKojo||[]).forEach(function(it){ kojo.push({label:it.label||'控除',value:it.value}); }); // 任意控除
+    return { name:e.name, company:state.company.name, payDate:(state.bonus&&state.bonus.payDay)||payDateStr(), kintai:[], shikyu:shikyu, kojo:kojo, net:c.net, shikyuTotal:c.totalGross, kojoTotal:c.si.total+c.taxAmt+c.addKojoTotal }; }); }
   // 明細デザイン(レイアウト+色)＝設定タブに表示。自動は廃止(全員ページ分割で対応)
   // テンプレの種類(縦並び/2カラム/横ストリップ)。複数人は自動でページ分割
   var TPL_OPTS=[
@@ -1364,16 +1398,28 @@
     // 入力タブ: 月次給与/賞与 モード切替
     var inScr=$('#scr-input');
     function bonusEmpOf(el){ var id=el.dataset.ba||el.dataset.bp||el.dataset.by; return (state.employees||[]).find(function(x){return x.id===id;}); }
+    function bonusById(id){ return (state.employees||[]).find(function(x){return x.id===id;}); }
+    // "eid:idx"を解析→対象の追加支給/控除エントリを返す。arr='addShikyu'|'addKojo'
+    function bxParse(v, arr){ if(!v)return null; var p=String(v).split(':'); var e=bonusById(p[0]); if(!e)return null; return { en:bonusEntry(e), idx:+p[1], arr:bonusEntry(e)[arr] }; }
     if(inScr){
       inScr.addEventListener('click',function(ev){
         if(ev.target.closest('[data-confirm-bonus]')){ try{ saveBonusPayslips(); }catch(_){} persistSave(); toast('賞与を確定しました（年調・台帳に反映）'); return; }
+        var addS=ev.target.closest('[data-bsadd]'); if(addS){ var es=bonusById(addS.dataset.bsadd); if(es){ var i1=inScr.querySelector('[data-bsaddl="'+addS.dataset.bsadd+'"]'); var l1=(i1&&i1.value||'').trim()||'特別賞与'; bonusEntry(es).addShikyu.push({label:l1,value:'',hikazei:false}); renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); } return; }
+        var addK=ev.target.closest('[data-bkadd]'); if(addK){ var ek=bonusById(addK.dataset.bkadd); if(ek){ var i2=inScr.querySelector('[data-bkaddl="'+addK.dataset.bkadd+'"]'); var l2=(i2&&i2.value||'').trim()||'控除'; bonusEntry(ek).addKojo.push({label:l2,value:''}); renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); } return; }
+        var dS=ev.target.closest('[data-bsx]'); if(dS){ var rS=bxParse(dS.dataset.bsx,'addShikyu'); if(rS){ rS.arr.splice(rS.idx,1); renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); } return; }
+        var dK=ev.target.closest('[data-bkx]'); if(dK){ var rK=bxParse(dK.dataset.bkx,'addKojo'); if(rK){ rK.arr.splice(rK.idx,1); renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); } return; }
         var m=ev.target.closest('.imode'); if(!m)return; state.inputMode=m.dataset.imode==='bonus'?'bonus':'monthly'; renderInputArea(); if(window.persistSaveDebounced)persistSaveDebounced(); });
       // 入力中は値を保存のみ(再描画しない=フォーカス維持)。結果はblur(change)で更新。
-      inScr.addEventListener('input',function(ev){ var ba=ev.target.closest('[data-ba]'), bp=ev.target.closest('[data-bp]'), by=ev.target.closest('[data-by]'); if(!ba&&!bp&&!by)return;
+      inScr.addEventListener('input',function(ev){
+        var bsl=ev.target.closest('[data-bsl]'), bsv=ev.target.closest('[data-bsv]'), bkl=ev.target.closest('[data-bkl]'), bkv=ev.target.closest('[data-bkv]');
+        if(bsl||bsv||bkl||bkv){ var t=bsl||bsv||bkl||bkv, isS=!!(bsl||bsv), isLbl=!!(bsl||bkl); var r=bxParse(t.dataset[bsl?'bsl':bsv?'bsv':bkl?'bkl':'bkv'], isS?'addShikyu':'addKojo'); if(r&&r.arr[r.idx]){ if(isLbl) r.arr[r.idx].label=t.value; else r.arr[r.idx].value=t.value.replace(/[^0-9]/g,''); } if(window.persistSaveDebounced)persistSaveDebounced(); return; }
+        var ba=ev.target.closest('[data-ba]'), bp=ev.target.closest('[data-bp]'), by=ev.target.closest('[data-by]'); if(!ba&&!bp&&!by)return;
         var e=bonusEmpOf(ba||bp||by); if(!e)return; var en=bonusEntry(e);
         if(ba) en.amount=ba.value.replace(/[^0-9]/g,''); else if(bp) en.prevAfter=bp.value.replace(/[^0-9]/g,''); else en.ytd=by.value.replace(/[^0-9]/g,'');
         if(window.persistSaveDebounced)persistSaveDebounced(); });
       inScr.addEventListener('change',function(ev){
+        var bsh=ev.target.closest('[data-bsh]'); if(bsh){ var rh=bxParse(bsh.dataset.bsh,'addShikyu'); if(rh&&rh.arr[rh.idx]) rh.arr[rh.idx].hikazei=bsh.checked; renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
+        if(ev.target.closest('[data-bsl],[data-bsv],[data-bkl],[data-bkv]')){ renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); return; } // 追加項目のblur=再描画(整形)
         var bn=ev.target.closest('[data-bn]');
         if(bn){ if(!state.bonus)state.bonus={byEmp:{}}; if(bn.dataset.bn==='payYm'){ state.bonus.payYm=bn.value; state._bonusPrevYm=null; } else { state.bonus.payDay=bn.value; } renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
         var ba=ev.target.closest('[data-ba]'), bp=ev.target.closest('[data-bp]'), by=ev.target.closest('[data-by]');

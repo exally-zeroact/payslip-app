@@ -213,6 +213,12 @@ main input[type="checkbox"]{width:20px;height:20px;min-width:20px;accent-color:#
 input[type="date"].finput:not(.finput-sm),input[type="month"].finput:not(.finput-sm){min-height:44px;box-sizing:border-box;}
 /* 並べ替え矢印のタップ領域拡大(旧22x15=小) */
 .mco-ord .ord-b{width:30px;height:26px;font-size:11px;}
+/* 賞与の追加支給/控除の項目行 */
+.bx-row{display:flex;gap:6px;align-items:center;margin:5px 0;}
+.bx-lbl{flex:1;min-width:0;font-size:12px;padding:7px 8px;}
+.bx-val{width:96px;font-size:12px;padding:7px 8px;text-align:right;font-family:'DM Mono',monospace;}
+.bx-hik{font-size:10px;color:#3D9E72;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:3px;}
+.bx-del{padding:4px 10px;color:#C0392B;border-color:#f0d4cf;font-weight:700;}
 .hint{font-size:11px;color:#7aa08c;line-height:1.6;margin-top:6px;}
 
 /* ---- buttons / chips ---- */
