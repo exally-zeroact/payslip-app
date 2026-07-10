@@ -691,7 +691,7 @@
   // 前月比/差分: 先月の保存値(pay_payslips)と今月の計算(手取り)を比較
   function prevYmOf(ym){ ym=String(ym||'2026-06'); var y=+ym.slice(0,4),m=+ym.slice(5,7)-1; if(m<1){m=12;y--;} return y+'-'+('0'+m).slice(-2); }
   function loadPrev(){ if(!(window.Store&&Store.getPayslipsByYm)) return; var pm=prevYmOf(state.month); if(state._prevYm===pm) return; state._prevYm=pm;
-    Store.getPayslipsByYm(pm,pm).then(function(rows){ var m={}; (rows||[]).forEach(function(r){ if(r&&r.data&&r.data.net!=null) m[r.employee_id]=num(r.data.net); }); state._prev=m;
+    Store.getPayslipsByYm(pm,pm).then(function(rows){ var m={}; (rows||[]).forEach(function(r){ if(r&&r.data&&r.data.kind!=='bonus'&&r.data.net!=null) m[r.employee_id]=num(r.data.net); }); state._prev=m; // 前月比は月次のみ(賞与除外)
       if($('#scr-input')&&$('#scr-input').classList.contains('active')) renderInput();
       if($('#scr-list')&&$('#scr-list').classList.contains('active')) renderListView(); }).catch(function(){});
   }
@@ -838,7 +838,7 @@
   function employYearOfYm(ym){ var k=KH(); return k?k.employYearOfYm(ym):2026; } // 単一ソース=koyo-hoken(労働保険年度4月切替)
   // 賞与支給月の前月の「社保控除後給与(kazei)」を履歴(pay_payslips)から取得
   function loadBonusPrev(){ if(!(window.Store&&Store.getPayslipsByYm)) return; var pm=prevYmOf(bonusYmOf()); if(state._bonusPrevYm===pm) return; state._bonusPrevYm=pm;
-    Store.getPayslipsByYm(pm,pm).then(function(rows){ var m={}; (rows||[]).forEach(function(r){ if(r&&r.data&&r.data.kazei!=null) m[r.employee_id]=num(r.data.kazei); }); state._bonusPrev=m;
+    Store.getPayslipsByYm(pm,pm).then(function(rows){ var m={}; (rows||[]).forEach(function(r){ if(r&&r.data&&r.data.kind!=='bonus'&&r.data.kazei!=null) m[r.employee_id]=num(r.data.kazei); }); state._bonusPrev=m; // 賞与税率の基準は前月「給与」(社保後)=賞与レコード除外
       if($('#scr-input')&&$('#scr-input').classList.contains('active')&&state.inputMode==='bonus') renderBonus(); }).catch(function(){});
   }
   function bonusEntry(e){ var b=state.bonus||(state.bonus={payYm:'',payDay:'',byEmp:{}}); if(!b.byEmp)b.byEmp={}; if(!b.byEmp[e.id])b.byEmp[e.id]={amount:'',prevAfter:'',ytd:''}; return b.byEmp[e.id]; }
@@ -904,7 +904,26 @@
           +'<div class="calc-line net tot"><span>差引支給額（手取り）</span><span class="v">'+yen(c.net)+'</span></div></div>'
         +'</div></div>';
     }).join('');
-    host.innerHTML=head+(cards||'<p class="hint">対象の従業員がいません。</p>');
+    var anyBonus=state.employees.some(function(e){ return isActiveInMonth(e,ym) && num(bonusEntry(e).amount)>0; });
+    var footer = anyBonus
+      ? '<div class="card" style="padding:12px;margin-top:6px"><button class="btn-primary" data-confirm-bonus style="width:100%">この賞与を確定（年調・台帳に反映）</button>'
+        +'<p class="hint" style="margin:8px 0 0">確定すると、この賞与（'+esc(ym)+'）を年末調整の自動集計と賃金台帳に反映します。あとで直せます。<b>定時決定（4〜6月の標準報酬）や前月比には賞与は含めません</b>（法令どおり）。</p></div>'
+      : '';
+    host.innerHTML=head+(cards||'<p class="hint">対象の従業員がいません。</p>')+footer;
+  }
+  // 賞与を pay_payslips に kind='bonus' で保存(年末調整の年集計・賃金台帳が拾う)。賞与額0は保存しない。
+  //  ★定時決定/前月比は賞与を除外して集計する(取得側フィルタ)ので、この保存は法令上の月額報酬に混入しない。
+  function saveBonusPayslips(){
+    if(!(window.Store&&Store.savePayslip)) return; var ym=bonusYmOf(); if(!ym) return;
+    state.employees.filter(function(e){ return isActiveInMonth(e,ym); }).forEach(function(e){
+      var en=bonusEntry(e); if(num(en.amount)<=0) return;
+      try{ var c=computeBonus(e); var si=c.si||{};
+        Store.savePayslip(ym, e.id, { name:e.name, shikyuTotal:c.bonus, kazei:c.bonus, net:c.net,
+          shikyu:[{label:'賞与',value:c.bonus,hikazei:false}], tax:num(c.taxAmt),
+          siTotal:si.total||0, si:{ health:num(si.health), kaigo:num(si.kaigo), pension:num(si.pension), employ:num(si.employ) },
+          dept:(e.dept||'') }, 'bonus');
+      }catch(_e){}
+    });
   }
   function renderInputArea(){
     var ml=$('#input-list'), bv=$('#bonus-view'), hint=$('#in-hint'), bonus=(state.inputMode==='bonus');
@@ -1019,7 +1038,7 @@
   }
   function renderChinginDaicho(sub){ var host=$('#view-cho'); var year=parseInt(String(state.month||'').slice(0,4),10)||2026;
     if(!(window.Store&&Store.getPayslipsByYm)){ host.innerHTML=sub+'<div class="card"><p class="hint">履歴保存が未対応です（保存を有効化してください）。</p></div>'; return; }
-    Store.getPayslipsByYm(year+'-01', year+'-12').then(function(recs){ host.innerHTML=sub+chinginDaichoHTML(CD().buildLedger(recs||[], year, state.employees), year); })
+    Store.getPayslipsByYm(year+'-01', year+'-12').then(function(recs){ recs=(recs||[]).filter(function(r){return !r.data||r.data.kind!=='bonus';}); host.innerHTML=sub+chinginDaichoHTML(CD().buildLedger(recs, year, state.employees), year); }) // 賃金台帳(月次)は賞与除外
       .catch(function(){ host.innerHTML=sub+'<div class="card"><p class="hint">読込に失敗しました。</p></div>'; }); }
   function choSub(v){ return '<div class="seg" style="margin-bottom:10px">'
     +'<button class="seg-b'+(v==='shakai'?' on':'')+'" data-cho="shakai">社保一覧</button>'
@@ -1033,7 +1052,7 @@
     if(kind==='shakai'){ PayslipXlsx.downloadSheets([{name:'社保一覧', aoa:PayslipXlsx.shakaiListAOA(shakaiRows(),{company:co,monthLabel:mlabel})}], {filename:'社保一覧_'+state.month+'.xlsx'}); return; }
     if(kind==='dept'){ var g=CD().deptGroups(deptRows()); PayslipXlsx.downloadSheets([{name:'部署別集計', aoa:PayslipXlsx.deptSummaryAOA(g,{company:co,monthLabel:mlabel})}], {filename:'部署別集計_'+state.month+'.xlsx'}); return; }
     if(kind==='daicho'){ var year=parseInt(String(state.month||'').slice(0,4),10)||2026;
-      Store.getPayslipsByYm(year+'-01',year+'-12').then(function(recs){ var L=CD().buildLedger(recs||[],year,state.employees);
+      Store.getPayslipsByYm(year+'-01',year+'-12').then(function(recs){ recs=(recs||[]).filter(function(r){return !r.data||r.data.kind!=='bonus';}); var L=CD().buildLedger(recs,year,state.employees); // 賃金台帳(月次)は賞与除外
         var sheets=PayslipXlsx.chinginDaichoSheets(L, year, CD(), {company:co}); if(!sheets.length){ uiAlert('確定済みの月がありません。'); return; } PayslipXlsx.downloadSheets(sheets,{filename:'賃金台帳_'+year+'.xlsx'}); }); return; } }
 
   /* ---------- 年末調整(view-nen) ---------- */
@@ -1049,7 +1068,7 @@
       var taxable=(d.shikyu&&d.shikyu.length)? d.shikyu.reduce(function(a,x){ return a+(x.hikazei?0:num(x.value)); },0) : num(d.shikyuTotal);
       shunyu+=taxable; genzen+=num(d.tax);
       var si=d.si||{}; shaho += (si.health!=null||si.pension!=null)?(num(si.health)+num(si.kaigo)+num(si.pension)+num(si.employ)):num(d.siTotal);
-      months++;
+      if(d.kind!=='bonus') months++; // 賞与は「保存済み○/12か月」の月数に数えない(金額は年収入/源泉/社保に合算=年調に含める)
     });
     return { shunyu:shunyu, genzen:genzen, shaho:shaho, months:months };
   }
@@ -1136,7 +1155,7 @@
     var yearGuard = (year<2026||year>2027) ? '<div class="cr-warn" style="margin:0 0 8px">⚠ この年末調整の税額計算は<b>令和8・9年分（2026・2027年）専用</b>です。対象年 '+year+' 年は未対応のため、控除額・税額が正しくない可能性があります（対象月を令和8・9年に設定してください）。</div>' : '';
     var head='<div class="card"><div class="card-h">年末調整 '+year+'年</div>'
       +yearGuard+statutoryStaleWarn()
-      +'<p class="hint">当年1〜12月の<b>保存済みの月次給与明細から自動集計</b>し、保険料・扶養などの<b>申告分を入力</b>すると過不足（還付／追加徴収）を計算します。月次を「今月を確定」で保存しておくと収入・源泉・社保が自動で埋まります。令和8年度改正（基礎控除・給与所得控除・特定親族特別控除）に対応。<br><b style="color:#92500A">※自動集計は月次給与のみ。賞与や他の所得がある場合は「年調の申告入力 ▾」で 給与収入(年)／源泉徴収済(年)／社保 の欄に賞与分を含めた金額を上書き入力してください。</b></p>'
+      +'<p class="hint">当年1〜12月の<b>保存済みの給与・賞与明細から自動集計</b>し、保険料・扶養などの<b>申告分を入力</b>すると過不足（還付／追加徴収）を計算します。月次は「今月を確定」、賞与は「賞与を確定」で保存すると収入・源泉・社保が自動で埋まります（賞与も含めて集計）。令和8年度改正（基礎控除・給与所得控除・特定親族特別控除）に対応。<br><b style="color:#92500A">※このアプリで扱っていない他の給与所得（前職分など）がある場合のみ「年調の申告入力 ▾」で 給与収入(年)／源泉徴収済(年)／社保 を上書き入力してください。</b></p>'
       +'<div class="pay-row" style="margin-top:6px"><span>全体の過不足</span><span id="nen-total" class="v">—</span></div>'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
       +'<button class="btn-ghost" data-nxlsx="1" style="padding:8px 12px;font-size:12px">年末調整一覧（源泉徴収簿）をExcel出力</button>'
@@ -1346,7 +1365,9 @@
     var inScr=$('#scr-input');
     function bonusEmpOf(el){ var id=el.dataset.ba||el.dataset.bp||el.dataset.by; return (state.employees||[]).find(function(x){return x.id===id;}); }
     if(inScr){
-      inScr.addEventListener('click',function(ev){ var m=ev.target.closest('.imode'); if(!m)return; state.inputMode=m.dataset.imode==='bonus'?'bonus':'monthly'; renderInputArea(); if(window.persistSaveDebounced)persistSaveDebounced(); });
+      inScr.addEventListener('click',function(ev){
+        if(ev.target.closest('[data-confirm-bonus]')){ try{ saveBonusPayslips(); }catch(_){} persistSave(); toast('賞与を確定しました（年調・台帳に反映）'); return; }
+        var m=ev.target.closest('.imode'); if(!m)return; state.inputMode=m.dataset.imode==='bonus'?'bonus':'monthly'; renderInputArea(); if(window.persistSaveDebounced)persistSaveDebounced(); });
       // 入力中は値を保存のみ(再描画しない=フォーカス維持)。結果はblur(change)で更新。
       inScr.addEventListener('input',function(ev){ var ba=ev.target.closest('[data-ba]'), bp=ev.target.closest('[data-bp]'), by=ev.target.closest('[data-by]'); if(!ba&&!bp&&!by)return;
         var e=bonusEmpOf(ba||bp||by); if(!e)return; var en=bonusEntry(e);
@@ -1581,7 +1602,7 @@
     if(!(window.Store&&Store.getPayslipsByYm&&window.PayrollCalc)){ if(cb)cb(); return; }
     var yms=PayrollCalc.getTeijiYms(state.month);
     Store.getPayslipsByYm(yms[0],yms[2]).then(function(rows){
-      var mine=(rows||[]).filter(function(r){ return r.employee_id===emp.id; });
+      var mine=(rows||[]).filter(function(r){ return r.employee_id===emp.id && (!r.data||r.data.kind!=='bonus'); }); // 定時決定(標準報酬月額)は賞与を除外(法令)
       if(!emp.shaho) emp.shaho={}; emp.shaho.mode='teiji';
       emp.shaho.months=yms.map(function(ym){ var row=mine.find(function(r){return r.ym===ym;}); var d=row&&row.data;
         return { pay:(d&&d.shikyuTotal!=null)?String(d.shikyuTotal):'', days:(d&&d.paymentDays!=null)?String(d.paymentDays):'' }; });
