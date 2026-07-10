@@ -54,6 +54,10 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .emp-dtgl{display:flex;align-items:center;font-size:12px;font-weight:700;color:#2E7D54;cursor:pointer;padding:10px 2px 8px;margin-top:8px;border-top:1px dashed #d4eae0;}
 .emp-dtgl .mco-cv{color:#A9C4B6;transition:transform .2s;}
 .emp-detail{padding-top:4px;}
+.emp-sub{border:1px solid #E3F0E8;border-radius:10px;margin-bottom:8px;overflow:hidden;}
+.emp-sub-h{display:flex;align-items:center;padding:11px 12px;font-size:12.5px;font-weight:700;color:#3D6B53;background:#F7FCF9;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.emp-sub-h .mco-cv{color:#A9C4B6;transition:transform .2s;}
+.emp-sub-b{padding:10px 12px 4px;}
 /* 従業員マスタ 絞り込み(在籍中/休暇中/退職者/全員) */
 .emp-filter{display:flex;gap:6px;margin:0 0 10px;flex-wrap:wrap;}
 .emp-filter .ef-b{flex:1;min-width:64px;text-align:center;border:1.5px solid #d4eae0;border-radius:9px;padding:7px 4px;font-size:12px;font-weight:700;color:#7aa08c;background:#fff;cursor:pointer;}
