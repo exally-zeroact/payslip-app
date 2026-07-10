@@ -195,6 +195,17 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .help-b b{color:#2E7D54;font-weight:700;}
 .help-x{margin-top:14px;width:100%;padding:11px;background:#3D9E72;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;}
 .finput:focus{outline:none;border-color:#52B788;}
+/* アプリ内モーダル(alert/confirm/prompt置換・動的生成) */
+.ui-modal-ov{position:fixed;inset:0;z-index:120;background:rgba(20,40,28,.46);display:flex;align-items:center;justify-content:center;padding:20px;animation:uiModalIn .16s ease;}
+@keyframes uiModalIn{from{opacity:0;}to{opacity:1;}}
+.ui-modal-card{background:#fff;border-radius:16px;max-width:360px;width:100%;padding:18px 18px 14px;box-shadow:0 14px 44px rgba(20,40,28,.34);}
+.ui-modal-t{font-size:15px;font-weight:700;color:#1a4a2e;margin-bottom:8px;}
+.ui-modal-b{font-size:13px;line-height:1.7;color:#4A6B5A;white-space:pre-line;}
+.ui-modal-in{margin-top:12px;width:100%;}
+.ui-modal-btns{display:flex;gap:8px;margin-top:16px;}
+.ui-modal-btn{flex:1;padding:11px;background:#EAF4EE;color:#3D6B53;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;}
+.ui-modal-btn.primary{background:#3D9E72;color:#fff;}
+.ui-modal-btn:active{filter:brightness(.95);}
 .finput-sm{padding:5px 8px;font-size:13px;width:auto;}
 .hint{font-size:11px;color:#7aa08c;line-height:1.6;margin-top:6px;}
 

@@ -703,6 +703,30 @@
   function reviewCounts(){ var done=0,total=0; state.employees.forEach(function(e){ if(!isActiveInMonth(e,state.month))return; total++; var r=compute(e); if(empConfirmed(e)||empAutoOk(e,r))done++; }); return {done:done,total:total,need:total-done}; }
   function setConfirm(id,on){ if(!state.confirmed[state.month])state.confirmed[state.month]={}; if(on)state.confirmed[state.month][id]=true; else delete state.confirmed[state.month][id]; }
   function toast(msg){ try{ var t=document.getElementById('app-toast'); if(!t){ t=document.createElement('div'); t.id='app-toast'; t.style.cssText='position:fixed;left:50%;bottom:88px;transform:translateX(-50%);background:#2E7D54;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 4px 16px rgba(0,0,0,.22);z-index:9999;opacity:0;transition:opacity .25s;pointer-events:none'; document.body.appendChild(t); } t.textContent=msg; t.style.opacity='1'; clearTimeout(t._h); t._h=setTimeout(function(){ t.style.opacity='0'; },2200); }catch(e){} }
+  // アプリ内モーダル(native alert/confirm/promptの置換)。Promiseで解決=非同期。DOMは動的生成(HTML変更不要)。
+  //  uiAlert→Promise<true> / uiConfirm→Promise<bool> / uiPrompt→Promise<string|null(キャンセル)>
+  function uiModal(opts){
+    return new Promise(function(resolve){
+      var ov=document.createElement('div'); ov.className='ui-modal-ov';
+      var card=document.createElement('div'); card.className='ui-modal-card'; card.setAttribute('role','dialog');
+      if(opts.title){ var t=document.createElement('div'); t.className='ui-modal-t'; t.textContent=opts.title; card.appendChild(t); }
+      if(opts.msg){ var b=document.createElement('div'); b.className='ui-modal-b'; b.textContent=opts.msg; card.appendChild(b); }
+      var inp=null;
+      if(opts.input){ inp=document.createElement('input'); inp.type='text'; inp.className='ui-modal-in finput'; inp.value=opts.input.def||''; if(opts.input.placeholder)inp.placeholder=opts.input.placeholder; card.appendChild(inp); }
+      var bw=document.createElement('div'); bw.className='ui-modal-btns';
+      (opts.buttons||[{label:'OK',val:true,primary:true}]).forEach(function(bt){ var el=document.createElement('button'); el.className='ui-modal-btn'+(bt.primary?' primary':''); el.textContent=bt.label; el.addEventListener('click',function(){ close(bt.val); }); bw.appendChild(el); });
+      card.appendChild(bw);
+      function close(v){ if(ov.parentNode)ov.parentNode.removeChild(ov); document.removeEventListener('keydown',onKey); resolve(opts.input?(v?(inp.value):null):v); }
+      function onKey(e){ if(e.key==='Escape'){ close(opts.input?false:false); } else if(e.key==='Enter'&&opts.input){ close(true); } }
+      ov.addEventListener('click',function(e){ if(e.target===ov) close(opts.input?false:false); });
+      document.addEventListener('keydown',onKey);
+      ov.appendChild(card); document.body.appendChild(ov);
+      if(inp) setTimeout(function(){ try{ inp.focus(); inp.select(); }catch(_){} },30);
+    });
+  }
+  function uiAlert(msg,title){ return uiModal({title:title||'お知らせ', msg:msg, buttons:[{label:'OK',val:true,primary:true}]}); }
+  function uiConfirm(msg,title){ return uiModal({title:title||'確認', msg:msg, buttons:[{label:'キャンセル',val:false},{label:'OK',val:true,primary:true}]}); }
+  function uiPrompt(label,def,placeholder){ return uiModal({title:label, input:{def:def||'',placeholder:placeholder||''}, buttons:[{label:'キャンセル',val:false},{label:'OK',val:true,primary:true}]}); }
   // 入社月/退職月の日割・社保の注記(黄・ブロックしない)
   function prorateNote(e){ var pr=e._prorate, lw=e._leaveNoWork; var msg=[];
     if(pr&&pr.prorate&&pr.factor<1) msg.push((pr.isJoin&&!pr.isLeave?'入社月':pr.isLeave&&!pr.isJoin?'退職月':'入社/退職月')+'につき在籍'+pr.zd+'日で日割（'+pr.zd+'/'+pr.dim+'日）');
@@ -732,21 +756,22 @@
     return { applied:applied, unmatched:unmatched };
   }
   function importKintaiCsv(text){
-    if(typeof KintaiCsv==='undefined'){ alert('CSVモジュールが読み込まれていません'); return; }
+    if(typeof KintaiCsv==='undefined'){ uiAlert('CSVモジュールが読み込まれていません'); return; }
     var r=KintaiCsv.parse(text);
-    if(r.warnings.length){ alert('取り込めません:\n'+r.warnings.join('\n')); return; }
-    if(!r.rows.length){ alert('データ行がありません。'); return; }
+    if(r.warnings.length){ uiAlert('取り込めません:\n'+r.warnings.join('\n')); return; }
+    if(!r.rows.length){ uiAlert('データ行がありません。'); return; }
     var matched=0, unmatched=[]; r.rows.forEach(function(row){ if(findEmpForKintai(row)) matched++; else unmatched.push(row.name); });
     var FN={shukkin:'出勤日数',kekkin:'欠勤日数',yukyu:'有給',worked:'労働時間',ot:'残業',night:'深夜',holiday:'休日'};
     var cols=r.recognized.filter(function(f){ return f!=='name'&&f!=='no'; }).map(function(f){ return FN[f]||f; }).join('・')||'(なし)';
     var msg='勤怠CSVを取り込みます（対象月 '+state.month+'）。\n\n認識した項目: '+cols+'\n反映される人: '+matched+'名'
       +(unmatched.length?'\n⚠ 未一致（氏名が従業員と不一致）: '+unmatched.slice(0,10).join('・')+(unmatched.length>10?' 他':''):'')
       +'\n\nこの内容で反映しますか？（反映後も各自 手修正できます）';
-    if(matched===0){ alert('一致する従業員がいません。CSVの氏名と従業員マスタの氏名を合わせてください。\n未一致: '+unmatched.join('・')); return; }
-    if(!confirm(msg)) return;
-    var ap=applyKintaiRows(r.rows);
-    renderInput(); persistSaveDebounced();
-    toast(ap.applied.length+'名の勤怠を反映しました'+(ap.unmatched.length?'（未一致 '+ap.unmatched.length+'名）':''));
+    if(matched===0){ uiAlert('一致する従業員がいません。CSVの氏名と従業員マスタの氏名を合わせてください。\n未一致: '+unmatched.join('・')); return; }
+    uiConfirm(msg).then(function(ok){ if(!ok) return;
+      var ap=applyKintaiRows(r.rows);
+      renderInput(); persistSaveDebounced();
+      toast(ap.applied.length+'名の勤怠を反映しました'+(ap.unmatched.length?'（未一致 '+ap.unmatched.length+'名）':''));
+    });
   }
   function renderInput(){
     var host=$('#input-list'); if(!host) return; loadPrev();
@@ -1009,7 +1034,7 @@
     if(kind==='dept'){ var g=CD().deptGroups(deptRows()); PayslipXlsx.downloadSheets([{name:'部署別集計', aoa:PayslipXlsx.deptSummaryAOA(g,{company:co,monthLabel:mlabel})}], {filename:'部署別集計_'+state.month+'.xlsx'}); return; }
     if(kind==='daicho'){ var year=parseInt(String(state.month||'').slice(0,4),10)||2026;
       Store.getPayslipsByYm(year+'-01',year+'-12').then(function(recs){ var L=CD().buildLedger(recs||[],year,state.employees);
-        var sheets=PayslipXlsx.chinginDaichoSheets(L, year, CD(), {company:co}); if(!sheets.length){ alert('確定済みの月がありません。'); return; } PayslipXlsx.downloadSheets(sheets,{filename:'賃金台帳_'+year+'.xlsx'}); }); return; } }
+        var sheets=PayslipXlsx.chinginDaichoSheets(L, year, CD(), {company:co}); if(!sheets.length){ uiAlert('確定済みの月がありません。'); return; } PayslipXlsx.downloadSheets(sheets,{filename:'賃金台帳_'+year+'.xlsx'}); }); return; } }
 
   /* ---------- 年末調整(view-nen) ---------- */
   function Nen_(){ return (typeof Nenmatsu!=='undefined')?Nenmatsu:(window&&window.Nenmatsu); }
@@ -1165,7 +1190,7 @@
   }
   function nenPrintGensen(){
     var year=nenYear(); var emps=state._nenEmps||[];
-    if(!emps.length){ alert('対象の従業員がいません。'); return; }
+    if(!emps.length){ uiAlert('対象の従業員がいません。'); return; }
     var body=emps.map(function(e){ return nenGensenHTML(e, year); }).join('');
     var css='body{font-family:"Noto Sans JP",sans-serif;color:#1a1a1a;margin:0;padding:12px;}'
       +'.gensen{border:2px solid #333;border-radius:4px;padding:12px 14px;margin:0 0 16px;page-break-after:always;}'
@@ -1179,7 +1204,7 @@
       +'<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">'
       +'<style>'+css+'</style></head><body>'+body
       +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},400);}</scr'+'ipt></body></html>';
-    var w=window.open('', '_blank'); if(!w){ alert('ポップアップがブロックされました。ブラウザの設定で許可してください。'); return; }
+    var w=window.open('', '_blank'); if(!w){ uiAlert('ポップアップがブロックされました。ブラウザの設定で許可してください。'); return; }
     w.document.open(); w.document.write(html); w.document.close();
   }
 
@@ -1265,21 +1290,21 @@
       +'<p class="hint" style="margin:6px 0 0">全銀ファイル=銀行の「総合振込」に取り込む固定長データ（Shift-JIS）。銀行/支店コードは通帳や銀行サイトで確認してください。</p>';
     box.innerHTML=committer+listHTML+btns;
   }
-  function dlBytes(bytes, filename, type){ try{ var blob=new Blob([bytes],{type:type||'application/octet-stream'}); var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(url); if(a.parentNode)a.parentNode.removeChild(a); },200); }catch(e){ alert('ダウンロードに失敗しました'); } }
+  function dlBytes(bytes, filename, type){ try{ var blob=new Blob([bytes],{type:type||'application/octet-stream'}); var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(url); if(a.parentNode)a.parentNode.removeChild(a); },200); }catch(e){ uiAlert('ダウンロードに失敗しました'); } }
   function downloadZengin(){
-    if(typeof Zengin==='undefined'){ alert('全銀モジュールが読み込まれていません'); return; }
+    if(typeof Zengin==='undefined'){ uiAlert('全銀モジュールが読み込まれていません'); return; }
     var c=state.company; var d=(c.furiDate&&/^\d{4}-\d{2}-\d{2}$/.test(c.furiDate))?c.furiDate.slice(5,7)+c.furiDate.slice(8,10):'';
     var committer={ code:c.furiCode, name:c.furiName, torikumiMMDD:d, bankNo:c.furiBankNo, bankName:c.furiBankName, branchNo:c.furiBranchNo, branchName:c.furiBranchName, yokin:c.furiYokin, account:c.furiAccount };
     var tr=buildTransfers().filter(function(t){return t.ready;});
-    if(!tr.length){ alert('振込対象がありません。従業員マスタの「総合振込データ用」に銀行/支店/口座を入力してください。'); return; }
+    if(!tr.length){ uiAlert('振込対象がありません。従業員マスタの「総合振込データ用」に銀行/支店/口座を入力してください。'); return; }
     var r=Zengin.build(committer, tr);
     dlBytes(r.bytes, 'furikomi_'+state.month+'.txt', 'text/plain');
     toast('全銀ファイルを作成しました（'+r.count+'件・'+yen(r.total)+'）');
   }
   function downloadFuriExcel(){
-    if(typeof PayslipXlsx==='undefined'||!PayslipXlsx.downloadSheets){ alert('Excelモジュールが読み込まれていません'); return; }
+    if(typeof PayslipXlsx==='undefined'||!PayslipXlsx.downloadSheets){ uiAlert('Excelモジュールが読み込まれていません'); return; }
     var tr=buildTransfers().filter(function(t){return t.amount>0;});
-    if(!tr.length){ alert('対象がありません。'); return; }
+    if(!tr.length){ uiAlert('対象がありません。'); return; }
     var aoa=[['氏名','受取人名(ｶﾅ)','銀行名','銀行コード','支店名','支店コード','科目','口座番号','差引支給額']];
     tr.forEach(function(t){ aoa.push([t.emp.name, t.name, t.bankName||'', t.bankNo||'', t.branchName||'', t.branchNo||'', t.yokin||'', t.account||'', t.amount]); });
     aoa.push(['合計','','','','','','','', tr.reduce(function(a,t){return a+t.amount;},0)]);
@@ -1369,7 +1394,7 @@
       var mu=ev.target.closest('[data-moveup]'); if(mu){ moveEmp(+mu.dataset.moveup,-1); return; }
       var md=ev.target.closest('[data-movedn]'); if(md){ moveEmp(+md.dataset.movedn,1); return; }
       if(ev.target.dataset.goleave!=null){ var gl=+ev.target.dataset.goleave; var ge=state.employees[gl]; state.open[ge.id]=true; state.open['D'+ge.id]=true; renderEmpMaster(); return; } // カードの詳細(就業状況)を開く=1経路に集約
-      if(ev.target.dataset.goretire!=null){ var gr=+ev.target.dataset.goretire; if(activeEmps().length<=1){ alert('稼働中は最低1名必要です'); return; } if(!confirm((state.employees[gr].name||'この従業員')+' を退職にします。給与計算・印刷の対象から外れます（データは残ります）。')) return; state.employees[gr].retired=true; state.employees[gr].retiredYmd=state.month; renderEmpMaster(); return; }
+      if(ev.target.dataset.goretire!=null){ var gr=+ev.target.dataset.goretire; if(activeEmps().length<=1){ uiAlert('稼働中は最低1名必要です'); return; } uiConfirm((state.employees[gr].name||'この従業員')+' を退職にします。給与計算・印刷の対象から外れます（データは残ります）。').then(function(ok){ if(!ok)return; state.employees[gr].retired=true; state.employees[gr].retiredYmd=state.month; renderEmpMaster(); }); return; }
       var card=ev.target.closest('.mco');
       var tg=ev.target.closest('[data-toggle]');
       if(tg){ var ti=+tg.dataset.toggle; var e=state.employees[ti]; state.open[e.id]=!state.open[e.id]; renderEmpMaster(); return; }
@@ -1387,14 +1412,14 @@
         renderEmpMaster(); return; }
       if(ev.target.classList.contains('chip')){ var key=ev.target.dataset.chip, lab=ev.target.dataset.lab; var arr=emp[key]; var idx=arr.findIndex(function(x){return x.label===lab;}); if(idx>=0)arr.splice(idx,1); else arr.push({label:lab,value:'0'}); renderEmpMaster(); return; }
       if(ev.target.classList.contains('ac-btn')){ var g=ev.target.dataset.g; var inp=ev.target.previousElementSibling; var val=(inp.value||'').trim(); if(val){ emp[g].push({label:val,value:'0'}); renderEmpMaster(); } return; }
-      if(ev.target.classList.contains('m-retire')){ if(!emp.retired){ if(confirm((emp.name||'この従業員')+' を退職にします。給与計算・印刷の対象から外れます（データは残ります）。')){ emp.retired=true; emp.retiredYmd=state.month; state.open[emp.id]=false; renderEmpMaster(); } } else { emp.retired=false; renderEmpMaster(); } return; }
-      if(ev.target.classList.contains('m-del-emp')){ if(activeEmps().length<=1&&!emp.retired){alert('稼働中は最低1名必要です');return;} state.employees.splice(i,1); renderEmpMaster(); return; }
+      if(ev.target.classList.contains('m-retire')){ if(!emp.retired){ uiConfirm((emp.name||'この従業員')+' を退職にします。給与計算・印刷の対象から外れます（データは残ります）。').then(function(ok){ if(!ok)return; emp.retired=true; emp.retiredYmd=state.month; state.open[emp.id]=false; renderEmpMaster(); }); } else { emp.retired=false; renderEmpMaster(); } return; }
+      if(ev.target.classList.contains('m-del-emp')){ if(activeEmps().length<=1&&!emp.retired){uiAlert('稼働中は最低1名必要です');return;} state.employees.splice(i,1); renderEmpMaster(); return; }
     });
     el.addEventListener('change',function(ev){
       var card=ev.target.closest('.mco'); if(!card)return; var i=+card.dataset.i; var emp=state.employees[i];
       if(ev.target.classList.contains('sh-days')){ renderEmpMaster(); return; }
       var f=ev.target.dataset.f; if(!f)return;
-      if((f==='dept'||f==='role')&&ev.target.value==='__new'){ var label=f==='dept'?'部署':'役職'; var nv=(prompt('新しい'+label+'名',''))||''; nv=nv.trim(); if(nv){ var list=f==='dept'?state.depts:state.roles; if(list.indexOf(nv)<0)list.push(nv); emp[f]=nv; } renderEmpMaster(); return; }
+      if((f==='dept'||f==='role')&&ev.target.value==='__new'){ var label=f==='dept'?'部署':'役職'; var fld=f; uiPrompt('新しい'+label+'名を入力').then(function(nv){ nv=(nv||'').trim(); if(nv){ var list=fld==='dept'?state.depts:state.roles; if(list.indexOf(nv)<0)list.push(nv); emp[fld]=nv; } renderEmpMaster(); }); return; }
       emp[f]=ev.target.value; if(ev.target.classList.contains('num')){ emp[f]=String(num(ev.target.value)); ev.target.value=fmtN(emp[f]); }
       if(f==='workStatus'){ if(!emp.apply)emp.apply={}; var off=(emp.workStatus==='sankyu'||emp.workStatus==='ikukyu'); ['health','pension','kaigo'].forEach(function(k){ if(off) emp.apply[k]=false; else delete emp.apply[k]; }); }
       if(f==='payType'||f==='dept'||f==='role'||f==='commuteType'||f==='workStatus'||f==='residentTaxMode'||f==='residentTaxAnnual'||f==='taishokuYmd') renderEmpMaster();
@@ -1411,7 +1436,7 @@
     var swX=0,swY=0,swCard=null;
     el.addEventListener('touchstart',function(ev){ swCard=ev.target.closest('.mco'); if(swCard){ swX=ev.touches[0].clientX; swY=ev.touches[0].clientY; } },{passive:true});
     el.addEventListener('touchend',function(ev){ if(!swCard)return; var c=swCard; swCard=null; var dx=ev.changedTouches[0].clientX-swX, dy=ev.changedTouches[0].clientY-swY;
-      if(dx<-60 && Math.abs(dy)<40){ var i=+c.dataset.i, e=state.employees[i]; if(state.employees.length<=1){ alert('最低1名は必要です'); return; } if(confirm((e&&e.name||'この従業員')+' を削除しますか？')){ state.employees.splice(i,1); renderEmpMaster(); } } });
+      if(dx<-60 && Math.abs(dy)<40){ var i=+c.dataset.i, e=state.employees[i]; if(state.employees.length<=1){ uiAlert('最低1名は必要です'); return; } uiConfirm((e&&e.name||'この従業員')+' を削除しますか？').then(function(ok){ if(ok){ state.employees.splice(i,1); renderEmpMaster(); } }); } });
 
     // 入力 accordion
     var il=$('#input-list');
@@ -1423,8 +1448,9 @@
       var fs=e.target.closest('[data-fillsche]');
       if(fs){ var sd=fs.dataset.fillsche;
         var hasManual=state.employees.some(function(emp){ if(!isActiveInMonth(emp,state.month))return false; var mi=kinIdx(emp,/出勤/); return mi>=0 && emp.kintai[mi].value!=='' && emp.kintai[mi].value!=null && String(emp.kintai[mi].value)!==String(sd); });
-        if(hasManual && !confirm('手入力した出勤日数がある人も含めて、全員の出勤を所定（'+sd+'日）で上書きします。よろしいですか？')) return;
-        state.employees.forEach(function(emp){ if(!isActiveInMonth(emp,state.month))return; ensureKintai(emp); var oi=kinIdx(emp,/出勤/); if(oi>=0) emp.kintai[oi].value=sd; }); renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
+        var doFill=function(){ state.employees.forEach(function(emp){ if(!isActiveInMonth(emp,state.month))return; ensureKintai(emp); var oi=kinIdx(emp,/出勤/); if(oi>=0) emp.kintai[oi].value=sd; }); renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); };
+        if(hasManual){ uiConfirm('手入力した出勤日数がある人も含めて、全員の出勤を所定（'+sd+'日）で上書きします。よろしいですか？').then(function(ok){ if(ok)doFill(); }); } else { doFill(); }
+        return; }
       if(e.target.closest('[data-csvimport]')){ var kf=$('#kintai-file'); if(kf){ kf.value=''; kf.click(); } return; }
       var tg=e.target.closest('[data-toggle]');
       if(tg){ var i=+tg.dataset.toggle; var emp=state.employees[i]; state.open['I'+emp.id]=!state.open['I'+emp.id]; il.querySelector('.acc[data-i="'+i+'"]').classList.toggle('open'); return; }
@@ -1502,8 +1528,8 @@
     });
     $('#webmeisai-card').addEventListener('click',function(e){
       var cp=e.target.closest('.wm-copy'); if(cp){ try{ navigator.clipboard.writeText(cp.dataset.link); toast('コピーしました'); }catch(err){} return; }
-      var ri=e.target.closest('.wm-reissue'); if(ri){ if(!confirm('初回コードを再発行しますか？\n現在のパスワードと端末の記憶は無効になり、従業員は新しい初回コードで再設定します。')) return;
-        Store.reissueMeisaiInit(ri.dataset.token).then(function(){ renderWebMeisai(); toast('初回コードを再発行しました'); }); return; }
+      var ri=e.target.closest('.wm-reissue'); if(ri){ var tok=ri.dataset.token; uiConfirm('初回コードを再発行しますか？\n現在のパスワードと端末の記憶は無効になり、従業員は新しい初回コードで再設定します。').then(function(ok){ if(!ok)return;
+        Store.reissueMeisaiInit(tok).then(function(){ renderWebMeisai(); toast('初回コードを再発行しました'); }); }); return; }
     });
     window.addEventListener('resize',function(){ if($('#scr-print').classList.contains('active'))doPreview(); });
   }
