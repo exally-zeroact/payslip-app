@@ -31,6 +31,34 @@
   // カスタム給の既定spec(固定 +「歩合 か 時給×時間 の高い方」)。payType=カスタムに切替時にlazy初期化。
   function defPayRule(){ return { fixed:'', variable:{ mode:'max', parts:[{type:'commission',amount:'',label:''},{type:'hourly',amount:'',label:''}] } }; }
   function ensurePayRule(e){ if(!e.payRule||!e.payRule.variable) e.payRule=defPayRule(); if(!e.payRule.variable.parts) e.payRule.variable.parts=[]; return e.payRule; }
+  function PPARSE(){ return (typeof PayParse!=='undefined')?PayParse:(window&&window.PayParse); }
+  // 雑入力の解釈結果を従業員に反映(payType+base/hourly/payRule)
+  function applyParse(e,r){ if(!r||!r.ok)return; e.payType=r.payType;
+    if(r.fields.hourly!=null) e.hourly=r.fields.hourly;
+    if(r.fields.base!=null) e.base=r.fields.base;
+    if(r.fields.payRule){ e.payRule=JSON.parse(JSON.stringify(r.fields.payRule)); }
+    if(e.payType==='カスタム') ensurePayRule(e);
+    syncBasePay(e);
+  }
+  // 解釈の「数字例つき確認」テキスト。例の当月値でbasePayを計算して見せる=人が誤読を捕まえる(silent-wrong防止)
+  function parseExampleText(r){
+    var pr=PR(); if(!pr) return '';
+    if(r.payType==='時給') return '例：160時間なら 基本給 '+yen(Math.round(num(r.fields.hourly)*160))+'（時給×時間）';
+    if(r.payType==='日給') return '例：20日出勤なら 基本給 '+yen(num(r.fields.base)*20)+'（日給×日数）';
+    if(r.payType==='月給') return '基本給（固定）'+yen(num(r.fields.base));
+    if(r.payType==='カスタム'&&r.fields.payRule){
+      var ctx={ workMin:9600, workDays:20, sales:1000000, count:100, commission:200000 };
+      var res=pr.basePay(r.fields.payRule, ctx);
+      var used=[]; var pts=(r.fields.payRule.variable&&r.fields.payRule.variable.parts)||[];
+      if(pts.some(function(p){return p.type==='hourly';})) used.push('160時間');
+      if(pts.some(function(p){return p.type==='daily';})) used.push('20日');
+      if(pts.some(function(p){return p.type==='rate';})) used.push('売上100万');
+      if(pts.some(function(p){return p.type==='piece';})) used.push('件数100');
+      if(pts.some(function(p){return p.type==='commission';})) used.push('歩合20万');
+      return '例：'+(used.join('・')||'当月値')+'なら 基本給 '+yen(res.base)+(res.chosen?'（採用：'+res.chosen.label+' '+yen(res.chosen.value)+'）':'');
+    }
+    return '';
+  }
   // ── 給与パターン(テンプレ): 給料の「決め方＋既定の支給/控除項目」を名前付きで保存→他の従業員に適用 ──
   //  ★人ごとの値(氏名/生年月日/扶養/都道府県/通勤/歩合額/売上等)は含めない=給与"構造"だけをテンプレ化★
   var PAY_PATTERN_FIELDS=['payType','base','hourly','hourlyGuarantee','annualHolidays','dailyWorkH','dailyWorkM','minashiH'];
@@ -468,14 +496,21 @@
         +'<select class="finput pr-type" data-prtype="'+i+':'+idx+'" style="flex:1.3;min-width:0">'+TYPES.map(function(t){return '<option value="'+t[0]+'"'+(p.type===t[0]?' selected':'')+'>'+t[1]+'</option>';}).join('')+'</select>'
         +(isCom?'<span style="font-size:10px;color:#8FA89A;flex:1">歩合額は毎月「入力」で</span>':'<input class="finput num pr-amt" data-pramt="'+i+':'+idx+'" inputmode="numeric" value="'+attr(fmtN(p.amount))+'" placeholder="'+amtPh(p.type)+'" style="width:90px">')
         +'<button class="btn-ghost bx-del" data-prdel="'+i+':'+idx+'">×</button></div>'; }).join('');
+    var isMax=(v.mode==='max'), isOne=(v.mode==='one'), hasFix=num(pr.fixed)>0;
+    // 決め方=実務の型。none=固定給/月給のみ・one=固定給+歩合(上乗せ)・max=完全歩合+保障(高い方)
+    var modeNote = isMax ? '<b>完全歩合＋保障</b>の型。下の部品の"高い方"を採用します。時給×時間／日給×日数は労基27条の<b>保障給（下限）</b>になります（固定給は通常0）。'
+      : isOne ? '<b>固定給＋歩合</b>の型。固定給（月給）に、下の歩合などを<b>上乗せ</b>します。'
+      : '固定給（月給）だけ。変動なし。';
+    var maxFixWarn = (isMax && hasFix) ? '<div class="cr-warn" style="margin:4px 2px 0">※「高い方（完全歩合＋保障）」では固定給は通常<b>0</b>です。固定給があるなら決め方を<b>「固定給＋歩合（上乗せ）」</b>にするのが自然です。</div>' : '';
     return '<div class="pr-box">'
-      +'<div class="frow"><div class="flabel">固定給<span class="hint2">円・無ければ0</span></div><input class="finput num" data-prfixed="'+i+'" inputmode="numeric" value="'+attr(fmtN(pr.fixed))+'" placeholder="0"></div>'
-      +'<div class="frow"><div class="flabel">変動部分の決め方</div><select class="finput" data-prmode="'+i+'">'
-        +'<option value="none"'+(v.mode==='none'?' selected':'')+'>なし（固定給のみ）</option>'
-        +'<option value="one"'+(v.mode==='one'?' selected':'')+'>1つ</option>'
-        +'<option value="max"'+(v.mode==='max'?' selected':'')+'>AかBの高い方</option></select></div>'
-      +(v.mode!=='none'?partsHtml+'<div class="addcustom"><button class="btn-ghost" data-pradd="'+i+'" style="padding:8px 12px">＋部品を追加</button></div>':'')
-      +'<div class="ri-note" style="margin:4px 2px 0">例）固定18万＋「売上×率35% か 時給1200×時間 の高い方」＝固定給18万・決め方「高い方」・部品〔売上×率:35〕〔時給×時間:1200〕。歩合額・売上は毎月「入力」タブで。</div>'
+      +'<div class="frow"><div class="flabel">固定給<span class="hint2">月給・'+(isMax?'高い方なら0':'無ければ0')+'</span></div><input class="finput num" data-prfixed="'+i+'" inputmode="numeric" value="'+attr(fmtN(pr.fixed))+'" placeholder="0"></div>'
+      +'<div class="frow"><div class="flabel">決め方</div><select class="finput" data-prmode="'+i+'">'
+        +'<option value="none"'+(v.mode==='none'?' selected':'')+'>固定給（月給）だけ</option>'
+        +'<option value="one"'+(v.mode==='one'?' selected':'')+'>固定給＋歩合（上乗せ）</option>'
+        +'<option value="max"'+(v.mode==='max'?' selected':'')+'>高い方を採用（完全歩合＋保障）</option></select></div>'
+      +'<div class="ri-note" style="margin:2px 2px 6px">'+modeNote+'</div>'+maxFixWarn
+      +(v.mode!=='none'?(isMax?'<div class="hint" style="margin:2px 2px 4px;color:#3D6B53">高い方を採用する候補（歩合系＋保障）</div>':'<div class="hint" style="margin:2px 2px 4px;color:#3D6B53">上乗せする歩合など</div>')+partsHtml+'<div class="addcustom"><button class="btn-ghost" data-pradd="'+i+'" style="padding:8px 12px">＋'+(isMax?'候補':'項目')+'を追加</button></div>':'')
+      +'<div class="ri-note" style="margin:4px 2px 0">例）完全歩合＋保障＝決め方「高い方」・候補〔売上×率:35〕〔時給×時間:1200（保障）〕・固定給0。／固定給＋歩合＝決め方「上乗せ」・固定給18万・項目〔歩合〕。歩合額・売上は毎月「入力」タブで。</div>'
       +'</div>';
   }
   // 給与パターンの適用select＋保存ボタン(従業員カード基本欄)
@@ -486,6 +521,12 @@
       +(pats.length?'<select class="finput pat-apply" data-i="'+i+'" style="flex:1"><option value="">— 選んで適用 —</option>'+pats.map(function(p){return '<option value="'+attr(p.id)+'">'+esc(p.name)+'</option>';}).join('')+'</select>':'<span style="flex:1;font-size:11px;color:#8FA89A">まだパターンがありません</span>')
       +'<button class="btn-ghost pat-save" data-i="'+i+'" style="padding:9px 10px;white-space:nowrap;font-size:12px">この設定を保存</button></div></div>'
       +'<div class="hint" style="margin:2px 2px 8px">'+(pats.length?'選ぶと 給与形態・決め方・支給/控除項目 をこの人に反映（氏名・扶養・通勤などは変わりません）。':'「この設定を保存」で いまの給与形態・決め方・項目 を"パターン"化 → 他の人へ一括適用できます。')+'</div>';
+  }
+  // 雑入力ウィザード(給料の決め方を言葉で→読み取る→数字例つき確認→設定)
+  function parseRow(e,i){
+    return '<div class="frow"><div class="flabel">雑に書いて作る<span class="hint2">任意</span></div>'
+      +'<div style="display:flex;gap:6px;align-items:center"><input class="finput parse-in" data-i="'+i+'" placeholder="例：売上の3.5割か時給1200の高い方"><button class="btn-ghost parse-go" data-i="'+i+'" style="white-space:nowrap;padding:9px 12px">読み取る</button></div></div>'
+      +'<div class="hint" style="margin:2px 2px 8px">給料の決め方を言葉で書いて「読み取る」→ 内容を"数字例つき"で確認して設定できます（時給/月給/日給/歩合/売上×率/件数×単価/固定＋歩合/高い方）。</div>';
   }
   function empCardBody(e,i){
     var dOpen=!!state.open['D'+e.id];
@@ -499,6 +540,7 @@
         : '<div class="frow2"><div class="frow"><div class="flabel">給与形態</div><select class="finput m-f" data-f="payType">'+PAYTYPES.map(function(p){return '<option'+(p===e.payType?' selected':'')+'>'+p+'</option>';}).join('')+'</select></div>'
           +'<div class="frow"><div class="flabel">'+amtLabel+'<span class="hint2">円'+(e.payType==='歩合'?'/時':'')+'</span></div><input class="finput num m-f" data-f="'+payField+'" inputmode="numeric" value="'+attr(fmtN(e[payField]))+'"></div></div>'
           +(e.payType==='歩合'?'<div class="ri-note" style="margin:-4px 2px 8px">歩合給額は毎月「入力」タブで。基本給＝歩合実績と保障給（保障時給×総労働時間）の高い方（労基27条）。割増は歩合給÷総労働時間に上乗せ。</div>':''))
+      +parseRow(e,i)
       +payPatternRow(e,i)
       +(function(){ var mw=minWageInfo(e); if(!mw||mw.ok) return ''; return '<div class="cr-warn" style="margin:0 2px 8px">⚠ 最低賃金（'+esc(mw.prefName)+' 時給'+fmtN(mw.minWage)+'円）を下回っています（約'+fmtN(mw.hourly)+'円）</div>'; })()
       +'<div class="frow2"><div class="frow"><div class="flabel">都道府県<span class="hint2">健保率</span></div><select class="finput m-f" data-f="pref">'+prefOptions(e.pref)+'</select></div>'
@@ -1581,6 +1623,12 @@
         renderEmpMaster(); return; }
       if(ev.target.classList.contains('chip')){ var key=ev.target.dataset.chip, lab=ev.target.dataset.lab; var arr=emp[key]; var idx=arr.findIndex(function(x){return x.label===lab;}); if(idx>=0)arr.splice(idx,1); else arr.push({label:lab,value:'0'}); renderEmpMaster(); return; }
       if(ev.target.classList.contains('ac-btn')){ var g=ev.target.dataset.g; var inp=ev.target.previousElementSibling; var val=(inp.value||'').trim(); if(val){ emp[g].push({label:val,value:'0'}); renderEmpMaster(); } return; }
+      if(ev.target.classList.contains('parse-go')){ var pp=PPARSE(); var pin=ev.target.previousElementSibling; var ptxt=(pin&&pin.value||'').trim(); if(!ptxt)return; // 雑入力→解釈→数字例つき確認
+        var r=pp?pp.parse(ptxt):{ok:false};
+        if(!r.ok){ uiAlert('「'+ptxt+'」から給料の決め方を読み取れませんでした。\n例：時給1200 ／ 月給25万 ／ 売上の3.5割か時給1200の高い方 ／ 1件1500円'); return; }
+        var body='読み取り：'+r.summary+'\n\n'+parseExampleText(r)+(r.unrecognized?'\n\n※「'+r.unrecognized+'」は読み取れませんでした（あとで手で足せます）':'');
+        uiModal({ title:'この内容でいいですか？', msg:body, buttons:[{label:'キャンセル',val:false},{label:'この内容で設定',val:true,primary:true}] }).then(function(ok){ if(!ok)return; applyParse(emp,r); renderEmpMaster(); if(window.persistSaveDebounced)persistSaveDebounced(); toast('給与形態を設定しました'); });
+        return; }
       if(ev.target.classList.contains('pat-save')){ uiPrompt('パターン名を入力','','例：ドライバー・事務・バイト').then(function(nm){ nm=(nm||'').trim(); if(!nm)return; if(!state.payPatterns)state.payPatterns=[]; state.payPatterns.push(makePayPattern(emp,nm)); renderEmpMaster(); if(window.persistSaveDebounced)persistSaveDebounced(); toast('パターン「'+nm+'」を保存しました'); }); return; } // 給与パターン保存
       if(ev.target.closest('[data-pradd]')){ ensurePayRule(emp).variable.parts.push({type:'hourly',amount:''}); renderEmpMaster(); return; } // カスタム給: 部品追加
       var prd=ev.target.closest('[data-prdel]'); if(prd){ ensurePayRule(emp).variable.parts.splice(+String(prd.dataset.prdel).split(':')[1],1); renderEmpMaster(); return; } // 部品削除
