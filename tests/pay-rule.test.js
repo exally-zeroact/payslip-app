@@ -32,6 +32,41 @@ T('件数×単価 vs 時給保障 の高い方', function () {
   eq(r.base, 192000); eq(r.chosenType, 'hourly'); eq(r.pieceworkForWari, 0);
 });
 
+/* ── 段階制/スライド率(売上に応じ率アップ・超過分だけ=累進) ── */
+T('tiered 累進: 100万まで3%/超5% → 売上120万=40,000', function () {
+  var p = { type: 'tiered', tiers: [{ from: 0, rate: 3 }, { from: 1000000, rate: 5 }] };
+  eq(P.evalPart(p, { sales: 1200000 }), 40000); // 100万×3%(30000)+20万×5%(10000)
+});
+T('tiered 累進: しきい未満は最下段のみ / しきいちょうどは超過0', function () {
+  var p = { type: 'tiered', tiers: [{ from: 0, rate: 3 }, { from: 1000000, rate: 5 }] };
+  eq(P.evalPart(p, { sales: 500000 }), 15000);  // 50万×3%
+  eq(P.evalPart(p, { sales: 1000000 }), 30000); // 全部3%・5%帯は0
+  eq(P.evalPart(p, { sales: 0 }), 0);
+});
+T('tiered 3段・順不同でも内部でソート', function () {
+  var p = { type: 'tiered', tiers: [{ from: 1000000, rate: 6 }, { from: 0, rate: 2 }, { from: 500000, rate: 4 }] };
+  // 50万×2%(10000)+50万×4%(20000)+20万×6%(12000)=42000
+  eq(P.evalPart(p, { sales: 1200000 }), 42000);
+});
+T('tiered 空/不正は0・端数四捨五入', function () {
+  eq(P.evalPart({ type: 'tiered', tiers: [] }, { sales: 1000000 }), 0);
+  eq(P.evalPart({ type: 'tiered' }, { sales: 1000000 }), 0);
+  // 3.333%相当: 30万×1.111%…端数四捨五入(r0)で確認
+  eq(P.evalPart({ type: 'tiered', tiers: [{ from: 0, rate: 3.333 }] }, { sales: 300001 }), Math.round(300001 * 3.333 / 100));
+});
+T('tiered は出来高性=歩合割増側(固定+段階制)', function () {
+  var r = P.basePay({ fixed: 100000, variable: { mode: 'one', parts: [{ type: 'tiered', tiers: [{ from: 0, rate: 3 }, { from: 1000000, rate: 5 }] }] } }, { sales: 1200000 });
+  eq(r.base, 140000); eq(r.chosenType, 'tiered'); eq(r.fixedForWari, 100000); eq(r.pieceworkForWari, 40000);
+});
+T('tiered vs 固定歩合 の高い方(max)', function () {
+  // 段階制(売上120万→40000) vs 固定率4%(売上120万→48000) → 高い方48000
+  var r = P.basePay({ fixed: 0, variable: { mode: 'max', parts: [
+    { type: 'tiered', tiers: [{ from: 0, rate: 3 }, { from: 1000000, rate: 5 }] },
+    { type: 'rate', amount: 4 }
+  ] } }, { sales: 1200000 });
+  eq(r.base, 48000); eq(r.chosenType, 'rate');
+});
+
 /* ── 基本給(固定+変動) ── */
 T('月給: 固定250000・変動なし', function () {
   var r = P.basePay({ fixed: 250000, variable: { mode: 'none' } }, {});

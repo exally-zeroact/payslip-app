@@ -31,6 +31,10 @@
   // カスタム給の既定spec(固定 +「歩合 か 時給×時間 の高い方」)。payType=カスタムに切替時にlazy初期化。
   function defPayRule(){ return { fixed:'', variable:{ mode:'max', parts:[{type:'commission',amount:'',label:''},{type:'hourly',amount:'',label:''}] } }; }
   function ensurePayRule(e){ if(!e.payRule||!e.payRule.variable) e.payRule=defPayRule(); if(!e.payRule.variable.parts) e.payRule.variable.parts=[]; return e.payRule; }
+  // 段階制の段(下限/率)を設定。key='i:idx:tidx:from|rate'。from=整数円 / rate=小数%許容。
+  function prTierSet(e,key,val){ var p=String(key).split(':'); var part=ensurePayRule(e).variable.parts[+p[1]]; if(!part)return; if(!part.tiers)part.tiers=[]; var tr=part.tiers[+p[2]]; if(!tr){ tr={from:'',rate:''}; part.tiers[+p[2]]=tr; }
+    if(p[3]==='rate'){ var v=String(val).replace(/[^0-9.]/g,''); var dot=v.indexOf('.'); if(dot>=0)v=v.slice(0,dot+1)+v.slice(dot+1).replace(/\./g,''); tr.rate=v; }
+    else { tr.from=String(val).replace(/[^0-9]/g,''); } }
   function PPARSE(){ return (typeof PayParse!=='undefined')?PayParse:(window&&window.PayParse); }
   // 雑入力の解釈結果を従業員に反映(payType+base/hourly/payRule)
   function applyParse(e,r){ if(!r||!r.ok)return; e.payType=r.payType;
@@ -489,13 +493,25 @@
   // カスタム給の「決め方」編集UI(固定給 + 変動{なし/1つ/高い方} + 部品)。歩合額/売上は毎月「入力」タブ。
   function payRuleEditor(e,i){
     var pr=ensurePayRule(e); var v=pr.variable||{mode:'none',parts:[]};
-    var TYPES=[['hourly','時給×時間'],['daily','日給×日数'],['piece','件数×単価'],['commission','歩合(出来高)'],['rate','売上×率(%)'],['fixed','固定額']];
+    var TYPES=[['hourly','時給×時間'],['daily','日給×日数'],['piece','件数×単価'],['commission','歩合(出来高)'],['rate','売上×率(%)'],['tiered','売上×段階率'],['fixed','固定額']];
     var amtPh=function(t){ return t==='hourly'?'時給':t==='daily'?'日給':t==='piece'?'単価':t==='rate'?'率%':t==='fixed'?'金額':''; };
-    var partsHtml=(v.parts||[]).map(function(p,idx){ var isCom=(p.type==='commission');
-      return '<div class="bx-row">'
+    var partsHtml=(v.parts||[]).map(function(p,idx){ var isCom=(p.type==='commission'), isTiered=(p.type==='tiered');
+      var head='<div class="bx-row">'
         +'<select class="finput pr-type" data-prtype="'+i+':'+idx+'" style="flex:1.3;min-width:0">'+TYPES.map(function(t){return '<option value="'+t[0]+'"'+(p.type===t[0]?' selected':'')+'>'+t[1]+'</option>';}).join('')+'</select>'
-        +(isCom?'<span style="font-size:10px;color:#8FA89A;flex:1">歩合額は毎月「入力」で</span>':'<input class="finput num pr-amt" data-pramt="'+i+':'+idx+'" inputmode="numeric" value="'+attr(fmtN(p.amount))+'" placeholder="'+amtPh(p.type)+'" style="width:90px">')
-        +'<button class="btn-ghost bx-del" data-prdel="'+i+':'+idx+'">×</button></div>'; }).join('');
+        +(isTiered?'':(isCom?'<span style="font-size:10px;color:#8FA89A;flex:1">歩合額は毎月「入力」で</span>':'<input class="finput num pr-amt" data-pramt="'+i+':'+idx+'" inputmode="numeric" value="'+attr(fmtN(p.amount))+'" placeholder="'+amtPh(p.type)+'" style="width:90px">'))
+        +'<button class="btn-ghost bx-del" data-prdel="'+i+':'+idx+'">×</button></div>';
+      if(!isTiered) return head;
+      var tiers=(p.tiers&&p.tiers.length)?p.tiers:[{from:0,rate:''}];
+      var tiersHtml=tiers.map(function(tr,tidx){ return '<div class="bx-row" style="gap:4px;padding-left:8px">'
+        +'<input class="finput num pr-tier-f" data-prtier="'+i+':'+idx+':'+tidx+':from" inputmode="numeric" value="'+attr(fmtN(tr.from))+'" placeholder="下限(円)" style="width:104px">'
+        +'<span style="font-size:11px;color:#8FA89A">円〜</span>'
+        +'<input class="finput pr-tier-r" data-prtier="'+i+':'+idx+':'+tidx+':rate" inputmode="decimal" value="'+attr(tr.rate==null?'':tr.rate)+'" placeholder="率" style="width:58px">'
+        +'<span style="font-size:11px;color:#8FA89A">%</span>'
+        +'<button class="btn-ghost bx-del" data-prtierdel="'+i+':'+idx+':'+tidx+'">×</button></div>'; }).join('');
+      return head+'<div class="pr-tiers" style="margin:2px 0 6px">'+tiersHtml
+        +'<div class="addcustom"><button class="btn-ghost" data-prtieradd="'+i+':'+idx+'" style="padding:6px 10px">＋段を追加</button></div>'
+        +'<div class="ri-note" style="margin:2px 2px 0">超過分だけその率（累進＝境目で急に増えない）。下限0円から順に。売上は毎月「入力」で。</div></div>';
+    }).join('');
     var isMax=(v.mode==='max'), isOne=(v.mode==='one'), hasFix=num(pr.fixed)>0;
     // 決め方=実務の型。none=固定給/月給のみ・one=固定給+歩合(上乗せ)・max=完全歩合+保障(高い方)
     var modeNote = isMax ? '<b>完全歩合＋保障</b>の型。下の部品の"高い方"を採用します。時給×時間／日給×日数は労基27条の<b>保障給（下限）</b>になります（固定給は通常0）。'
@@ -792,7 +808,7 @@
         +'<div class="basepay-note">'+basePayNoteOnly(e)+'</div>'
         +'<div style="font-size:10px;color:#7aa08c;margin:-4px 2px 8px">保障給の時給は「設定▸従業員マスタ」で。割増は下の「歩合の上乗せ」で。</div></div>'; }
     if(e.payType==='カスタム'){ var spc=ensurePayRule(e); var prts=(spc.variable&&spc.variable.parts)||[];
-      var hasCom=prts.some(function(p){return p.type==='commission';}), hasRate=prts.some(function(p){return p.type==='rate';}), hasPiece=prts.some(function(p){return p.type==='piece';});
+      var hasCom=prts.some(function(p){return p.type==='commission';}), hasRate=prts.some(function(p){return p.type==='rate'||p.type==='tiered';}), hasPiece=prts.some(function(p){return p.type==='piece';});
       var hh='<div class="grp"><div class="grp-h">給与（カスタム）</div>';
       if(hasCom) hh+='<label class="ic-f ic-f2"><span>歩合額<small>円</small></span><input class="finput num cm-f ic-in" data-cmf="commissionAmt" inputmode="numeric" placeholder="0" value="'+attr(fmtN(e.commissionAmt))+'"></label>';
       if(hasPiece) hh+='<label class="ic-f ic-f2"><span>当月の件数<small>件</small></span><input class="finput num cm-f ic-in" data-cmf="pieceCount" inputmode="numeric" placeholder="0" value="'+attr(fmtN(e.pieceCount))+'"></label>';
@@ -1743,6 +1759,8 @@
       if(ev.target.classList.contains('pat-save')){ uiPrompt('パターン名を入力','','例：ドライバー・事務・バイト').then(function(nm){ nm=(nm||'').trim(); if(!nm)return; if(!state.payPatterns)state.payPatterns=[]; state.payPatterns.push(makePayPattern(emp,nm)); renderEmpMaster(); if(window.persistSaveDebounced)persistSaveDebounced(); toast('パターン「'+nm+'」を保存しました'); }); return; } // 給与パターン保存
       if(ev.target.closest('[data-pradd]')){ ensurePayRule(emp).variable.parts.push({type:'hourly',amount:''}); renderEmpMaster(); return; } // カスタム給: 部品追加
       var prd=ev.target.closest('[data-prdel]'); if(prd){ ensurePayRule(emp).variable.parts.splice(+String(prd.dataset.prdel).split(':')[1],1); renderEmpMaster(); return; } // 部品削除
+      var prta=ev.target.closest('[data-prtieradd]'); if(prta){ var _tp=ensurePayRule(emp).variable.parts[+String(prta.dataset.prtieradd).split(':')[1]]; if(_tp){ if(!_tp.tiers||!_tp.tiers.length)_tp.tiers=[{from:0,rate:''}]; _tp.tiers.push({from:'',rate:''}); } renderEmpMaster(); return; } // 段追加
+      var prtd=ev.target.closest('[data-prtierdel]'); if(prtd){ var _pp=String(prtd.dataset.prtierdel).split(':'); var _tp2=ensurePayRule(emp).variable.parts[+_pp[1]]; if(_tp2&&_tp2.tiers)_tp2.tiers.splice(+_pp[2],1); renderEmpMaster(); return; } // 段削除
       if(ev.target.classList.contains('m-retire')){ if(!emp.retired){ uiConfirm((emp.name||'この従業員')+' を退職にします。給与計算・印刷の対象から外れます（データは残ります）。').then(function(ok){ if(!ok)return; emp.retired=true; emp.retiredYmd=state.month; state.open[emp.id]=false; renderEmpMaster(); }); } else { emp.retired=false; renderEmpMaster(); } return; }
       if(ev.target.classList.contains('m-del-emp')){ if(activeEmps().length<=1&&!emp.retired){uiAlert('稼働中は最低1名必要です');return;} state.employees.splice(i,1); renderEmpMaster(); return; }
     });
@@ -1752,7 +1770,8 @@
       if(ev.target.classList.contains('pat-apply')){ var pid=ev.target.value; if(!pid){ renderEmpMaster(); return; } var pat=(state.payPatterns||[]).find(function(x){return x.id===pid;}); if(pat){ uiConfirm('「'+pat.name+'」を '+(emp.name||'この従業員')+' に適用します。給与形態・決め方・支給/控除項目が置き換わります（氏名・扶養・通勤などは変わりません）。よろしいですか？').then(function(ok){ if(!ok){ renderEmpMaster(); return; } applyPayPattern(emp,pat); renderEmpMaster(); if(window.persistSaveDebounced)persistSaveDebounced(); toast('「'+pat.name+'」を適用しました'); }); } return; } // 給与パターン適用
       // カスタム給の決め方(mode/部品type/固定給/部品金額)。data-f無しなので先に処理
       if(ev.target.dataset.prmode!=null){ ensurePayRule(emp).variable.mode=ev.target.value; renderEmpMaster(); return; }
-      var prt=ev.target.closest('[data-prtype]'); if(prt){ var _pt=ensurePayRule(emp).variable.parts[+String(prt.dataset.prtype).split(':')[1]]; if(_pt)_pt.type=prt.value; renderEmpMaster(); return; }
+      var prt=ev.target.closest('[data-prtype]'); if(prt){ var _pt=ensurePayRule(emp).variable.parts[+String(prt.dataset.prtype).split(':')[1]]; if(_pt){ _pt.type=prt.value; if(prt.value==='tiered'&&(!_pt.tiers||!_pt.tiers.length))_pt.tiers=[{from:0,rate:''},{from:'',rate:''}]; } renderEmpMaster(); return; }
+      var prtc=ev.target.closest('[data-prtier]'); if(prtc){ prTierSet(emp,prtc.dataset.prtier,prtc.value); refreshShaho(i); return; } // 段の下限/率(change)
       if(ev.target.dataset.prfixed!=null){ ensurePayRule(emp).fixed=String(num(ev.target.value)); renderEmpMaster(); return; }
       var pra=ev.target.closest('[data-pramt]'); if(pra){ var _pa=ensurePayRule(emp).variable.parts[+String(pra.dataset.pramt).split(':')[1]]; if(_pa)_pa.amount=String(num(pra.value)); renderEmpMaster(); return; }
       var f=ev.target.dataset.f; if(!f)return;
@@ -1766,6 +1785,7 @@
       // カスタム給の固定給/部品金額を入力中に反映(再描画せずフォーカス維持)+社保ヒーロー更新
       if(t.dataset.prfixed!=null){ ensurePayRule(emp).fixed=t.value.replace(/[^0-9]/g,''); refreshShaho(i); return; }
       var _prai=t.closest('[data-pramt]'); if(_prai){ var _pav=ensurePayRule(emp).variable.parts[+String(_prai.dataset.pramt).split(':')[1]]; if(_pav)_pav.amount=t.value.replace(/[^0-9]/g,''); refreshShaho(i); return; }
+      var _prti=t.closest('[data-prtier]'); if(_prti){ prTierSet(emp,_prti.dataset.prtier,t.value); refreshShaho(i); return; } // 段の下限/率(入力中・フォーカス維持)
       if(t.classList.contains('sh-pay')||t.classList.contains('sh-days')){ var k=+t.dataset.k; emp.shaho.months[k]=emp.shaho.months[k]||{}; emp.shaho.months[k][t.classList.contains('sh-pay')?'pay':'days']=t.value; refreshShaho(i); return; }
       if(t.classList.contains('sh-mikomi')){ emp.shaho.mikomi=t.value; refreshShaho(i); return; }
       if(t.classList.contains('sh-manual')){ emp.shaho.manual=t.value; refreshShaho(i); return; }
