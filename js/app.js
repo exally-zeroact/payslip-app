@@ -366,7 +366,7 @@
   function updatePaydayPreview(){ var el=$('#payday-preview'); if(el) el.textContent='→ 支給日：'+payDateStr(); }
   // 支給サイクルの説明(表示のみ・計算方式は月単位で不変)。日払いは丙欄へ誘導。
   function payCycleNote(){ var el=$('#paycycle-note'); if(!el)return; var c=(state.company&&state.company.payCycle)||'monthly';
-    var m={ monthly:'月に1回まとめて支給。', semimonthly:'月に2回に分けて支給。明細に区分を表示します。', weekly:'毎週支給。明細に「週払い」を表示します。', daily:'1日ごとに支給。<b>所得税は日額表「丙欄」が基本</b>です（従業員ごとの税区分で「丙」を選べます）。' };
+    var m={ monthly:'月に1回まとめて支給。', semimonthly:'月に2回に分けて支給。明細に区分を表示します。', weekly:'毎週支給。明細に「週払い」を表示します。', daily:'1日ごとに支給。<b>所得税は日額表</b>で日ごとに計算します（従業員ごとの税区分：甲＝扶養反映／乙／丙＝日雇い）。' };
     el.innerHTML=(m[c]||'')+'<br><span style="color:#8FA89A">※月の社会保険・所得税の計算方式は変わりません（本設定は明細の表示と税区分の目安）。任意期間で締め直す本格計算は対象外。</span>'; }
   function monthLabel(){ var y=Number((state.month||'2026-06').slice(0,4)), m=Number((state.month||'2026-06').slice(5,7)); var k=['','一','二','三','四','五','六','七','八','九','十','十一','十二']; return '令 和 '+(y-2018)+' 年 '+k[m]+' 月 分'; }
 
@@ -1405,6 +1405,7 @@
 
   /* ── 日払い/週払い スリップ明細(日別内訳) ── */
   function HEI(){ return (typeof ShotokuzeiHei!=='undefined')?ShotokuzeiHei:(window&&window.ShotokuzeiHei); }
+  function NICHI(){ return (typeof ShotokuzeiNichi!=='undefined')?ShotokuzeiNichi:(window&&window.ShotokuzeiNichi); }
   function DP(){ return (typeof DailyPay!=='undefined')?DailyPay:(window&&window.DailyPay); }
   var WD=['日','月','火','水','木','金','土'];
   function dateLabel(ymd){ if(!ymd) return ''; var p=String(ymd).split('-'); var m=+p[1]||0, d=+p[2]||0; var wd=''; try{ var dt=new Date(+p[0],(m||1)-1,d||1); wd='（'+WD[dt.getDay()]+'）'; }catch(_){} return m+'/'+d+wd; }
@@ -1414,12 +1415,19 @@
   function buildDailyData(e){
     var dp=DP(); if(!dp) return null;
     var entries=(e.dailyEntries||[]).map(function(d){ return { ymd:d.ymd, min:hmToMin(d.hm), amount:num(d.amount), count:num(d.count), hikazei:!!d.hikazei }; });
-    var dd=dp.computeDaily(entries, { taxClass:e.taxClass, year:parseInt(String(state.month||'').slice(0,4),10)||2026, heiFn:(HEI()&&HEI().heiTax) });
+    var year=parseInt(String(state.month||'').slice(0,4),10)||2026;
+    var cls=e.taxClass||'ko';
+    // その日の課税額→所得税(日ごと)。丙=日雇い日額表丙欄 / 甲・乙=日額表 甲乙欄(継続雇用の日払週払)。
+    var hei=HEI(), nichi=NICHI(), fuyou=num(e.fuyou), dayTaxFn=null, taxLabel='';
+    if(cls==='hei'){ if(hei){ dayTaxFn=function(t){ return hei.heiTax(t,{year:year}); }; taxLabel='丙欄'; } }
+    else if(cls==='otsu'){ if(nichi){ dayTaxFn=function(t){ return nichi.nichiTax(t,{taxClass:'otsu',year:year}); }; taxLabel='乙欄'; } }
+    else { if(nichi){ dayTaxFn=function(t){ return nichi.nichiTax(t,{taxClass:'ko',deps:fuyou,year:year}); }; taxLabel='甲欄'; } }
+    var dd=dp.computeDaily(entries, { taxClass:cls, year:year, dayTaxFn:dayTaxFn });
     var cyc=(state.company&&state.company.payCycle)||'monthly';
     var days=dd.days.map(function(d){ return { dateLabel:dateLabel(d.ymd), ymd:d.ymd, hhmm:dp.hhmm(d.min), amount:d.amount }; });
-    var tax=dd.tax; // 丙=数値 / 甲乙=null
+    var tax=dd.tax; // 日ごとに計算し合算(甲/乙/丙)。libが未ロードならnull
     var net=dd.totalAmount-(tax||0);
-    return { company:(state.company.name||''), name:(e.name||''), cycle:cyc, days:days,
+    return { company:(state.company.name||''), name:(e.name||''), cycle:cyc, days:days, taxLabel:taxLabel, taxClass:cls,
       cycleLabel:cyc==='weekly'?'週払い':'日払い', title:cyc==='weekly'?'週 払 給 与 明 細':'日 払 給 与 明 細',
       heroLabel:cyc==='weekly'?'今 週 支 給 額':'本 日 支 給 額', payDate:(state.company.paydayDay?('毎回 '+state.company.paydayDay+'日ごろ'):periodLabelOf(days)),
       periodLabel:periodLabelOf(days), count:dd.count, totalMin:dd.totalMin, totalMinLabel:dp.hhmm(dd.totalMin), totalCount:dd.totalCount,
@@ -1447,8 +1455,8 @@
   function dailySlipDoc(d, layout){
     if(!d) return '<html><body style="font-family:sans-serif;padding:40px;color:#7a6a3e">日別の入力がありません。入力タブで「日別」に日付・時数・金額を入れてください。</body></html>';
     var taxRow = (d.tax!=null)
-      ? '<div class="r"><span class="l">所得税（丙欄）</span><span class="v">'+fmtN(d.tax)+'</span></div><div class="r sum"><span class="l">控除計</span><span class="v">'+fmtN(d.tax)+'</span></div>'
-      : '<div class="r"><span class="l">所得税</span><span class="v" style="font-size:10px;color:#8a7a4e">別途（甲/乙は月まとめ）</span></div><div class="r sum"><span class="l">控除計</span><span class="v">0</span></div>';
+      ? '<div class="r"><span class="l">所得税（'+(d.taxLabel||'日額表')+'）</span><span class="v">'+fmtN(d.tax)+'</span></div><div class="r sum"><span class="l">控除計</span><span class="v">'+fmtN(d.tax)+'</span></div>'
+      : '<div class="r"><span class="l">所得税</span><span class="v" style="font-size:10px;color:#8a7a4e">別途</span></div><div class="r sum"><span class="l">控除計</span><span class="v">0</span></div>';
     var dhead='<div class="dhead"><span>日付</span><span class="c">労働時数</span><span class="c">支給額</span></div>';
     var dRows=d.days.map(function(x){ return '<div class="rd"><span class="l">'+esc(x.dateLabel)+'</span><span class="h">'+esc(x.hhmm)+'</span><span class="v">'+fmtN(x.amount)+'</span></div>'; }).join('')
       +'<div class="rd sum"><span class="l">支給計</span><span class="h">'+esc(d.totalMinLabel)+'</span><span class="v">'+fmtN(d.totalAmount)+'</span></div>';
@@ -1464,9 +1472,10 @@
       var hero1='<div class="hero1"><div class="h-co">'+esc(d.company)+'</div><div class="h-nm">'+esc(d.name)+'<span class="dono">殿</span></div><div class="h-lab">'+d.heroLabel+'</div><div class="h-val">'+yenR(d.net)+'</div></div>';
       body=hero1+kin+(d.single?'':'<div class="st">日 別 支 給</div>'+dhead+dRows)+'<div class="st">控 除</div>'+taxRow;
     }
+    var taxHow=(d.taxClass==='hei')?'「丙欄」（日雇い）':(d.taxClass==='otsu')?'「乙欄」（申告書なし）':'「甲欄」（扶養人数を反映）';
     var note=(d.tax!=null)
-      ? (d.cycleLabel+'＝所得税は日額表「丙欄」（日雇い）を日ごとに計算。社会保険は月まとめ。色・書体は月給明細と統一。')
-      : (d.cycleLabel+'＝甲/乙欄は日額表が本来必要。所得税はこの明細に含めず月まとめで精算してください。社会保険は月まとめ。');
+      ? (d.cycleLabel+'＝所得税は日額表'+taxHow+'を日ごとに計算し合算。社会保険は月まとめ。色・書体は月給明細と統一。')
+      : (d.cycleLabel+'＝所得税の税額表が読み込めませんでした。所得税はこの明細に含めず別途精算してください。社会保険は月まとめ。');
     return '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><style>'+DAILY_CSS+'</style></head><body><div class="sheet">'+top+body+'<div class="note">'+note+'</div></div></body></html>';
   }
   // 日別入力(入力タブ・支給サイクルが日/週のとき)。各日=日付/労働時数(時:分)/支給額
@@ -1480,9 +1489,9 @@
       +'<input class="finput num dl-f dl-amt" data-dl="'+i+':'+idx+':amount" inputmode="numeric" value="'+attr(fmtN(d.amount))+'" placeholder="金額">'
       +'<button class="btn-ghost dl-del" data-dldel="'+i+':'+idx+'">×</button></div>'; }).join('');
     var dv=buildDailyData(e);
-    var tot=dv?('<div class="dl-tot">合計 '+(dv.count)+'日 ・ '+esc(dv.totalMinLabel)+' ・ '+yen(dv.totalAmount)+(dv.tax!=null?'（所得税 丙欄 '+yen(dv.tax)+'）':'')+'</div>'):'';
+    var tot=dv?('<div class="dl-tot">合計 '+(dv.count)+'日 ・ '+esc(dv.totalMinLabel)+' ・ '+yen(dv.totalAmount)+(dv.tax!=null?'（所得税 '+esc(dv.taxLabel||'日額表')+' '+yen(dv.tax)+'）':'')+'</div>'):'';
     return '<div class="grp"><div class="grp-h">日別（'+(cyc==='weekly'?'週払い':'日払い')+'）<span class="help-i" data-help="daily">💡</span></div>'
-      +'<div class="wi-note2">その日の 日付・労働時数（時:分）・支給額 を入れると、日払い/週払いの明細に日別で出ます。所得税は丙欄（日雇い）で日ごとに計算。</div>'
+      +'<div class="wi-note2">その日の 日付・労働時数（時:分）・支給額 を入れると、日払い/週払いの明細に日別で出ます。所得税は税区分（甲=扶養反映／乙／丙=日雇い）ごとに<b>日額表</b>で日ごとに計算します。</div>'
       +'<div class="dl-head"><span>日付</span><span>労働時数</span><span>支給額</span><span></span></div>'
       +rows+tot
       +'<div class="addcustom"><button class="btn-ghost" data-dladd="'+i+'" style="padding:8px 12px">＋日を追加</button></div></div>';
