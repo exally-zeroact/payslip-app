@@ -172,7 +172,7 @@
     return { id:uid(), name:name||'山田 太郎', no:'', birthYmd:'1980-05-15', dept:'', role:'',
       payType:'月給', base:'250000', hourly:'1200', commissionAmt:'', hourlyGuarantee:'', salesAmt:'', pieceCount:'', payRule:null, fuyou:'1', pref:'tokyo', commute:'8400', commuteType:'public', commuteKm:'', residentTax:'12500', residentTaxMode:'monthly', residentTaxAnnual:'', residentTaxIkkatsu:false, bank:'',
       furiBankName:'', furiBankNo:'', furiBranchName:'', furiBranchNo:'', furiYokin:'普通', furiAccount:'', furiKana:'',
-      annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0',
+      annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0', dailyEntries:[],
       kintai:[{label:'出勤日数',value:'21'},{label:'欠勤日数',value:'0'},{label:'有給取得',value:'1'}],
       shikyu:[{label:'基本給',value:'250000'},{label:'住宅手当',value:'10000'}],
       apply:{}, taxClass:'ko', retired:false, workStatus:'normal', leavePay:'', leaveStartYmd:'', leaveEndYmd:'', leaveDaysInMonth:'',
@@ -956,6 +956,7 @@
         +((mw&&!mw.ok)?'<div class="cr-warn" style="margin:0 12px 10px">⚠ 最低賃金（'+esc(mw.prefName)+'：時給'+fmtN(mw.minWage)+'円）を下回っています（約'+fmtN(mw.hourly)+'円）。設定▸従業員マスタで'+(e.payType==='時給'?'時給':'基本給')+'を上げてください。</div>':'')
         +'<div class="acc-body">'
           +basePayInputHTML(e,i)
+          +dailyInputHTML(e,i)
           +(e.payType==='役員'?'':warimashiInputHTML(e))
           +daikyuInputHTML(e)
           +'<div class="grp"><div class="grp-h">その他の勤怠<button class="mini add" data-add="kintai" data-i="'+i+'">＋</button></div><div class="rows">'+otherKinRows(e)+'</div></div>'
@@ -1401,6 +1402,91 @@
   function payDateForSlip(){ var c=(state.company&&state.company.payCycle)||'monthly';
     if(c==='daily') return '日払い'; if(c==='weekly') return '週払い'; if(c==='semimonthly') return payDateStr()+'（月2回）'; return payDateStr(); }
   function buildPeople(emps){ return emps.map(function(e){ var r=compute(e); var k=(e.kintai||[]).filter(function(x){ if(/代休取得|振替休日/.test(x.label||'')) return num(x.value)>0; return true; }); var oi=k.findIndex(function(x){return /出勤/.test(x.label||'');}); var wt={label:'労働時間',value:workedLabel(e)}; if(oi>=0)k.splice(oi+1,0,wt); else k.unshift(wt); return { name:e.name, company:state.company.name, payDate:payDateForSlip(), kintai:k, shikyu:r.shikyu, kojo:r.kojo, net:r.net, shikyuTotal:r.shikyuTotal, kojoTotal:r.kojoTotal, warnings:empWarnings(e) }; }); }
+
+  /* ── 日払い/週払い スリップ明細(日別内訳) ── */
+  function HEI(){ return (typeof ShotokuzeiHei!=='undefined')?ShotokuzeiHei:(window&&window.ShotokuzeiHei); }
+  function DP(){ return (typeof DailyPay!=='undefined')?DailyPay:(window&&window.DailyPay); }
+  var WD=['日','月','火','水','木','金','土'];
+  function dateLabel(ymd){ if(!ymd) return ''; var p=String(ymd).split('-'); var m=+p[1]||0, d=+p[2]||0; var wd=''; try{ var dt=new Date(+p[0],(m||1)-1,d||1); wd='（'+WD[dt.getDay()]+'）'; }catch(_){} return m+'/'+d+wd; }
+  function periodLabelOf(days){ if(!days.length) return ''; var ys=days.map(function(x){return x.ymd;}).filter(Boolean).sort(); if(!ys.length) return ''; var a=ys[0],b=ys[ys.length-1]; function jp(y){ var p=y.split('-'); return '令和'+(+p[0]-2018)+'年'+(+p[1])+'月'+(+p[2])+'日'; } return a===b?jp(a):(jp(a)+' 〜 '+(+b.split('-')[1])+'月'+(+b.split('-')[2])+'日'); }
+  // 従業員の日別入力→スリップ用データ。丙欄は日別税、甲乙は日額表未収録で税null(注記)。
+  function hmToMin(s){ s=String(s==null?'':s).trim(); if(!s)return 0; if(/:/.test(s)){ var p=s.split(':'); return num(p[0])*60+num(p[1]); } return Math.round(num(s)*60); }
+  function buildDailyData(e){
+    var dp=DP(); if(!dp) return null;
+    var entries=(e.dailyEntries||[]).map(function(d){ return { ymd:d.ymd, min:hmToMin(d.hm), amount:num(d.amount), count:num(d.count), hikazei:!!d.hikazei }; });
+    var dd=dp.computeDaily(entries, { taxClass:e.taxClass, year:parseInt(String(state.month||'').slice(0,4),10)||2026, heiFn:(HEI()&&HEI().heiTax) });
+    var cyc=(state.company&&state.company.payCycle)||'monthly';
+    var days=dd.days.map(function(d){ return { dateLabel:dateLabel(d.ymd), ymd:d.ymd, hhmm:dp.hhmm(d.min), amount:d.amount }; });
+    var tax=dd.tax; // 丙=数値 / 甲乙=null
+    var net=dd.totalAmount-(tax||0);
+    return { company:(state.company.name||''), name:(e.name||''), cycle:cyc, days:days,
+      cycleLabel:cyc==='weekly'?'週払い':'日払い', title:cyc==='weekly'?'週 払 給 与 明 細':'日 払 給 与 明 細',
+      heroLabel:cyc==='weekly'?'今 週 支 給 額':'本 日 支 給 額', payDate:(state.company.paydayDay?('毎回 '+state.company.paydayDay+'日ごろ'):periodLabelOf(days)),
+      periodLabel:periodLabelOf(days), count:dd.count, totalMin:dd.totalMin, totalMinLabel:dp.hhmm(dd.totalMin), totalCount:dd.totalCount,
+      totalAmount:dd.totalAmount, tax:tax, isHei:dd.isHei, net:net, single:(cyc==='daily'||dd.count<=1) };
+  }
+  var DAILY_CSS=':root{--ink:#23261f;--ink2:#6a6d62;--ink3:#7d7f72;--hair-lt:#ece7dc;--hair2:#cfc9b8;--accent:#6f5a3e;--accent-soft:#b6a06d;}*{box-sizing:border-box;margin:0;padding:0;}'
+    +'body{font-family:"Yu Mincho","YuMincho","Hiragino Mincho ProN","MS Mincho",serif;color:var(--ink);background:#fff;}'
+    +'.sheet{width:794px;min-height:1123px;margin:0 auto;padding:40px 60px;}'
+    +'.tophd{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;}.mh-title{font-size:15px;letter-spacing:.32em;font-weight:500;}.mh-sub{font-size:11px;letter-spacing:.14em;margin-top:6px;color:var(--ink2);}'
+    +'.tag{display:inline-block;font-family:"Yu Gothic",sans-serif;font-size:9.5px;color:#7a6a3e;border:.7px solid var(--accent-soft);border-radius:3px;padding:1px 7px;letter-spacing:.1em;vertical-align:2px;margin-left:9px;}'
+    +'.iss{font-size:10px;color:var(--ink2);text-align:right;line-height:1.7;}.mh-rule{height:.6px;background:var(--hair2);margin:11px 0 16px;}'
+    +'.hero1{text-align:center;}.hero2{display:grid;grid-template-columns:1fr auto;align-items:start;gap:14px;}'
+    +'.h-co{font-size:12px;color:var(--ink2);letter-spacing:.12em;}.h-nm{font-size:16px;letter-spacing:.1em;margin-top:4px;}.h-nm .dono{font-size:12px;color:var(--ink2);margin-left:.3em;}'
+    +'.h-lab{font-size:12px;letter-spacing:.40em;color:var(--accent);margin-top:13px;}.hero2 .h-lab{text-align:center;}.h-val{font-size:40px;margin-top:4px;font-variant-numeric:tabular-nums;}.hero2 .h-val{text-align:center;}.h-val .yen{font-size:19px;color:var(--accent);margin-right:2px;}'
+    +'.kin{display:flex;justify-content:center;border-top:1px solid var(--accent-soft);border-bottom:1px solid var(--accent-soft);margin:16px 0 12px;padding:10px 0;}.k{text-align:center;padding:0 26px;}.kl{font-size:10.5px;color:var(--ink2);}.kv{font-size:15px;margin-top:4px;font-variant-numeric:tabular-nums;}'
+    +'.st{font-size:13px;letter-spacing:.40em;color:var(--accent);padding-bottom:7px;border-bottom:.7px solid var(--hair2);margin:12px 0 2px;}'
+    +'.cols{display:flex;gap:44px;}.col{flex:1;}'
+    +'.dhead{display:grid;grid-template-columns:1fr auto auto;column-gap:26px;padding:5px 2px 6px;font-family:"Yu Gothic",sans-serif;font-size:9px;color:var(--ink3);border-bottom:.7px solid var(--hair-lt);}.dhead .c{text-align:right;}'
+    +'.rd{display:grid;grid-template-columns:1fr auto auto;column-gap:26px;align-items:baseline;padding:6px 2px;border-bottom:.7px solid var(--hair-lt);}.rd .l{font-size:12px;color:var(--ink2);}.rd .h{font-size:12px;color:var(--ink3);font-variant-numeric:tabular-nums;text-align:right;min-width:52px;}.rd .v{font-size:12.5px;font-variant-numeric:tabular-nums;text-align:right;min-width:64px;}'
+    +'.r{display:flex;justify-content:space-between;align-items:baseline;padding:6px 2px;border-bottom:.7px solid var(--hair-lt);}.r .l{font-size:12px;color:var(--ink2);}.r .v{font-size:12.5px;font-variant-numeric:tabular-nums;}'
+    +'.rd.sum,.r.sum{border-bottom:none;border-top:1px solid var(--accent-soft);padding-top:9px;}.rd.sum .l,.r.sum .l{color:var(--ink);letter-spacing:.16em;font-size:13px;}.rd.sum .h{color:var(--ink);font-size:12px;}.rd.sum .v,.r.sum .v{font-size:15px;}'
+    +'.note{margin-top:16px;font-size:9.5px;color:var(--ink3);font-family:"Yu Gothic","Hiragino Sans",sans-serif;line-height:1.6;border-top:.7px dashed var(--hair2);padding-top:9px;}'
+    +'@page{size:A4 portrait;margin:0;}';
+  function yenR(n){ return '<span class="yen">¥</span>'+fmtN(n); }
+  function dailySlipDoc(d, layout){
+    if(!d) return '<html><body style="font-family:sans-serif;padding:40px;color:#7a6a3e">日別の入力がありません。入力タブで「日別」に日付・時数・金額を入れてください。</body></html>';
+    var taxRow = (d.tax!=null)
+      ? '<div class="r"><span class="l">所得税（丙欄）</span><span class="v">'+fmtN(d.tax)+'</span></div><div class="r sum"><span class="l">控除計</span><span class="v">'+fmtN(d.tax)+'</span></div>'
+      : '<div class="r"><span class="l">所得税</span><span class="v" style="font-size:10px;color:#8a7a4e">別途（甲/乙は月まとめ）</span></div><div class="r sum"><span class="l">控除計</span><span class="v">0</span></div>';
+    var dhead='<div class="dhead"><span>日付</span><span class="c">労働時数</span><span class="c">支給額</span></div>';
+    var dRows=d.days.map(function(x){ return '<div class="rd"><span class="l">'+esc(x.dateLabel)+'</span><span class="h">'+esc(x.hhmm)+'</span><span class="v">'+fmtN(x.amount)+'</span></div>'; }).join('')
+      +'<div class="rd sum"><span class="l">支給計</span><span class="h">'+esc(d.totalMinLabel)+'</span><span class="v">'+fmtN(d.totalAmount)+'</span></div>';
+    var kin='<div class="kin">'+(d.single
+      ?'<div class="k"><div class="kl">労働時数</div><div class="kv">'+esc(d.totalMinLabel)+'</div></div>'+(d.totalCount>0?'<div class="k"><div class="kl">件数</div><div class="kv">'+d.totalCount+' 件</div></div>':'')
+      :'<div class="k"><div class="kl">出勤</div><div class="kv">'+d.count+' 日</div></div><div class="k"><div class="kl">労働時数</div><div class="kv">'+esc(d.totalMinLabel)+'</div></div>'+(d.totalCount>0?'<div class="k"><div class="kl">件数</div><div class="kv">'+d.totalCount+' 件</div></div>':''))+'</div>';
+    var top='<div class="tophd"><div><div class="mh-title">'+d.title+'</div><div class="mh-sub">'+esc(d.periodLabel)+'<span class="tag">'+d.cycleLabel+'</span></div></div><div class="iss">'+esc(d.company)+'</div></div><div class="mh-rule"></div>';
+    var body;
+    if(layout==='2col' && !d.single){
+      var hero='<div class="hero2"><div><div class="h-co">'+esc(d.company)+'</div><div class="h-nm">'+esc(d.name)+'<span class="dono">殿</span></div></div><div><div class="h-lab">'+d.heroLabel+'</div><div class="h-val">'+yenR(d.net)+'</div></div></div>';
+      body=hero+kin+'<div class="cols"><div class="col"><div class="st">日 別 支 給</div>'+dhead+dRows+'</div><div class="col"><div class="st">控 除</div>'+taxRow+'</div></div>';
+    } else {
+      var hero1='<div class="hero1"><div class="h-co">'+esc(d.company)+'</div><div class="h-nm">'+esc(d.name)+'<span class="dono">殿</span></div><div class="h-lab">'+d.heroLabel+'</div><div class="h-val">'+yenR(d.net)+'</div></div>';
+      body=hero1+kin+(d.single?'':'<div class="st">日 別 支 給</div>'+dhead+dRows)+'<div class="st">控 除</div>'+taxRow;
+    }
+    var note=(d.tax!=null)
+      ? (d.cycleLabel+'＝所得税は日額表「丙欄」（日雇い）を日ごとに計算。社会保険は月まとめ。色・書体は月給明細と統一。')
+      : (d.cycleLabel+'＝甲/乙欄は日額表が本来必要。所得税はこの明細に含めず月まとめで精算してください。社会保険は月まとめ。');
+    return '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><style>'+DAILY_CSS+'</style></head><body><div class="sheet">'+top+body+'<div class="note">'+note+'</div></div></body></html>';
+  }
+  // 日別入力(入力タブ・支給サイクルが日/週のとき)。各日=日付/労働時数(時:分)/支給額
+  function dailyInputHTML(e,i){
+    var cyc=(state.company&&state.company.payCycle)||'monthly';
+    if(cyc!=='daily'&&cyc!=='weekly') return '';
+    var entries=e.dailyEntries||[];
+    var rows=entries.map(function(d,idx){ return '<div class="dl-row">'
+      +'<input class="finput dl-f" data-dl="'+i+':'+idx+':ymd" type="date" value="'+attr(d.ymd||'')+'">'
+      +'<input class="finput dl-f dl-hm" data-dl="'+i+':'+idx+':hm" value="'+attr(d.hm||'')+'" placeholder="時:分">'
+      +'<input class="finput num dl-f dl-amt" data-dl="'+i+':'+idx+':amount" inputmode="numeric" value="'+attr(fmtN(d.amount))+'" placeholder="金額">'
+      +'<button class="btn-ghost dl-del" data-dldel="'+i+':'+idx+'">×</button></div>'; }).join('');
+    var dv=buildDailyData(e);
+    var tot=dv?('<div class="dl-tot">合計 '+(dv.count)+'日 ・ '+esc(dv.totalMinLabel)+' ・ '+yen(dv.totalAmount)+(dv.tax!=null?'（所得税 丙欄 '+yen(dv.tax)+'）':'')+'</div>'):'';
+    return '<div class="grp"><div class="grp-h">日別（'+(cyc==='weekly'?'週払い':'日払い')+'）<span class="help-i" data-help="daily">💡</span></div>'
+      +'<div class="wi-note2">その日の 日付・労働時数（時:分）・支給額 を入れると、日払い/週払いの明細に日別で出ます。所得税は丙欄（日雇い）で日ごとに計算。</div>'
+      +'<div class="dl-head"><span>日付</span><span>労働時数</span><span>支給額</span><span></span></div>'
+      +rows+tot
+      +'<div class="addcustom"><button class="btn-ghost" data-dladd="'+i+'" style="padding:8px 12px">＋日を追加</button></div></div>';
+  }
   // 賞与明細用: 月次明細と同じテンプレ/テーマ(ユーザー選択)で 勤怠なし・支給=賞与/控除=賞与社保+源泉
   function bonusMonthLabel(){ var ym=bonusYmOf(); var y=Number(ym.slice(0,4)), m=Number(ym.slice(5,7)); var k=['','一','二','三','四','五','六','七','八','九','十','十一','十二']; return '令 和 '+(y-2018)+' 年 '+(k[m]||m)+' 月 賞 与'; }
   function buildBonusPeople(emps){ return emps.map(function(e){ var c=computeBonus(e);
@@ -1508,6 +1594,13 @@
   function doPreview(){
     var v=$('#p-emp').value; var emps=v==='__all'?state.employees.filter(function(e){return isActiveInMonth(e,state.month);}):[state.employees[+v]];
     var isBonus=state.printMode==='bonus';
+    var cyc=(state.company&&state.company.payCycle)||'monthly';
+    if(!isBonus && (cyc==='daily'||cyc==='weekly')){ // 日払い/週払い=スリップ明細(日別)
+      var de=emps[0]; var dd=de?buildDailyData(de):null; var fr=$('#frame');
+      fr.srcdoc=dailySlipDoc(dd, state.dailySlipLayout||'1col');
+      fr.style.width='794px'; fr.style.height='1123px'; fr.style.transformOrigin='top left'; fr.dataset.pw=794; fr.dataset.ph=1123;
+      fitPreview(); return;
+    }
     var people=isBonus?buildBonusPeople(emps):buildPeople(emps);
     var doc=isBonus?{month:bonusMonthLabel(),kind:'bonus'}:{month:monthLabel()};
     var out=Render.build(people, doc, state.prefer, state.theme);
@@ -1684,10 +1777,13 @@
       var tg=e.target.closest('[data-toggle]');
       if(tg){ var i=+tg.dataset.toggle; var emp=state.employees[i]; state.open['I'+emp.id]=!state.open['I'+emp.id]; il.querySelector('.acc[data-i="'+i+'"]').classList.toggle('open'); return; }
       var wm=e.target.closest('.wi-mode'); if(wm){ var c1=e.target.closest('.acc'); var ci1=+c1.dataset.i; var em1=state.employees[ci1]; if(!em1.warimashi)em1.warimashi={}; em1.warimashi.mode=wm.dataset.wm; renderInput(); return; }
+      if(e.target.closest('[data-dladd]')){ var dai=+e.target.closest('[data-dladd]').dataset.dladd; var dae=state.employees[dai]; if(dae){ if(!dae.dailyEntries)dae.dailyEntries=[]; dae.dailyEntries.push({ymd:'',hm:'',amount:''}); renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); } return; } // 日別: 日を追加
+      var dld=e.target.closest('[data-dldel]'); if(dld){ var dp2=String(dld.dataset.dldel).split(':'); var dde=state.employees[+dp2[0]]; if(dde&&dde.dailyEntries){ dde.dailyEntries.splice(+dp2[1],1); renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); } return; } // 日別: 日を削除
       if(e.target.dataset.add){ var ai=+e.target.dataset.i, g=e.target.dataset.add; state.employees[ai][g].push({label:'',value:''}); renderInput(); return; }
       if(e.target.classList.contains('m-del')&&e.target.closest('#input-list')){ var card=e.target.closest('.acc'); var ci=+card.dataset.i; var g=e.target.dataset.g, ri=+e.target.dataset.ri; state.employees[ci][g].splice(ri,1); renderInput(); return; }
     });
     il.addEventListener('input',function(e){ var card=e.target.closest('.acc'); if(!card)return; var ci=+card.dataset.i; var emp=state.employees[ci];
+      var dl=e.target.closest('[data-dl]'); if(dl){ var dpp=String(dl.dataset.dl).split(':'); if(emp.dailyEntries&&emp.dailyEntries[+dpp[1]]){ var f2=dpp[2]; emp.dailyEntries[+dpp[1]][f2]=(f2==='amount')?e.target.value.replace(/[^0-9]/g,''):e.target.value; } if(window.persistSaveDebounced)persistSaveDebounced(); return; } // 日別入力(再描画せずフォーカス維持)
       if(e.target.classList.contains('wk-f')){ emp[e.target.dataset.wkf]=e.target.value.replace(/[^0-9]/g,''); refreshCard(ci); return; }
       if(e.target.classList.contains('cm-f')){ emp[e.target.dataset.cmf]=e.target.value.replace(/[^0-9]/g,''); refreshCard(ci); return; }
       if(e.target.classList.contains('wi-f')){ if(!emp.warimashi)emp.warimashi={}; emp.warimashi[e.target.dataset.wk]=e.target.value.replace(/[^0-9]/g,''); refreshCard(ci); return; }
