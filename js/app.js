@@ -193,7 +193,7 @@
   var state={ company: defCompany(),
     month:'2026-06', prefer:'col2_1', theme:{accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}, depts:['営業部'], roles:['課長','主任','一般'],
     employees:[defEmp('山田 太郎')], open:{},
-    inputMode:'monthly', printMode:'monthly', empFilter:'active', bonus:{ payYm:'', payDay:'', byEmp:{} }, confirmed:{}, nencho:{}, onboardDone:false, payPatterns:[] };
+    inputMode:'monthly', printMode:'monthly', empFilter:'active', bonus:{ payYm:'', payDay:'', byEmp:{} }, confirmed:{}, nencho:{}, onboardDone:false, payPatterns:[], dailySlipLayout:'1col' };
 
   // マイカー通勤 1か月非課税限度(片道km・国税庁No.2585 令和8年4月〜)★12区分 公式照合済2026-07★
   function carCommuteNonTax(km){ km=num(km);
@@ -1527,10 +1527,19 @@
     if(bn) bn.style.display=isBonus?'':'none';
     if(bl&&isBonus){ var ym=bonusYmOf(); bl.textContent=(ym?bonusMonthLabel().replace(/ /g,''):'未設定')+'（入力 ▸ 賞与 で設定）'; }
   }
+  // 日払い/週払いスリップの 1カラム/2カラム 切替UI(週払いのみ=2カラムが意味を持つ)
+  function updateDailyLayoutUI(){
+    var row=$('#daily-layout-row'); if(!row) return;
+    var cyc=(state.company&&state.company.payCycle)||'monthly';
+    var show=(state.printMode||'monthly')!=='bonus' && cyc==='weekly';
+    row.style.display=show?'':'none';
+    if(show) $$('.dls').forEach(function(x){ x.classList.toggle('on', x.dataset.dls===(state.dailySlipLayout||'1col')); });
+  }
   function renderPrint(){
     $('#p-month').value=state.month;
     $$('.pmode').forEach(function(x){ x.classList.toggle('on', x.dataset.pmode===(state.printMode||'monthly')); });
     updatePrintMonthUI();
+    updateDailyLayoutUI();
     var sel=$('#p-emp'); sel.innerHTML='<option value="__all">全員</option>'+state.employees.map(function(e,i){return isActiveInMonth(e,state.month)?'<option value="'+i+'">'+esc(e.name)+'</option>':'';}).join('');
     renderWebMeisai();
     renderFuri();
@@ -1807,7 +1816,8 @@
     // 印刷
     $('#p-emp').addEventListener('change',doPreview);
     // #p-monthは.scr-monthに統合(P1-18)→共通ハンドラ(対象月change)が state.month同期＋doPreviewを行う
-    $('#print-mode-seg').addEventListener('click',function(e){ var b=e.target.closest('.pmode'); if(!b)return; state.printMode=b.dataset.pmode==='bonus'?'bonus':'monthly'; $$('.pmode').forEach(function(x){ x.classList.toggle('on', x.dataset.pmode===state.printMode); }); updatePrintMonthUI(); doPreview(); });
+    $('#print-mode-seg').addEventListener('click',function(e){ var b=e.target.closest('.pmode'); if(!b)return; state.printMode=b.dataset.pmode==='bonus'?'bonus':'monthly'; $$('.pmode').forEach(function(x){ x.classList.toggle('on', x.dataset.pmode===state.printMode); }); updatePrintMonthUI(); updateDailyLayoutUI(); doPreview(); });
+    $('#daily-layout-seg').addEventListener('click',function(e){ var b=e.target.closest('.dls'); if(!b)return; state.dailySlipLayout=b.dataset.dls==='2col'?'2col':'1col'; $$('.dls').forEach(function(x){ x.classList.toggle('on', x.dataset.dls===state.dailySlipLayout); }); if(window.persistSaveDebounced)persistSaveDebounced(); doPreview(); });
     function afterDesign(){ renderDesign(); if($('#scr-print')&&$('#scr-print').classList.contains('active')) doPreview(); }
     $('#tpl-row').addEventListener('click',function(e){ var b=e.target.closest('[data-tpl]'); if(!b)return; state.prefer=b.dataset.tpl; afterDesign(); });
     $('#color-pickers').addEventListener('click',function(e){
