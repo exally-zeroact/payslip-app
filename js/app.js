@@ -1983,6 +1983,7 @@
       // 数値表libのbare参照(index.htmlで先にロード済み・calc.js等は同一オブジェクト参照なので変異が伝播)
       var dn=(typeof ShotokuzeiDensan!=='undefined'?ShotokuzeiDensan:window.ShotokuzeiDensan);
       var hi=(typeof ShotokuzeiHei!=='undefined'?ShotokuzeiHei:window.ShotokuzeiHei);
+      var hn=NICHI();
       var sz=(typeof SZ==='function'?SZ():(window.ShoyoZei));
       var nn=(typeof Nen_==='function'?Nen_():(window.Nenmatsu));
       var wm=(typeof Warimashi!=='undefined'?Warimashi:window.Warimashi);
@@ -1992,6 +1993,7 @@
         else if(r.kind==='koyo' && kh&&kh.hydrate){ kh.hydrate(r.year, r.data); applied++; }
         else if(r.kind==='shotokuzei_densan' && dn&&dn.hydrate){ dn.hydrate(r.year, r.data); applied++; }
         else if(r.kind==='shotokuzei_hei' && hi&&hi.hydrate){ hi.hydrate(r.year, r.data); applied++; }
+        else if(r.kind==='shotokuzei_nichi' && hn&&hn.hydrate){ hn.hydrate(r.year, r.data); applied++; }
         else if(r.kind==='shoyo' && sz&&sz.hydrate){ sz.hydrate(r.year, r.data); applied++; }
         else if(r.kind==='nenmatsu' && nn&&nn.hydrate){ nn.hydrate(r.year, r.data); applied++; }
         else if(r.kind==='warimashi' && wm&&wm.hydrate){ wm.hydrate(r.data); applied++; }

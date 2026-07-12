@@ -10,6 +10,7 @@ const SAI = require('../lib/saitei-chingin.js');
 const KOYO = require('../lib/koyo-hoken.js');
 const D = require('../lib/shotokuzei-densan.js');
 const H = require('../lib/shotokuzei-hei.js');
+const NI = require('../lib/shotokuzei-nichi.js');
 const SZ = require('../lib/shoyo-zei.js');
 const N = require('../lib/nenmatsu.js');
 const WM = require('../lib/warimashi.js');
@@ -23,6 +24,7 @@ function shakaihokenRow(year) {
   return { kenko_total: kenko, kaigo_total: SHH.getKaigo(ym).total, shienkin_total: (year >= 2026 ? SHH.SHIENKIN_TOTAL_FROM_2026_04 : 0), kosei_total: SHH.KOSEI_NENKIN_RITSU_TOTAL };
 }
 const heiTable = (H.HEI_BY_YEAR && H.HEI_BY_YEAR[2026]) || H.HEI_R8;
+const nichiTable = (NI.tableFor && NI.tableFor(2026)) || NI.TABLE_R8;
 
 const rows = [
   { kind: 'saitei_chingin', year: 2025, data: { todofuken: SAI.todofuken, zenkoku_heikin: SAI.ZENKOKU_HEIKIN, nendo: SAI.NENDO }, source_url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/roudoukijun/minimumichiran/' },
@@ -33,6 +35,7 @@ const rows = [
   { kind: 'shotokuzei_densan', year: 2025, data: { fuyouKojo: D.PARAMS[2025].fuyouKojo, kyuyo: D.PARAMS[2025].kyuyo, kiso: D.PARAMS[2025].kiso }, source_url: 'https://www.nta.go.jp/users/gensen/' },
   { kind: 'shotokuzei_densan', year: 2026, data: { fuyouKojo: D.PARAMS[2026].fuyouKojo, kyuyo: D.PARAMS[2026].kyuyo, kiso: D.PARAMS[2026].kiso, zeiKo: D.ZEI_KO, zeiOtsu: D.ZEI_OTSU }, source_url: 'https://www.nta.go.jp/users/gensen/2026kaisei/index.htm' },
   { kind: 'shotokuzei_hei', year: 2026, data: { start: heiTable.start, step: heiTable.step, arr: heiTable.arr }, source_url: 'https://www.nta.go.jp/publication/pamph/gensen/zeigakuhyo2026/02.htm' },
+  { kind: 'shotokuzei_nichi', year: 2026, data: { start: nichiTable.start, step: nichiTable.step, ko: nichiTable.ko, otsu: nichiTable.otsu, koOver: nichiTable.koOver, otsuLowRate: nichiTable.otsuLowRate, otsuOver: nichiTable.otsuOver }, source_url: 'https://www.nta.go.jp/publication/pamph/gensen/zeigakuhyo2026/data/08-14.pdf' },
   { kind: 'shoyo', year: 2026, data: { rates: SZ.RATES, kou: SZ.KOU_BY_YEAR[2026], otsu: SZ.OTSU_BY_YEAR[2026], kenpo_year_cap: SZ.KENPO_YEAR_CAP, kosei_per_cap: SZ.KOSEI_PER_CAP, kosei_ritsu_jugyoin: SZ.KOSEI_RITSU_JUGYOIN }, source_url: 'https://www.nta.go.jp/publication/pamph/gensen/zeigakuhyo2026/03.htm' },
   { kind: 'nenmatsu', year: 2026, data: N.P, source_url: 'https://www.nta.go.jp/users/gensen/2026kaisei/index.htm' },
   { kind: 'warimashi', year: 2023, data: WM.RATE, source_url: 'https://www.mhlw.go.jp/hourei/doc/kouji/K060000-A5.pdf' },

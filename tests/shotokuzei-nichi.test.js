@@ -93,3 +93,12 @@ T('nichiTax: taxClass別名(甲/乙)も受ける', function () {
   eq(N.nichiTax(10000, { taxClass: '甲', deps: 0 }), 265);
   eq(N.nichiTax(10000, { taxClass: '乙' }), 1800);
 });
+T('hydrate: 中央データ(seed形状)で年分上書き→正値・不正は拒否', function () {
+  var t = N.TABLE_R8;
+  var data = { start: t.start, step: t.step, ko: t.ko, otsu: t.otsu, koOver: t.koOver, otsuLowRate: t.otsuLowRate, otsuOver: t.otsuOver };
+  eq(N.hydrate(2099, data), true);
+  eq(N.nichiTax(10000, { taxClass: 'ko', deps: 0, year: 2099 }), 265); // 上書き年分でも表引き成立
+  eq(N.nichiTax(20000, { taxClass: 'otsu', year: 2099 }), 6530);
+  eq(N.hydrate(2098, { start: 0 }), false);          // start不正
+  eq(N.hydrate(2098, { start: 3500, step: 100, ko: [[1, 2]], otsu: [1] }), false); // 甲が8列でない
+});
