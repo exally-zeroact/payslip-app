@@ -197,7 +197,7 @@
   var state={ company: defCompany(),
     month:'2026-06', prefer:'col2_1', theme:{accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}, depts:['営業部'], roles:['課長','主任','一般'],
     employees:[defEmp('山田 太郎')], open:{},
-    inputMode:'monthly', printMode:'monthly', empFilter:'active', bonus:{ payYm:'', payDay:'', byEmp:{} }, confirmed:{}, nencho:{}, onboardDone:false, payPatterns:[], dailySlipLayout:'1col' };
+    inputMode:'monthly', printMode:'monthly', empFilter:'active', bonus:{ payYm:'', payDay:'', byEmp:{} }, confirmed:{}, nencho:{}, onboardDone:false, payPatterns:[], dailySlipLayout:'1col', inputView:'card' };
 
   // マイカー通勤 1か月非課税限度(片道km・国税庁No.2585 令和8年4月〜)★12区分 公式照合済2026-07★
   function carCommuteNonTax(km){ km=num(km);
@@ -954,6 +954,13 @@
       +'</div>'
       +'<div style="font-size:10px;color:#7aa08c;margin-top:4px">前月と変わった人だけ「確認」を。変わっていない人は自動で確認済み扱いです。</div>'
       +'</div>';
+    // 入力ビュー切替(カード/表)。2人以上のときだけ表を出す(1人は表の意味が薄い)
+    var activeCount=state.employees.filter(function(e){return isActiveInMonth(e,state.month);}).length;
+    var view=state.inputView||'card';
+    var viewToggle=activeCount>1 ? '<div class="in-view-seg imode-seg" style="grid-template-columns:1fr 1fr;max-width:320px">'
+      +'<b class="ivw'+(view==='card'?' on':'')+'" data-ivw="card">カードで1人ずつ</b>'
+      +'<b class="ivw'+(view==='table'?' on':'')+'" data-ivw="table">表でまとめて</b></div>' : '';
+    if(view==='table' && activeCount>1){ host.innerHTML=statutoryStaleWarn()+calHTML+progHTML+viewToggle+renderInputTableHTML(reviewOnly)+confirmBtn; return; }
     var cards=state.employees.map(function(e,i){
       if(!isActiveInMonth(e,state.month)) return '';
       ensureKintai(e);
@@ -984,9 +991,51 @@
     var confirmBtn='<div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px"><button class="btn-primary" data-confirm-month style="flex:0 0 auto;padding:11px 18px;font-size:14px">今月を確定（台帳・年調に反映）</button>'
       +(cnt.need>0?'<span style="font-size:11px;color:#92500A;font-weight:700">未確認 '+cnt.need+'名</span>':'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 確認済</span>')
       +'<span style="font-size:10px;color:#7aa08c"><b>保存は自動</b>です。「確定」は全員を確認済みにし、<b>賃金台帳・年末調整の集計対象</b>として今月を記録します（あとで直せます）。</span></div>';
-    host.innerHTML=statutoryStaleWarn()+calHTML+progHTML+cards+emptyMsg+confirmBtn;
+    host.innerHTML=statutoryStaleWarn()+calHTML+progHTML+viewToggle+cards+emptyMsg+confirmBtn;
   }
-  function refreshCard(i){ var e=state.employees[i]; var card=$('#input-list .acc[data-i="'+i+'"]'); if(!card) return; var r=compute(e); card.querySelector('.acc-net').textContent=yen(r.net); var dw=card.querySelector('.diffb-wrap'); if(dw) dw.innerHTML=diffBadge(e,r); var bn=card.querySelector('.basepay-note'); if(bn) bn.innerHTML=basePayNoteOnly(e); var cw=card.querySelector('.calc-wrap'); if(cw) cw.innerHTML=calcBoxHTML(e); var wr=card.querySelector('.wi-resw'); if(wr) wr.innerHTML=wiResHTML(e); }
+  // 表でまとめて入力(全従業員1画面・弥生の弱点/Exallyモデル)。列は既存と同じdata属性を再利用=同じハンドラで書ける。
+  function renderInputTableHTML(reviewOnly){
+    var sche=scheduledDaysOf(state.month);
+    function kinCell(e,i,re){ var idx=kinIdx(e,re); var v=idx>=0?e.kintai[idx].value:''; return '<td class="tnum"><input class="finput num ic-in tcell" data-g="kintai" data-ri="'+idx+'" data-f="value" inputmode="numeric" value="'+attr(v)+'"></td>'; }
+    function hmCell(hName,mName,hVal,mVal,cls,dsH,dsM){ return '<td class="tnum"><span class="thm"><input class="'+cls+' tcell" '+dsH+' inputmode="numeric" placeholder="0" value="'+attr(hVal)+'">:<input class="'+cls+' tcell" '+dsM+' inputmode="numeric" placeholder="0" value="'+attr(mVal)+'"></span></td>'; }
+    // 割増(残業/深夜/休日)=かんたんのdata-wk。詳細モードの人は表では触らせない(カードへ誘導)=silent-wrong防止
+    function wariCell(e,key){ var w=e.warimashi||{}; if((w.mode||'easy')==='detail') return '<td class="tnum tdim">詳細<span class="thint">カードで</span></td>';
+      return hmCell(0,0,w[key+'H'],w[key+'M'],'wi-f','data-wk="'+key+'H"','data-wk="'+key+'M"'); }
+    function extraCell(e){ // 歩合/売上/件数(カスタム/歩合のみ・該当なしは—)
+      if(e.payType==='歩合') return '<td class="tnum"><input class="finput num cm-f tcell" data-cmf="commissionAmt" inputmode="numeric" placeholder="歩合" value="'+attr(fmtN(e.commissionAmt))+'"></td>';
+      if(e.payType==='カスタム'){ var prts=((ensurePayRule(e).variable||{}).parts)||[];
+        if(prts.some(function(p){return p.type==='rate'||p.type==='tiered';})) return '<td class="tnum"><input class="finput num cm-f tcell" data-cmf="salesAmt" inputmode="numeric" placeholder="売上" value="'+attr(fmtN(e.salesAmt))+'"></td>';
+        if(prts.some(function(p){return p.type==='piece';})) return '<td class="tnum"><input class="finput num cm-f tcell" data-cmf="pieceCount" inputmode="numeric" placeholder="件数" value="'+attr(fmtN(e.pieceCount))+'"></td>';
+        if(prts.some(function(p){return p.type==='commission';})) return '<td class="tnum"><input class="finput num cm-f tcell" data-cmf="commissionAmt" inputmode="numeric" placeholder="歩合" value="'+attr(fmtN(e.commissionAmt))+'"></td>';
+      }
+      return '<td class="tnum tdim">—</td>'; }
+    var rows=state.employees.map(function(e,i){
+      if(!isActiveInMonth(e,state.month)) return '';
+      ensureKintai(e);
+      if(sche!=null){ var soi=kinIdx(e,/出勤/); if(soi>=0 && (e.kintai[soi].value===''||e.kintai[soi].value==null)) e.kintai[soi].value=String(sche); }
+      var r=compute(e);
+      if(reviewOnly && !empNeedsReview(e,r)) return '';
+      var cf=empConfirmed(e), nr=empNeedsReview(e,r);
+      var conf=cf?'<input type="checkbox" class="econf" data-econf="'+i+'" checked title="確認済">'
+        :nr?'<input type="checkbox" class="econf" data-econf="'+i+'" title="要確認">':'<span class="thint">—</span>';
+      var mw=minWageInfo(e); var mwWarn=(mw&&!mw.ok)?' <span class="tmw" title="最低賃金割れ">⚠</span>':'';
+      return '<tr class="trow" data-i="'+i+'"><td class="tnm">'+esc(e.name)+wsBadge(e)+mwWarn+'</td>'
+        +kinCell(e,i,/出勤/)+kinCell(e,i,/欠勤/)+kinCell(e,i,/有給/)
+        +hmCell(0,0,e.workedH,e.workedM,'wk-f','data-wkf="workedH"','data-wkf="workedM"')
+        +wariCell(e,'ot')+wariCell(e,'night')+wariCell(e,'holiday')
+        +extraCell(e)
+        +'<td class="tnet"><span class="tnet-v">'+yen(r.net)+'</span></td><td class="tdiff">'+diffBadge(e,r)+'</td>'
+        +'<td class="tconf">'+conf+'</td></tr>';
+    }).join('');
+    if(!rows) return '<p class="hint" style="text-align:center;padding:18px 0">要確認の人はいません（全員確認済み）。</p>';
+    return '<div class="in-table-wrap"><table class="in-table"><thead><tr>'
+      +'<th class="tnm">氏名</th><th>出勤</th><th>欠勤</th><th>有給</th><th>労働<small>時:分</small></th><th>残業</th><th>深夜</th><th>休日</th><th>歩合/売上</th><th class="tnet">手取り</th><th>前月比</th><th>確認</th>'
+      +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
+      +'<p class="hint" style="margin:6px 2px">横スクロールできます。詳しい項目（支給の追加・法定外控除・日別など）は「カードで1人ずつ」で。時給/日給/歩合の金額は 設定▸従業員マスタ。</p>';
+  }
+  function refreshCard(i){ var e=state.employees[i];
+    var trow=$('#input-list .trow[data-i="'+i+'"]'); if(trow){ var rt=compute(e); var nv=trow.querySelector('.tnet-v'); if(nv) nv.textContent=yen(rt.net); var td=trow.querySelector('.tdiff'); if(td) td.innerHTML=diffBadge(e,rt); return; } // 表モードは手取り/前月比セルだけ更新(フォーカス維持)
+    var card=$('#input-list .acc[data-i="'+i+'"]'); if(!card) return; var r=compute(e); card.querySelector('.acc-net').textContent=yen(r.net); var dw=card.querySelector('.diffb-wrap'); if(dw) dw.innerHTML=diffBadge(e,r); var bn=card.querySelector('.basepay-note'); if(bn) bn.innerHTML=basePayNoteOnly(e); var cw=card.querySelector('.calc-wrap'); if(cw) cw.innerHTML=calcBoxHTML(e); var wr=card.querySelector('.wi-resw'); if(wr) wr.innerHTML=wiResHTML(e); }
 
   // ───────── 賞与(ボーナス)モード ─────────
   function SZ(){ try{ if(typeof ShoyoZei!=='undefined'&&ShoyoZei) return ShoyoZei; }catch(e){} return (typeof window!=='undefined'&&window.ShoyoZei)||null; }
@@ -1803,6 +1852,7 @@
     il.addEventListener('click',function(e){
       if(e.target.classList.contains('econf')){ var eci=+e.target.dataset.econf; var emc=state.employees[eci]; if(emc){ setConfirm(emc.id, e.target.checked); renderInput(); persistSaveDebounced(); } return; }
       if(e.target.dataset.reviewonly!=null){ state._reviewOnly=e.target.checked; renderInput(); return; }
+      var ivw=e.target.closest('[data-ivw]'); if(ivw){ state.inputView=ivw.dataset.ivw==='table'?'table':'card'; renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
       var cmb=e.target.closest('[data-confirm-month]');
       if(cmb){ state.employees.forEach(function(emp){ if(isActiveInMonth(emp,state.month)) setConfirm(emp.id,true); }); try{ saveMonthlyPayslips(); }catch(_){} persistSave(); renderInput(); toast('今月を確定しました'); return; }
       var fs=e.target.closest('[data-fillsche]');
@@ -1820,7 +1870,7 @@
       if(e.target.dataset.add){ var ai=+e.target.dataset.i, g=e.target.dataset.add; state.employees[ai][g].push({label:'',value:''}); renderInput(); return; }
       if(e.target.classList.contains('m-del')&&e.target.closest('#input-list')){ var card=e.target.closest('.acc'); var ci=+card.dataset.i; var g=e.target.dataset.g, ri=+e.target.dataset.ri; state.employees[ci][g].splice(ri,1); renderInput(); return; }
     });
-    il.addEventListener('input',function(e){ var card=e.target.closest('.acc'); if(!card)return; var ci=+card.dataset.i; var emp=state.employees[ci];
+    il.addEventListener('input',function(e){ var card=e.target.closest('.acc,.trow'); if(!card)return; var ci=+card.dataset.i; var emp=state.employees[ci];
       var dl=e.target.closest('[data-dl]'); if(dl){ var dpp=String(dl.dataset.dl).split(':'); if(emp.dailyEntries&&emp.dailyEntries[+dpp[1]]){ var f2=dpp[2]; emp.dailyEntries[+dpp[1]][f2]=(f2==='amount')?e.target.value.replace(/[^0-9]/g,''):e.target.value; } if(window.persistSaveDebounced)persistSaveDebounced(); return; } // 日別入力(再描画せずフォーカス維持)
       if(e.target.classList.contains('wk-f')){ emp[e.target.dataset.wkf]=e.target.value.replace(/[^0-9]/g,''); refreshCard(ci); return; }
       if(e.target.classList.contains('cm-f')){ emp[e.target.dataset.cmf]=e.target.value.replace(/[^0-9]/g,''); refreshCard(ci); return; }

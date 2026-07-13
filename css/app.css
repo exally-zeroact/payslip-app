@@ -173,6 +173,28 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .imode-seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 10px;}
 .imode-seg .imode,.imode-seg .pmode,.imode-seg .dls{text-align:center;border:1.5px solid #d4eae0;border-radius:9px;padding:8px 4px;font-size:13px;font-weight:700;color:#7aa08c;background:#fff;cursor:pointer;}
 .imode-seg .imode.on,.imode-seg .pmode.on,.imode-seg .dls.on{border-color:#52B788;background:#F0FAF4;color:#2E7D54;}
+.imode-seg .ivw{text-align:center;border:1.5px solid #d4eae0;border-radius:9px;padding:8px 4px;font-size:13px;font-weight:700;color:#7aa08c;background:#fff;cursor:pointer;}
+.imode-seg .ivw.on{border-color:#52B788;background:#F0FAF4;color:#2E7D54;}
+/* 入力=表でまとめて(全従業員1画面・横スクロール・数値右揃え・1列目固定) */
+.in-table-wrap{overflow-x:auto;border:1px solid #d4eae0;border-radius:12px;margin-bottom:10px;-webkit-overflow-scrolling:touch;}
+.in-table{border-collapse:separate;border-spacing:0;font-size:12.5px;min-width:100%;white-space:nowrap;}
+.in-table th{background:#F0FAF4;color:#2E7D54;font-weight:700;font-size:11px;padding:8px 8px;border-bottom:1px solid #C8ECD8;text-align:right;position:sticky;top:0;}
+.in-table th small{display:block;font-size:9px;color:#7aa08c;font-weight:400;}
+.in-table th.tnm{text-align:left;}
+.in-table td{padding:5px 8px;border-bottom:1px solid #eef4f0;vertical-align:middle;}
+.in-table tr:last-child td{border-bottom:none;}
+.in-table .tnm{text-align:left;font-weight:700;color:#23261f;position:sticky;left:0;background:#fff;z-index:1;box-shadow:1px 0 0 #eef4f0;}
+.in-table th.tnm{position:sticky;left:0;z-index:2;background:#F0FAF4;}
+.in-table .tnum{text-align:right;}
+.in-table .tcell{width:52px;text-align:right;padding:5px 6px;font-variant-numeric:tabular-nums;}
+.in-table .thm{display:inline-flex;align-items:center;gap:2px;color:#8FA89A;}
+.in-table .thm .tcell{width:38px;}
+.in-table .tnet{text-align:right;}
+.in-table .tnet-v{font-weight:700;color:#23261f;font-variant-numeric:tabular-nums;}
+.in-table .tdim{color:#C0CFC7;text-align:right;}
+.in-table .thint{color:#A9C4B6;font-size:10px;}
+.in-table .tmw{color:#C0392B;cursor:help;}
+.in-table .tconf{text-align:center;}
 .cap-badge{display:inline-block;font-size:10px;font-weight:700;color:#92500A;background:#fff8e1;border:1px solid #F4D8A8;border-radius:6px;padding:2px 7px;margin-right:5px;}
 .wi-df{width:46px;padding:7px 4px;border:1.5px solid #d4eae0;border-radius:8px;font-size:15px;font-family:'DM Mono',monospace;text-align:center;color:#1a4a2e;-webkit-appearance:none;}
 .wi-note2{font-size:10px;color:#7aa08c;line-height:1.5;margin:4px 0 2px;}
