@@ -205,7 +205,7 @@
   var state={ company: defCompany(),
     month:'2026-06', prefer:'col2_1', theme:{accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}, depts:['営業部'], roles:['課長','主任','一般'],
     employees:[defEmp('山田 太郎')], open:{},
-    inputMode:'monthly', printMode:'monthly', empFilter:'active', bonus:{ payYm:'', payDay:'', byEmp:{} }, confirmed:{}, nencho:{}, onboardDone:false, payPatterns:[], dailySlipLayout:'1col', inputView:'card' };
+    inputMode:'monthly', printMode:'monthly', empFilter:'active', bonus:{ payYm:'', payDay:'', byEmp:{} }, confirmed:{}, nencho:{}, onboardDone:false, onboardOutput:false, payPatterns:[], dailySlipLayout:'1col', inputView:'card' };
 
   // マイカー通勤 1か月非課税限度(片道km・国税庁No.2585 令和8年4月〜)★12区分 公式照合済2026-07★
   function carCommuteNonTax(km){ km=num(km);
@@ -397,18 +397,31 @@
   /* ---------- 設定: 会社情報 ---------- */
   function fillCompany(){ $('#c-name').value=state.company.name||''; $('#c-addr').value=state.company.addr||''; $('#c-close').value=state.company.close||''; $('#c-payrel').value=state.company.paydayRel||'next'; $('#c-payday-day').value=state.company.paydayDay||''; var pc=$('#c-paycycle'); if(pc)pc.value=state.company.payCycle||'monthly'; updatePaydayPreview(); payCycleNote(); renderRuleChips(); renderCompanyRules(); renderDesign(); }
   // 初回オンボーディング(4ステップ案内・×で閉じたら二度と出ない)。"すぐ分かる"を底上げ。
+  // はじめかたガイドの各ステップの達成判定(freee/MF流のライブToDo)。全完了で自動的に消える。
+  function onboardSteps(){
+    var emps=state.employees||[];
+    var realEmp=emps.length>1 || emps.some(function(e){ return e.name && !/^(山田 太郎|日払 太郎)$/.test(String(e.name).trim()); });
+    var conf=state.confirmed&&state.confirmed[state.month]; var inputDone=!!(conf&&Object.keys(conf).length);
+    return [
+      { done: !!(state.company&&String(state.company.name||'').trim()), label:'会社情報を入れる', sub:'会社名・締め日・支給日', go:'company' },
+      { done: realEmp, label:'従業員を追加する', sub:'サンプルの山田太郎は書き換え/削除でOK', go:'emp' },
+      { done: inputDone, label:'当月を入力して確認', sub:'勤怠を入れて「今月を確定」', go:'input' },
+      { done: !!state.onboardOutput, label:'明細を出力する', sub:'PDF/Web明細/Excel/振込データ', go:'print' }
+    ];
+  }
   function renderOnboard(){
     var box=$('#onboard-box'); if(!box) return;
-    if(state.onboardDone){ box.innerHTML=''; return; }
-    box.innerHTML='<div class="card" style="border:1px solid #C8ECD8;background:linear-gradient(180deg,#F4FBF7,#ffffff)">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center"><b style="color:#2E7D54">はじめに（4ステップ）</b>'
-      +'<button data-onboard-close="1" title="閉じる" style="border:none;background:none;color:#5C7E6C;font-size:20px;cursor:pointer;line-height:1;padding:0 4px">×</button></div>'
-      +'<div style="font-size:12.5px;color:#3D6B53;margin-top:6px;line-height:1.95">'
-        +'<b>①</b> この画面で<b>会社情報</b>（会社名・締め日・支給日）を入れる<br>'
-        +'<b>②</b> 上のタブ「<b>従業員マスタ</b>」で従業員を追加（※最初の「山田 太郎」はサンプルです。書き換えか削除でOK）<br>'
-        +'<b>③</b> 下の「<b>入力</b>」で対象月の勤怠を入れる（勤怠CSV取込／所定で一括も可）<br>'
-        +'<b>④</b> 「<b>印刷</b>」で PDF・Web明細・Excel・総合振込データ を出力'
-      +'</div></div>';
+    var steps=onboardSteps(), doneN=steps.filter(function(s){return s.done;}).length;
+    if(state.onboardDone || doneN===steps.length){ box.innerHTML=''; return; } // 手動で閉じた or 全完了→自動で消える
+    box.innerHTML='<div class="card ob-card">'
+      +'<div class="ob-hd"><b>はじめかたガイド（'+doneN+'/'+steps.length+'）</b>'
+      +'<button data-onboard-close="1" class="ob-x" title="あとで">×</button></div>'
+      +'<div class="ob-lead">未完のステップをタップすると、その画面へ移動します。</div>'
+      +steps.map(function(s,i){ return '<button class="ob-step'+(s.done?' done':'')+'" data-onboard-goto="'+s.go+'">'
+          +'<span class="ob-ck">'+(s.done?'✓':(i+1))+'</span>'
+          +'<span class="ob-tx"><b>'+esc(s.label)+'</b><small>'+esc(s.sub)+'</small></span>'
+          +(s.done?'<span class="ob-done-lb">完了</span>':'<span class="ob-arrow">›</span>')+'</button>'; }).join('')
+      +'</div>';
   }
   function renderRuleChips(){
     var host=$('#rule-chips'); if(!host)return; var on=state.company.ruleOn||{};
@@ -1729,7 +1742,11 @@
   function bind(){
     $$('.bn').forEach(function(b){ b.addEventListener('click',function(){ showScreen(b.dataset.scr); }); });
     // 💡 ヘルプ（全画面共通）
-    document.addEventListener('click',function(e){ var hi=e.target.closest('.help-i'); if(hi){ openHelp(hi.dataset.help); return; } if(e.target.closest('[data-onboard-close]')){ state.onboardDone=true; renderOnboard(); if(window.persistSaveDebounced)persistSaveDebounced(); } });
+    document.addEventListener('click',function(e){ var hi=e.target.closest('.help-i'); if(hi){ openHelp(hi.dataset.help); return; } if(e.target.closest('[data-onboard-close]')){ state.onboardDone=true; renderOnboard(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
+      var gob=e.target.closest('[data-onboard-goto]'); if(gob){ var g=gob.dataset.onboardGoto; // はじめかたガイド: 未完ステップ→その画面へジャンプ
+        if(g==='company'||g==='emp'){ showScreen('scr-settings'); var b=$('#set-seg .seg-b[data-set="'+g+'"]'); if(b)b.click(); }
+        else if(g==='input'){ showScreen('scr-input'); } else if(g==='print'){ showScreen('scr-print'); }
+        return; } });
     $('#help-x').addEventListener('click',function(){ $('#help-ov').classList.remove('on'); });
     $('#help-ov').addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); });
     document.addEventListener('change',function(ev){ if(!ev.target.classList.contains('scr-month'))return; state.month=ev.target.value||state.month; state._prevYm=null; state._bonusPrevYm=null; /* 月替わりで前月比/賞与前月キャッシュを更新 */ $$('.scr-month').forEach(function(m){ m.value=state.month; }); updatePaydayPreview();
@@ -1933,7 +1950,8 @@
       if(e.target.closest('[data-reset]')){ state.theme={accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}; state._oc=null; afterDesign(); return; } // 色のみ初期化(レイアウトは維持)
       var tg=e.target.closest('.cp-toggle:not(.cp-reset)'); if(tg){ state._oc=(state._oc===tg.dataset.cpk)?null:tg.dataset.cpk; renderDesign(); return; }
       var w=e.target.closest('.cw'); if(w){ state.theme[w.dataset.ck]=w.dataset.col; state._oc=null; afterDesign(); } });
-    $('#b-print').addEventListener('click',function(){ var f=$('#frame'); try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} });
+    function markOutput(){ if(!state.onboardOutput){ state.onboardOutput=true; if(window.persistSaveDebounced)persistSaveDebounced(); } } // はじめかたガイド④の達成
+    $('#b-print').addEventListener('click',function(){ markOutput(); var f=$('#frame'); try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} });
     // 総合振込データ(委託者入力の保存 + 全銀/Excel ダウンロード)。#furi-boxは静的なので委譲で1回だけ配線。
     (function(){ var fb=$('#furi-box'); if(!fb) return;
       function setFc(ev){ var el=ev.target.closest&&ev.target.closest('[data-fc]'); if(el){ state.company[el.getAttribute('data-fc')]=el.value; persistSaveDebounced(); } }
@@ -1952,7 +1970,7 @@
     })();
     // モバイルの回転/リサイズでプレビューを再フィット(再描画せず軽く)
     var _fitT; window.addEventListener('resize',function(){ if(!$('#scr-print')||!$('#scr-print').classList.contains('active'))return; clearTimeout(_fitT); _fitT=setTimeout(fitPreview,120); });
-    $('#b-xlsx').addEventListener('click',function(){ if(!window.PayslipXlsx)return; var v=$('#p-emp').value; var emps=(v==='__all')?state.employees.filter(function(e){return isActiveInMonth(e,state.month);}):[state.employees[+v]];
+    $('#b-xlsx').addEventListener('click',function(){ if(!window.PayslipXlsx)return; markOutput(); var v=$('#p-emp').value; var emps=(v==='__all')?state.employees.filter(function(e){return isActiveInMonth(e,state.month);}):[state.employees[+v]];
       var isBonus=state.printMode==='bonus'; // 印刷の月次/賞与トグルに合わせる(賞与で月次が出る不具合を修正)
       var people=isBonus?buildBonusPeople(emps):buildPeople(emps);
       var lbl=(isBonus?bonusMonthLabel():monthLabel()).replace(/ /g,'');
@@ -1960,6 +1978,7 @@
       PayslipXlsx.download(people, {company:state.company.name, monthLabel:lbl, filename:fn}); });
     // Web明細で公開(従業員向け配布・アクセスコード方式)
     $('#b-webpub').addEventListener('click',function(){
+      markOutput();
       if(!(window.Store&&Store.publishMeisai)) return;
       var isBonus=state.printMode==='bonus';
       var emps=state.employees.filter(function(e){return isActiveInMonth(e,isBonus?bonusYmOf():state.month);});
@@ -2039,13 +2058,13 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';
   // 保存時はcomputeが書く一時フィールド(_prorate/_wari/_shahoExemptThisMonth等)を除外→DB/LS汚染防止(in-memoryは描画用に保持)
   function stripTransient(e){ var o={}; for(var k in e){ if(Object.prototype.hasOwnProperty.call(e,k)&&k.charAt(0)!=='_') o[k]=e[k]; } return o; }
-  function snapshot(){ return { v:1, company:state.company, employees:(state.employees||[]).map(stripTransient), month:state.month, theme:state.theme, prefer:state.prefer, depts:state.depts, roles:state.roles, showRetired:state.showRetired, bonus:state.bonus, confirmed:state.confirmed, nencho:state.nencho, onboardDone:state.onboardDone, payPatterns:state.payPatterns }; }
+  function snapshot(){ return { v:1, company:state.company, employees:(state.employees||[]).map(stripTransient), month:state.month, theme:state.theme, prefer:state.prefer, depts:state.depts, roles:state.roles, showRetired:state.showRetired, bonus:state.bonus, confirmed:state.confirmed, nencho:state.nencho, onboardDone:state.onboardDone, onboardOutput:state.onboardOutput, payPatterns:state.payPatterns }; }
   var _saveT=null;
   function persistSave(){ try{ localStorage.setItem(PKEY, JSON.stringify(snapshot())); }catch(e){} if(window.Store&&Store.cloudSaveState){ try{ Store.cloudSaveState(snapshot()); }catch(e){} } try{ saveMonthlyPayslips(); }catch(e){}
     try{ var d=new Date(); state._savedAt=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); var ss=document.getElementById('save-status'); if(ss) ss.textContent='自動保存済 '+state._savedAt; }catch(e){} }
@@ -2063,7 +2082,7 @@
       if(s.confirmed) state.confirmed=s.confirmed;
       if(s.nencho) state.nencho=s.nencho;
       if(s.payPatterns) state.payPatterns=s.payPatterns;
-      if(s.onboardDone) state.onboardDone=true;
+      if(s.onboardDone) state.onboardDone=true; if(s.onboardOutput) state.onboardOutput=true;
     }
     // クラウド(Supabase)が有効なら後から読み込んで上書き＋再描画
     reloadCloud();

@@ -118,6 +118,27 @@ T('B3/B4: 表でmax(売上,歩合)は両欄・役員は割増欄なし', functio
   eq(row1.querySelectorAll('[data-wk]').length, 0, 'B4: 役員は割増入力なし');
 });
 
+// ── はじめかたガイド(ライブToDo): 各ステップの達成判定 ──
+T('オンボーディング: 達成判定(会社名✓/サンプルemp未/確定で入力✓/出力flag✓)', function () {
+  const st = A.state;
+  st.company = Object.assign(st.company, { name: '株式会社 ゼロアクト' });
+  st.employees = [A.defEmp('山田 太郎')]; st.month = '2026-06'; st.confirmed = {}; st.onboardOutput = false;
+  let s = A.onboardSteps();
+  eq(s[0].done, true, '会社名あり→①完了');
+  eq(s[1].done, false, 'サンプルのみ→②未完');
+  eq(s[2].done, false, '未確定→③未完');
+  eq(s[3].done, false, '未出力→④未完');
+  // 本物の従業員を追加→②完了
+  st.employees.push(A.defEmp('佐藤 花子'));
+  eq(A.onboardSteps()[1].done, true, '本物emp追加→②完了');
+  // 当月を確認→③完了
+  A.setConfirm(st.employees[0].id, true);
+  eq(A.onboardSteps()[2].done, true, '確認済→③完了');
+  // 出力→④完了
+  st.onboardOutput = true;
+  eq(A.onboardSteps()[3].done, true, '出力flag→④完了');
+});
+
 // ── 出勤クランプ: 出勤マイナスで負支給にならない ──
 T('出勤クランプ: 日給 出勤-5 → effShukkin=0・支給非負', function () {
   const e = A.defEmp('日給'); e.payType = '日給'; e.base = '12000';
