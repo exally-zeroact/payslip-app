@@ -10,6 +10,7 @@ const SAI = require('../lib/saitei-chingin.js');
 const KOYO = require('../lib/koyo-hoken.js');
 const D = require('../lib/shotokuzei-densan.js');
 const H = require('../lib/shotokuzei-hei.js');
+const NI = require('../lib/shotokuzei-nichi.js');
 const SZ = require('../lib/shoyo-zei.js');
 const N = require('../lib/nenmatsu.js');
 const WM = require('../lib/warimashi.js');
@@ -46,6 +47,8 @@ function verify(rows) {
   { const d = row(rows, 'shotokuzei_densan', 2026); if (d) { eq('densan2026.kyuyo', D.PARAMS[2026].kyuyo, d.kyuyo); eq('densan2026.kiso', D.PARAMS[2026].kiso, d.kiso); eq('densan.zeiKo', D.ZEI_KO, d.zeiKo); eq('densan.zeiOtsu', D.ZEI_OTSU, d.zeiOtsu); } else diffs.push('shotokuzei_densan/2026 無し'); }
   // ── 所得税 日額(hei) ──
   { const d = row(rows, 'shotokuzei_hei', 2026); const t = (H.HEI_BY_YEAR && H.HEI_BY_YEAR[2026]) || H.HEI_R8; if (d) { eq('hei.start', t.start, d.start); eq('hei.step', t.step, d.step); eq('hei.arr', t.arr, d.arr); } else diffs.push('shotokuzei_hei 無し'); }
+  // ── 所得税 日額 甲乙(nichi) ──
+  { const d = row(rows, 'shotokuzei_nichi', 2026); const t = (NI.tableFor && NI.tableFor(2026)) || NI.TABLE_R8; if (d) { eq('nichi.start', t.start, d.start); eq('nichi.step', t.step, d.step); eq('nichi.ko', t.ko, d.ko); eq('nichi.otsu', t.otsu, d.otsu); eq('nichi.koOver', t.koOver, d.koOver); } else diffs.push('shotokuzei_nichi 無し'); }
   // ── 賞与(shoyo) ──
   { const d = row(rows, 'shoyo', 2026); if (d) { eq('shoyo.rates', SZ.RATES, d.rates); eq('shoyo.kou', SZ.KOU_BY_YEAR[2026], d.kou); eq('shoyo.otsu', SZ.OTSU_BY_YEAR[2026], d.otsu); } else diffs.push('shoyo 無し'); }
   // ── 年末調整(nenmatsu) ──
