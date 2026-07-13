@@ -59,6 +59,7 @@ T('実の日額表 乙欄を通した統合: 扶養に依らず乙の表値', fu
 });
 T('hhmm: 390分→6:30 / 32:30', function () {
   eq(DP.hhmm(390), '6:30'); eq(DP.hhmm(1950), '32:30');
+  eq(DP.hhmm(-90), '0:00'); eq(DP.hhmm(-1), '0:00'); // M1: 負の労働時数は0:00にクランプ(「-2:30」表示崩れ防止)
 });
 T('空/無効は落ちない', function () {
   eq(DP.computeDaily(null, {}).count, 0); eq(DP.computeDaily([], {}).totalAmount, 0);

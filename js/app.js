@@ -3,7 +3,7 @@
   'use strict';
   var $=function(s,r){return (r||document).querySelector(s);};
   var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
-  var num=function(v){var n=Number(String(v==null?0:v).replace(/[, ]/g,''));return isNaN(n)?0:n;};
+  var num=function(v){var s=String(v==null?0:v).replace(/[０-９]/g,function(d){return String.fromCharCode(d.charCodeAt(0)-0xFEE0);}).replace(/[，、]/g,'').replace(/[, ]/g,'');var n=Number(s);return isNaN(n)?0:n;}; // 全角数字/読点も数値化(M3: 全角123が0に化けるのを防ぐ)
   var yen=function(n){return '¥'+Math.round(n).toLocaleString('ja-JP');};
   var fmtN=function(v){var n=num(v);return n?n.toLocaleString('ja-JP'):(v===0||v==='0'?'0':'');};
   function activeEmps(){ return state.employees.filter(function(e){return !e.retired;}); } // 稼働中(退職を除く)
@@ -72,7 +72,8 @@
   }
   // ── 給与パターン(テンプレ): 給料の「決め方＋既定の支給/控除項目」を名前付きで保存→他の従業員に適用 ──
   //  ★人ごとの値(氏名/生年月日/扶養/都道府県/通勤/歩合額/売上等)は含めない=給与"構造"だけをテンプレ化★
-  var PAY_PATTERN_FIELDS=['payType','base','hourly','hourlyGuarantee','annualHolidays','dailyWorkH','dailyWorkM','minashiH'];
+  // ★B6: base/hourly(＝個人ごとの給与額)はパターンに含めない=適用しても各人の給与額は変わらない(「人ごとの値は不変」の原則・適用ダイアログの文言と一致)。payType/決め方/保障給率/所定/項目 の"構造"だけをテンプレ化。
+  var PAY_PATTERN_FIELDS=['payType','hourlyGuarantee','annualHolidays','dailyWorkH','dailyWorkM','minashiH'];
   function makePayPattern(e,name){
     var p={ id:uid(), name:(name||'パターン'), pay:{} };
     PAY_PATTERN_FIELDS.forEach(function(k){ p.pay[k]=e[k]; });
@@ -94,7 +95,7 @@
   }
   // spec+当月コンテキストで基本給を評価(PayRule)。ctx=労働時間/出勤日数/売上。
   function payRuleCtx(e){ return { workMin:workedMin(e), workDays:kintaiVal(e,/出勤/), sales:num(e.salesAmt), commission:num(e.commissionAmt), count:num(e.pieceCount) }; }
-  function payRuleResult(e){ var pr=PR(); if(!pr)return null; return pr.basePay(e.payRule||{}, payRuleCtx(e)); }
+  function payRuleResult(e){ var pr=PR(); if(!pr)return null; ensurePayRule(e); return pr.basePay(e.payRule, payRuleCtx(e)); } // B5: payRule未初期化(null)でも既定を作ってから評価=基本給0の黙り込みを防ぐ
   // 就業状況。産休/育休=社保免除(自動off・上書き可)、介護休/病休=社保継続、休業=会社都合(休業手当)
   var WORK_STATUS=[['normal','通常'],['sankyu','産休'],['ikukyu','育休'],['kaigokyu','介護休'],['byoukyu','病気休職'],['kyugyo','休業(会社都合)']];
   var WS_LABEL=function(k){ var f=WORK_STATUS.find(function(x){return x[0]===k;}); return f?f[1]:'通常'; };
@@ -271,7 +272,7 @@
   function workedMin(e){ return num(e.workedH)*60+num(e.workedM); }
   function workedLabel(e){ var m=workedMin(e); return Math.floor(m/60)+':'+('0'+(m%60)).slice(-2); }
   // 実出勤日数(日給の基本給用)。無給代休(daikyuDeduct)なら代休取得を出勤から控除
-  function effShukkin(e){ var s=kintaiVal(e,/出勤/); if((state.company.ruleOn||{}).daikyu && state.company.daikyuDeduct) s=Math.max(0, s-kintaiVal(e,/代休取得/)); return s; }
+  function effShukkin(e){ var s=Math.max(0, kintaiVal(e,/出勤/)); if((state.company.ruleOn||{}).daikyu && state.company.daikyuDeduct) s=Math.max(0, s-kintaiVal(e,/代休取得/)); return s; } // 出勤日数は0未満にしない(負の支給を防ぐ)
   // 時給=時給単価×労働時間 / 日給=日給額×出勤日数 で基本給を自動算出(月給は手入力のまま)
   // 基本給を状態から導出(単一ソース)。休暇中=休暇中の金額・時給=時給×労働時間・日給=日給×出勤・月給/役員=基本給。復職/再就職で自動的に元へ戻る
   function syncBasePay(e){
@@ -1047,7 +1048,9 @@
       +'<p class="hint" style="margin:6px 2px">横スクロールできます。詳しい項目（支給の追加・法定外控除・日別など）は「カードで1人ずつ」で。時給/日給/歩合の金額は 設定▸従業員マスタ。</p>';
   }
   function refreshCard(i){ var e=state.employees[i];
-    var trow=$('#input-list .trow[data-i="'+i+'"]'); if(trow){ var rt=compute(e); var nv=trow.querySelector('.tnet-v'); if(nv) nv.textContent=yen(rt.net); var td=trow.querySelector('.tdiff'); if(td) td.innerHTML=diffBadge(e,rt); return; } // 表モードは手取り/前月比セルだけ更新(フォーカス維持)
+    var trow=$('#input-list .trow[data-i="'+i+'"]'); if(trow){ var rt=compute(e); var nv=trow.querySelector('.tnet-v'); if(nv) nv.textContent=yen(rt.net); var td=trow.querySelector('.tdiff'); if(td) td.innerHTML=diffBadge(e,rt);
+      var nmc=trow.querySelector('.tnm'); if(nmc){ var mw=minWageInfo(e); var mwc=nmc.querySelector('.tmw'); if(mw&&!mw.ok){ if(!mwc){ var sp=document.createElement('span'); sp.className='tmw'; sp.title='最低賃金割れ'; sp.textContent=' ⚠'; nmc.appendChild(sp); } } else if(mwc){ mwc.remove(); } } // B7: 最賃⚠も即時更新
+      return; } // 表モードは手取り/前月比/最賃⚠セルを更新(フォーカス維持)
     var card=$('#input-list .acc[data-i="'+i+'"]'); if(!card) return; var r=compute(e); card.querySelector('.acc-net').textContent=yen(r.net); var dw=card.querySelector('.diffb-wrap'); if(dw) dw.innerHTML=diffBadge(e,r); var bn=card.querySelector('.basepay-note'); if(bn) bn.innerHTML=basePayNoteOnly(e); var cw=card.querySelector('.calc-wrap'); if(cw) cw.innerHTML=calcBoxHTML(e); var wr=card.querySelector('.wi-resw'); if(wr) wr.innerHTML=wiResHTML(e); }
 
   // ───────── 賞与(ボーナス)モード ─────────
