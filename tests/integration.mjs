@@ -139,6 +139,25 @@ T('オンボーディング: 達成判定(会社名✓/サンプルemp未/確定
   eq(A.onboardSteps()[3].done, true, '出力flag→④完了');
 });
 
+// ── UX#8 空状態: 在籍0名で「次の一手」CTAが出る ──
+T('UX#8: 入力タブ 在籍0名→従業員追加CTA', function () {
+  const st = A.state; st.employees = []; st.month = '2026-06';
+  A.renderInput();
+  const host = win.document.querySelector('#input-list');
+  ok(/data-goto-empmaster/.test(host.innerHTML), '従業員追加CTAが出る');
+  ok(/従業員がいません/.test(host.textContent), '空状態の文言');
+});
+
+// ── UX#7 月の状態バッジ: 全員確認で「確定済」、未確認で「下書き」 ──
+T('UX#7: 月の状態バッジ 下書き↔確定済', function () {
+  const st = A.state; const e = A.defEmp('状態'); e.id = 'ms1'; st.employees = [e]; st.month = '2026-06'; st.confirmed = {};
+  A.renderInput();
+  ok(/mstate-draft/.test(win.document.querySelector('#input-list').innerHTML), '未確認→下書き');
+  A.setConfirm('ms1', true);
+  A.renderInput();
+  ok(/mstate-fixed/.test(win.document.querySelector('#input-list').innerHTML), '全員確認→確定済');
+});
+
 // ── 出勤クランプ: 出勤マイナスで負支給にならない ──
 T('出勤クランプ: 日給 出勤-5 → effShukkin=0・支給非負', function () {
   const e = A.defEmp('日給'); e.payType = '日給'; e.base = '12000';

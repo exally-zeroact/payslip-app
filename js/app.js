@@ -966,8 +966,12 @@
       +'<div style="font-size:10px;color:#5C7E6C;margin-top:3px">出勤日数は所定を初期表示。各自で手修正できます（赤で止めません）。会社独自の休みは「設定▸会社の決まり」で追加できます。</div>'
       +'</div>';
     var cnt=reviewCounts(), reviewOnly=!!state._reviewOnly;
+    // 月の状態バッジ(下書き/確定済)=freee型「確定=凍結」の状態を可視化(UX🟠#7)。全員確認済=確定済(凍結)
+    var monthConf=(cnt.total>0)&&state.employees.every(function(e){ return !isActiveInMonth(e,state.month)||empConfirmed(e); });
+    var stateChip=monthConf?'<span class="mstate mstate-fixed" title="この月は確定=凍結済み。自動保存では上書きされません">🔒 確定済</span>':'<span class="mstate mstate-draft" title="下書き。編集すると自動保存されます">下書き</span>';
     var progHTML='<div class="cal-box" style="background:#fff;border:1px solid #d4eae0;border-radius:12px;padding:10px 12px;margin-bottom:12px">'
       +'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">'
+        +stateChip
         +'<b style="color:#2E7D54;font-size:13px">確認 '+cnt.done+'/'+cnt.total+'名</b>'
         +(cnt.need>0?'<span style="background:#fff8e1;border:1px solid #F4D8A8;color:#92500A;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">未確認 '+cnt.need+'名</span>':'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 全員確認済</span>')
         +'<label style="font-size:11px;color:#3D6B53;display:inline-flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" data-reviewonly'+(reviewOnly?' checked':'')+'>要確認だけ表示</label>'
@@ -1008,6 +1012,14 @@
           +'<div class="grp"><div class="grp-h">法定外控除<button class="mini add" data-add="extraKojo" data-i="'+i+'">＋</button></div><div class="rows">'+rowsHTML('extraKojo',e.extraKojo)+'</div></div>'
           +'<div class="calc-wrap">'+calcBoxHTML(e)+'</div></div></div>';
     }).join('');
+    // 空状態(この月に在籍する従業員が0名)=次の一手CTA。カレンダーや確定ボタンだけが浮くのを防ぐ(UX🟠#8)
+    if(activeCount===0){
+      host.innerHTML=statutoryStaleWarn()+'<div class="empty-cta"><div class="ec-emoji">🧑‍💼</div>'
+        +'<div class="ec-t">この月に給与計算する従業員がいません</div>'
+        +'<div class="ec-s">「設定 ▸ 従業員マスタ」で従業員を追加すると、ここに当月の入力が出ます。</div>'
+        +'<button class="btn-primary ec-btn" data-goto-empmaster>＋ 従業員を追加する</button></div>';
+      return;
+    }
     var emptyMsg=(reviewOnly && !cards) ? '<p class="hint" style="text-align:center;padding:18px 0">要確認の人はいません（全員確認済み）。</p>' : '';
     var confirmBtn='<div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px"><button class="btn-primary" data-confirm-month style="flex:0 0 auto;padding:11px 18px;font-size:14px">今月を確定（台帳・年調に反映）</button>'
       +(cnt.need>0?'<span style="font-size:11px;color:#92500A;font-weight:700">未確認 '+cnt.need+'名</span>':'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 確認済</span>')
@@ -1429,7 +1441,7 @@
   }
   function renderNenView(){
     var host=$('#view-nen'); if(!host)return; var year=nenYear();
-    if(!(window.Store&&Store.getPayslipsByYm&&Nen_())){ host.innerHTML='<div class="card"><p class="hint">履歴保存または計算エンジンが未対応です。</p></div>'; return; }
+    if(!(window.Store&&Store.getPayslipsByYm&&Nen_())){ host.innerHTML='<div class="empty-cta"><div class="ec-emoji">📅</div><div class="ec-t">年末調整のデータがまだありません</div><div class="ec-s">各月の入力を「今月を確定」で記録すると、1〜12月分がここに自動集計されます。まずは入力タブで当月を確定してください。</div><button class="btn-primary ec-btn" data-scr="scr-input">入力タブへ</button></div>'; return; }
     host.innerHTML='<div class="card"><div class="card-h">年末調整 '+year+'年</div><p class="hint">読込中…</p></div>';
     Store.getPayslipsByYm(year+'-01', year+'-12').then(function(recs){ host.innerHTML=nenViewHTML(recs||[], year); nenTotal(); })
       .catch(function(){ host.innerHTML='<div class="card"><p class="hint">読込に失敗しました。</p></div>'; });
@@ -1746,7 +1758,9 @@
       var gob=e.target.closest('[data-onboard-goto]'); if(gob){ var g=gob.dataset.onboardGoto; // はじめかたガイド: 未完ステップ→その画面へジャンプ
         if(g==='company'||g==='emp'){ showScreen('scr-settings'); var b=$('#set-seg .seg-b[data-set="'+g+'"]'); if(b)b.click(); }
         else if(g==='input'){ showScreen('scr-input'); } else if(g==='print'){ showScreen('scr-print'); }
-        return; } });
+        return; }
+      if(e.target.closest('[data-goto-empmaster]')){ showScreen('scr-settings'); var eb=$('#set-seg .seg-b[data-set="emp"]'); if(eb)eb.click(); return; } // 空状態CTA→従業員マスタ
+      var gs=e.target.closest('[data-scr]'); if(gs && !gs.classList.contains('bn')){ showScreen(gs.dataset.scr); return; } }); // CTA等 ナビ外の画面遷移
     $('#help-x').addEventListener('click',function(){ $('#help-ov').classList.remove('on'); });
     $('#help-ov').addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); });
     document.addEventListener('change',function(ev){ if(!ev.target.classList.contains('scr-month'))return; state.month=ev.target.value||state.month; state._prevYm=null; state._bonusPrevYm=null; /* 月替わりで前月比/賞与前月キャッシュを更新 */ $$('.scr-month').forEach(function(m){ m.value=state.month; }); updatePaydayPreview();

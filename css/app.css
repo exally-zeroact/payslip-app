@@ -410,3 +410,15 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
 .ob-tx{flex:1;min-width:0;display:flex;flex-direction:column;}.ob-tx b{font-size:13px;color:#1A4A2E;}.ob-tx small{font-size:11px;color:#5C7E6C;}
 .ob-arrow{flex-shrink:0;color:#3D9E72;font-size:20px;font-weight:700;}
 .ob-done-lb{flex-shrink:0;font-size:10.5px;font-weight:700;color:#3D9E72;}
+
+/* ── 空状態CTA(次の一手・UX🟠#8) ── */
+.empty-cta{text-align:center;padding:32px 20px;background:#fff;border:1px solid #d4eae0;border-radius:16px;margin:10px 0;}
+.empty-cta .ec-emoji{font-size:40px;line-height:1;margin-bottom:10px;}
+.empty-cta .ec-t{font-size:15px;font-weight:700;color:#1A4A2E;margin-bottom:6px;}
+.empty-cta .ec-s{font-size:12px;color:#5C7E6C;line-height:1.6;margin:0 auto 14px;max-width:320px;}
+.empty-cta .ec-btn{display:inline-flex;width:auto;padding:11px 20px;}
+
+/* ── 月の状態バッジ(下書き/確定済・UX🟠#7) ── */
+.mstate{font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;white-space:nowrap;}
+.mstate-draft{background:#F1F5F3;color:#5C7E6C;border:1px solid #DCE8E1;}
+.mstate-fixed{background:#EAF5EF;color:#2E7D54;border:1px solid #A8DCC0;}
