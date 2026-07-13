@@ -1871,11 +1871,16 @@
     // 入力 accordion
     var il=$('#input-list');
     il.addEventListener('click',function(e){
-      if(e.target.classList.contains('econf')){ var eci=+e.target.dataset.econf; var emc=state.employees[eci]; if(emc){ setConfirm(emc.id, e.target.checked); renderInput(); persistSaveDebounced(); } return; }
+      if(e.target.classList.contains('econf')){ var eci=+e.target.dataset.econf; var emc=state.employees[eci]; if(!emc) return;
+        if(!e.target.checked){ // 「未確定に戻す」=凍結解除(freee型)。再計算で保存値が変わりうるので確認
+          uiConfirm('「確認済」を外すと、この月の保存内容（賃金台帳・年末調整の集計）が現在の入力で再計算・更新される場合があります。よろしいですか？').then(function(ok){ if(!ok){ renderInput(); return; } setConfirm(emc.id,false); renderInput(); persistSaveDebounced(); });
+          return;
+        }
+        setConfirm(emc.id, true); renderInput(); persistSaveDebounced(); return; }
       if(e.target.dataset.reviewonly!=null){ state._reviewOnly=e.target.checked; renderInput(); return; }
       var ivw=e.target.closest('[data-ivw]'); if(ivw){ state.inputView=ivw.dataset.ivw==='table'?'table':'card'; renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
       var cmb=e.target.closest('[data-confirm-month]');
-      if(cmb){ state.employees.forEach(function(emp){ if(isActiveInMonth(emp,state.month)) setConfirm(emp.id,true); }); try{ saveMonthlyPayslips(); }catch(_){} persistSave(); renderInput(); toast('今月を確定しました'); return; }
+      if(cmb){ state.employees.forEach(function(emp){ if(isActiveInMonth(emp,state.month)) setConfirm(emp.id,true); }); try{ saveMonthlyPayslips(true); }catch(_){} persistSave(); renderInput(); toast('今月を確定しました'); return; }
       var fs=e.target.closest('[data-fillsche]');
       if(fs){ var sd=fs.dataset.fillsche;
         var hasManual=state.employees.some(function(emp){ if(!isActiveInMonth(emp,state.month))return false; var mi=kinIdx(emp,/出勤/); return mi>=0 && emp.kintai[mi].value!=='' && emp.kintai[mi].value!=null && String(emp.kintai[mi].value)!==String(sd); });
@@ -1995,10 +2000,14 @@
 
   /* ---------- 月次明細を自動保存(定時決定4-6月の自動入力の素) ---------- */
   // 当月(state.month)の各従業員の総支給/支払基礎日数等を pay_payslips に保存(同月同人は上書き)。
-  function saveMonthlyPayslips(){
+  // 月次明細をStoreに保存。★freee型「確定＝凍結」★: 自動保存(force無し)は確定済みempを書かない=過去月の履歴が現マスタで黙って上書きされるのを防ぐ(D1)。
+  //  確定ボタン(force=true)のときだけ確定済みも含めて現在値で保存=そのスナップショットが台帳/年調の根拠。
+  function saveMonthlyPayslips(force){
     if(!(window.Store&&Store.savePayslip)) return; var ym=state.month; if(!ym) return;
     var method=(state.company||{}).paymentDaysMethod||'';
+    var conf=(state.confirmed&&state.confirmed[ym])||null;
     state.employees.filter(function(e){return isActiveInMonth(e,ym);}).forEach(function(e){ try{ // 母集合を入力/印刷/集計/賃金台帳と統一(退職後/入社前の月を保存しない)
+      if(!force && conf && conf[e.id]) return; // 確定済み=凍結(自動保存では上書きしない)。修正は「未確定に戻す」で明示的に
       var r=compute(e);
       var days=(window.PayrollCalc&&PayrollCalc.calcPaymentDays)?PayrollCalc.calcPaymentDays(e,ym,method):0;
       var wc=e.warimashi||{};
