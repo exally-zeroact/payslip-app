@@ -30,6 +30,13 @@
   function PR(){ return (typeof PayRule!=='undefined')?PayRule:(window&&window.PayRule); }
   // カスタム給の既定spec(固定 +「歩合 か 時給×時間 の高い方」)。payType=カスタムに切替時にlazy初期化。
   function defPayRule(){ return { fixed:'', variable:{ mode:'max', parts:[{type:'commission',amount:'',label:''},{type:'hourly',amount:'',label:''}] } }; }
+  // 保存/クラウドから読んだ従業員に既定値をマージ(会社と同じ防御)。旧保存で欠けた新項目をundefinedにしない=将来のクラッシュ防止(D2)。
+  //  ネストも既定で埋める(warimashi/shaho)=浅いassignだけだと部分オブジェクトが残るため。
+  function mergeEmp(x){ var e=Object.assign(defEmp(), x||{});
+    var d=defEmp(); e.warimashi=Object.assign({}, d.warimashi, x&&x.warimashi); if(e.warimashi&&!e.warimashi.detail) e.warimashi.detail=d.warimashi.detail;
+    e.shaho=Object.assign({}, d.shaho, x&&x.shaho); if(!Array.isArray(e.shaho.months)) e.shaho.months=d.shaho.months;
+    if(!Array.isArray(e.kintai)) e.kintai=d.kintai; if(!Array.isArray(e.shikyu)) e.shikyu=d.shikyu; if(!Array.isArray(e.extraKojo)) e.extraKojo=[];
+    return e; }
   function ensurePayRule(e){ if(!e.payRule||!e.payRule.variable) e.payRule=defPayRule(); if(!e.payRule.variable.parts) e.payRule.variable.parts=[]; return e.payRule; }
   // 段階制の段(下限/率)を設定。key='i:idx:tidx:from|rate'。from=整数円 / rate=小数%許容。
   function prTierSet(e,key,val){ var p=String(key).split(':'); var part=ensurePayRule(e).variable.parts[+p[1]]; if(!part)return; if(!part.tiers)part.tiers=[]; var tr=part.tiers[+p[2]]; if(!tr){ tr={from:'',rate:''}; part.tiers[+p[2]]=tr; }
@@ -998,17 +1005,23 @@
     var sche=scheduledDaysOf(state.month);
     function kinCell(e,i,re){ var idx=kinIdx(e,re); var v=idx>=0?e.kintai[idx].value:''; return '<td class="tnum"><input class="finput num ic-in tcell" data-g="kintai" data-ri="'+idx+'" data-f="value" inputmode="numeric" value="'+attr(v)+'"></td>'; }
     function hmCell(hName,mName,hVal,mVal,cls,dsH,dsM){ return '<td class="tnum"><span class="thm"><input class="'+cls+' tcell" '+dsH+' inputmode="numeric" placeholder="0" value="'+attr(hVal)+'">:<input class="'+cls+' tcell" '+dsM+' inputmode="numeric" placeholder="0" value="'+attr(mVal)+'"></span></td>'; }
-    // 割増(残業/深夜/休日)=かんたんのdata-wk。詳細モードの人は表では触らせない(カードへ誘導)=silent-wrong防止
-    function wariCell(e,key){ var w=e.warimashi||{}; if((w.mode||'easy')==='detail') return '<td class="tnum tdim">詳細<span class="thint">カードで</span></td>';
+    // 割増(残業/深夜/休日)=かんたんのdata-wk。詳細モードの人は表では触らせない(カードへ誘導)=silent-wrong防止。役員は割増対象外(B4)。
+    function wariCell(e,key){ var w=e.warimashi||{};
+      if(e.payType==='役員') return '<td class="tnum tdim">—</td>'; // 役員は割増なし(カードも非表示)=表でも入れさせない
+      if((w.mode||'easy')==='detail') return '<td class="tnum tdim">詳細<span class="thint">カードで</span></td>';
       return hmCell(0,0,w[key+'H'],w[key+'M'],'wi-f','data-wk="'+key+'H"','data-wk="'+key+'M"'); }
-    function extraCell(e){ // 歩合/売上/件数(カスタム/歩合のみ・該当なしは—)
-      if(e.payType==='歩合') return '<td class="tnum"><input class="finput num cm-f tcell" data-cmf="commissionAmt" inputmode="numeric" placeholder="歩合" value="'+attr(fmtN(e.commissionAmt))+'"></td>';
-      if(e.payType==='カスタム'){ var prts=((ensurePayRule(e).variable||{}).parts)||[];
-        if(prts.some(function(p){return p.type==='rate'||p.type==='tiered';})) return '<td class="tnum"><input class="finput num cm-f tcell" data-cmf="salesAmt" inputmode="numeric" placeholder="売上" value="'+attr(fmtN(e.salesAmt))+'"></td>';
-        if(prts.some(function(p){return p.type==='piece';})) return '<td class="tnum"><input class="finput num cm-f tcell" data-cmf="pieceCount" inputmode="numeric" placeholder="件数" value="'+attr(fmtN(e.pieceCount))+'"></td>';
-        if(prts.some(function(p){return p.type==='commission';})) return '<td class="tnum"><input class="finput num cm-f tcell" data-cmf="commissionAmt" inputmode="numeric" placeholder="歩合" value="'+attr(fmtN(e.commissionAmt))+'"></td>';
+    // 歩合/売上/件数=給与形態で"必要な当月値を全部"出す(B3: max(売上,歩合)等で片方が出ないバグ修正・複数はセル内で縦積み)
+    function cmInput(cmf,ph,val){ return '<input class="finput num cm-f tcell" data-cmf="'+cmf+'" inputmode="numeric" placeholder="'+ph+'" value="'+attr(fmtN(val))+'">'; }
+    function extraCell(e){
+      var ins=[];
+      if(e.payType==='歩合'){ ins.push(cmInput('commissionAmt','歩合',e.commissionAmt)); }
+      else if(e.payType==='カスタム'){ var prts=((ensurePayRule(e).variable||{}).parts)||[];
+        if(prts.some(function(p){return p.type==='rate'||p.type==='tiered';})) ins.push(cmInput('salesAmt','売上',e.salesAmt));
+        if(prts.some(function(p){return p.type==='piece';})) ins.push(cmInput('pieceCount','件数',e.pieceCount));
+        if(prts.some(function(p){return p.type==='commission';})) ins.push(cmInput('commissionAmt','歩合',e.commissionAmt));
       }
-      return '<td class="tnum tdim">—</td>'; }
+      if(!ins.length) return '<td class="tnum tdim">—</td>';
+      return '<td class="tnum"><span class="tstack">'+ins.join('')+'</span></td>'; }
     var rows=state.employees.map(function(e,i){
       if(!isActiveInMonth(e,state.month)) return '';
       ensureKintai(e);
@@ -1517,8 +1530,8 @@
     +'.note{margin-top:16px;font-size:9.5px;color:var(--ink3);font-family:"Yu Gothic","Hiragino Sans",sans-serif;line-height:1.6;border-top:.7px dashed var(--hair2);padding-top:9px;}'
     +'@page{size:A4 portrait;margin:0;}';
   function yenR(n){ return '<span class="yen">¥</span>'+fmtN(n); }
-  function dailySlipDoc(d, layout){
-    if(!d) return '<html><body style="font-family:sans-serif;padding:40px;color:#7a6a3e">日別の入力がありません。入力タブで「日別」に日付・時数・金額を入れてください。</body></html>';
+  // 1人分のスリップ(内側 .sheet)。複数人はこれを並べる(M2: 全員印刷が1人だけだったバグ修正)
+  function dailySlipSheet(d, layout){
     var taxRow = (d.tax!=null)
       ? '<div class="r"><span class="l">所得税（'+(d.taxLabel||'日額表')+'）</span><span class="v">'+fmtN(d.tax)+'</span></div><div class="r sum"><span class="l">控除計</span><span class="v">'+fmtN(d.tax)+'</span></div>'
       : '<div class="r"><span class="l">所得税</span><span class="v" style="font-size:10px;color:#8a7a4e">別途</span></div><div class="r sum"><span class="l">控除計</span><span class="v">0</span></div>';
@@ -1541,7 +1554,15 @@
     var note=(d.tax!=null)
       ? (d.cycleLabel+'＝所得税は日額表'+taxHow+'を日ごとに計算し合算。社会保険は月まとめ。色・書体は月給明細と統一。')
       : (d.cycleLabel+'＝所得税の税額表が読み込めませんでした。所得税はこの明細に含めず別途精算してください。社会保険は月まとめ。');
-    return '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><style>'+DAILY_CSS+'</style></head><body><div class="sheet">'+top+body+'<div class="note">'+note+'</div></div></body></html>';
+    return '<div class="sheet">'+top+body+'<div class="note">'+note+'</div></div>';
+  }
+  // 日払い/週払いスリップ文書。list=1人 または 複数人(全員印刷)。複数はページ分割。
+  function dailySlipDoc(list, layout){
+    var arr=Array.isArray(list)?list.filter(Boolean):(list?[list]:[]);
+    if(!arr.length) return '<html><body style="font-family:sans-serif;padding:40px;color:#7a6a3e">日別の入力がありません。入力タブで「日別」に日付・時数・金額を入れてください。</body></html>';
+    var sheets=arr.map(function(d){ return dailySlipSheet(d, layout); }).join('');
+    var pageBreakCss=arr.length>1?'.sheet:not(:last-child){page-break-after:always;}':'';
+    return '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><style>'+DAILY_CSS+pageBreakCss+'</style></head><body>'+sheets+'</body></html>';
   }
   // 日別入力(入力タブ・支給サイクルが日/週のとき)。各日=日付/労働時数(時:分)/支給額
   function dailyInputHTML(e,i){
@@ -1678,9 +1699,9 @@
     var v=$('#p-emp').value; var emps=v==='__all'?state.employees.filter(function(e){return isActiveInMonth(e,state.month);}):[state.employees[+v]];
     var isBonus=state.printMode==='bonus';
     var cyc=(state.company&&state.company.payCycle)||'monthly';
-    if(!isBonus && (cyc==='daily'||cyc==='weekly')){ // 日払い/週払い=スリップ明細(日別)
-      var de=emps[0]; var dd=de?buildDailyData(de):null; var fr=$('#frame');
-      fr.srcdoc=dailySlipDoc(dd, state.dailySlipLayout||'1col');
+    if(!isBonus && (cyc==='daily'||cyc==='weekly')){ // 日払い/週払い=スリップ明細(日別)。全員選択なら全員分を並べる(M2修正)
+      var ddList=emps.map(function(e){ return buildDailyData(e); }).filter(function(d){ return d && d.days && d.days.length; }); var fr=$('#frame');
+      fr.srcdoc=dailySlipDoc(ddList, state.dailySlipLayout||'1col');
       fr.style.width='794px'; fr.style.height='1123px'; fr.style.transformOrigin='top left'; fr.dataset.pw=794; fr.dataset.ph=1123;
       fitPreview(); return;
     }
@@ -2018,7 +2039,7 @@
   function persistLoad(){
     var s=null; try{ s=JSON.parse(localStorage.getItem(PKEY)||'null'); }catch(e){}
     if(s&&s.employees&&s.employees.length){
-      if(s.company) state.company=Object.assign(defCompany(), s.company); state.employees=s.employees;
+      if(s.company) state.company=Object.assign(defCompany(), s.company); state.employees=s.employees.map(mergeEmp);
       if(s.month) state.month=s.month; if(s.theme) state.theme=s.theme; if(s.prefer) state.prefer=migPrefer(s.prefer);
       if(s.depts) state.depts=s.depts; if(s.roles) state.roles=s.roles; if(s.showRetired!=null) state.showRetired=s.showRetired;
       if(s.bonus) state.bonus=s.bonus;
@@ -2031,7 +2052,7 @@
     reloadCloud();
   }
   function applyCloudState(cs){ if(!(cs&&cs.employees&&cs.employees.length)) return false;
-    state.company=cs.company?Object.assign(defCompany(),cs.company):state.company; state.employees=cs.employees;
+    state.company=cs.company?Object.assign(defCompany(),cs.company):state.company; state.employees=cs.employees.map(mergeEmp);
     if(cs.month)state.month=cs.month; if(cs.theme)state.theme=cs.theme; if(cs.prefer)state.prefer=migPrefer(cs.prefer);
     if(cs.depts)state.depts=cs.depts; if(cs.roles)state.roles=cs.roles; if(cs.showRetired!=null)state.showRetired=cs.showRetired;
     if(cs.bonus)state.bonus=cs.bonus;
