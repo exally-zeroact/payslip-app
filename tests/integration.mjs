@@ -190,5 +190,33 @@ T('出勤クランプ: 日給 出勤-5 → effShukkin=0・支給非負', functio
   ok(A.compute(e).shikyuTotal >= 0, '支給非負');
 });
 
+// ── A11y: 見た目ラベルが入力の aria-label に伝播する(SR読み上げ用) ──
+T('A11y: 従業員マスタの入力に見た目ラベル由来のaria-labelが付く', function () {
+  const st = A.state; const e = A.defEmp('山田 太郎'); st.employees = [e]; st.empFilter = 'all';
+  st.open = st.open || {}; st.open[e.id] = true; // カードを開いて基本フィールドを描画
+  A.renderEmpMaster();
+  A.labelInputsA11y(win.document);
+  const host = win.document.querySelector('#emp-list') || win.document;
+  const q = sel => host.querySelector(sel);
+  eq(q('input[data-f="name"]').getAttribute('aria-label'), '氏名', '氏名フィールド');
+  eq(q('select[data-f="pref"]').getAttribute('aria-label'), '都道府県', '都道府県セレクト(hint2除外)');
+  eq(q('input[data-f="commute"]').getAttribute('aria-label'), '通勤手当', '通勤手当(hint2/💡除外)');
+  // .frow>.flabel を持つ入力はその見た目ラベルを名前に(placeholderより優先)
+  const parse = q('input.parse-in');
+  eq(parse && parse.getAttribute('aria-label'), '雑に書いて作る', '雑入力欄は見出しラベル由来の名前');
+  // 数字のみplaceholderの入力に「数字だけ」の無意味なaria-labelを付けない
+  const allInputs = [...host.querySelectorAll('input[aria-label]')];
+  ok(allInputs.every(el => !/^[\s0-9%.,＋+\-〜()円]*$/.test(el.getAttribute('aria-label'))), '無意味な数字ラベルを付けない');
+});
+
+// ── A11y: 既存ボタンの aria-label を入力用ヘルパーが壊さない ──
+T('A11y: ボタンのaria-labelは維持(labelInputsA11yはinput/selectのみ対象)', function () {
+  const st = A.state; st.employees = [A.defEmp('山田 太郎'), A.defEmp('佐藤 花子')]; st.empFilter = 'all';
+  A.renderEmpMaster();
+  A.labelInputsA11y(win.document);
+  const up = win.document.querySelector('button[data-moveup]');
+  ok(!up || up.getAttribute('aria-label') === '上へ移動', '並べ替えボタンのaria-label不変');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

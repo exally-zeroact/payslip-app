@@ -394,6 +394,43 @@
     if(id==='scr-print') renderPrint();
   }
 
+  /* ---------- A11y: 見た目ラベルを入力のaria-labelへ伝播(スクリーンリーダー用・見た目は不変) ---------- */
+  // フォームは .frow>.flabel / .wi-row>.wi-l / .mini-l と <i>単位</i> で見た目上はラベル済みだが、
+  // プログラム的な関連付けが無い(placeholderが数字のみ等)ためSRは入力の意味を読めない。
+  // 見えているラベル文字列を集めて aria-label に写す。付加要素(💡/単位注記/small)は除外。将来の入力も自動でカバー。
+  function _a11yLabelText(elm){
+    var c=elm.cloneNode(true);
+    Array.prototype.forEach.call(c.querySelectorAll('.hint2,.help-i,small,.mco-cv'), function(n){ if(n.parentNode) n.parentNode.removeChild(n); });
+    return (c.textContent||'').replace(/\s+/g,' ').trim();
+  }
+  function _a11yFindLabel(el){
+    var f=el.closest('.frow'); if(f){ var x=f.querySelector('.flabel'); if(x) return _a11yLabelText(x); }
+    var w=el.closest('.wi-row'); if(w){ var y=w.querySelector('.wi-l'); if(y) return _a11yLabelText(y); }
+    var p=el.parentElement, hop=0;
+    while(p && hop<4){ var m=p.querySelector(':scope > .mini-l'); if(m) return _a11yLabelText(m); p=p.parentElement; hop++; }
+    return '';
+  }
+  function labelInputsA11y(root){
+    try{
+      root=root||document;
+      var els=root.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=button]),select,textarea');
+      for(var i=0;i<els.length;i++){ var el=els[i];
+        if(el.getAttribute('aria-label')||el.getAttribute('aria-labelledby')) continue;
+        var lab=el.closest('label');
+        // labelに内包される最初のcontrolだけ暗黙ラベルで名前あり(1labelは1controlのみ関連付く)。
+        // 2つ目以降(例: 労働 時:分 の"分")は名前が付かないので下で生成する。
+        if(lab && lab.querySelector('input:not([type=hidden]):not([type=button]):not([type=checkbox]):not([type=radio]),select,textarea')===el) continue;
+        var unit=''; var nx=el.nextElementSibling; if(nx&&nx.tagName==='I') unit=(nx.textContent||'').trim(); // <i>時間</i>等の単位
+        var base=_a11yFindLabel(el);
+        if(!base && lab) base=_a11yLabelText(lab); // 同一label内2つ目以降はlabel自身のテキストを名前に
+        if(!base){ var ph=(el.getAttribute('placeholder')||'').trim(); if(ph) base=ph; }
+        var name=(base+(unit?(' '+unit):'')).replace(/\s+/g,' ').trim();
+        // 数字/記号/単位だけ=名前として無意味 → 付けない(placeholderのままの方がマシ)
+        if(name && !/^[\s0-9%.,＋+\-〜()円]*$/.test(name)) el.setAttribute('aria-label', name);
+      }
+    }catch(_e){}
+  }
+
   /* ---------- 設定: 会社情報 ---------- */
   function fillCompany(){ $('#c-name').value=state.company.name||''; $('#c-addr').value=state.company.addr||''; $('#c-close').value=state.company.close||''; $('#c-payrel').value=state.company.paydayRel||'next'; $('#c-payday-day').value=state.company.paydayDay||''; var pc=$('#c-paycycle'); if(pc)pc.value=state.company.payCycle||'monthly'; updatePaydayPreview(); payCycleNote(); renderRuleChips(); renderCompanyRules(); renderDesign(); }
   // 初回オンボーディング(4ステップ案内・×で閉じたら二度と出ない)。"すぐ分かる"を底上げ。
@@ -2091,7 +2128,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';
@@ -2170,6 +2207,9 @@
   hydrateStatutory(); // 中央の法定データを非同期で注入(失敗時はlibのハードコードで動く)
   $$('.scr-month').forEach(function(m){ m.value=state.month; });
   fillCompany(); bind(); showScreen('scr-settings');
+  // A11y: 描画のたび見た目ラベルを入力のaria-labelへ伝播(全画面/再描画/将来の入力を自動カバー)
+  try{ var _a11yObs=new MutationObserver(function(){ if(_a11yObs._t) return; _a11yObs._t=setTimeout(function(){ _a11yObs._t=null; labelInputsA11y(document); },0); }); _a11yObs.observe(document.body,{childList:true,subtree:true}); }catch(e){}
+  labelInputsA11y(document);
   // 変更を自動保存(入力/選択/クリック後・離脱時)
   ['input','change','click'].forEach(function(ev){ document.addEventListener(ev, persistSaveDebounced, true); });
   window.addEventListener('beforeunload', persistSave);
