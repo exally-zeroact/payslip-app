@@ -56,7 +56,7 @@
       var used=[]; var pts=(r.fields.payRule.variable&&r.fields.payRule.variable.parts)||[];
       if(pts.some(function(p){return p.type==='hourly';})) used.push('160時間');
       if(pts.some(function(p){return p.type==='daily';})) used.push('20日');
-      if(pts.some(function(p){return p.type==='rate';})) used.push('売上100万');
+      if(pts.some(function(p){return p.type==='rate'||p.type==='tiered';})) used.push('売上100万');
       if(pts.some(function(p){return p.type==='piece';})) used.push('件数100');
       if(pts.some(function(p){return p.type==='commission';})) used.push('歩合20万');
       return '例：'+(used.join('・')||'当月値')+'なら 基本給 '+yen(res.base)+(res.chosen?'（採用：'+res.chosen.label+' '+yen(res.chosen.value)+'）':'');
@@ -542,7 +542,7 @@
   function parseRow(e,i){
     return '<div class="frow"><div class="flabel">雑に書いて作る<span class="hint2">任意</span></div>'
       +'<div style="display:flex;gap:6px;align-items:center"><input class="finput parse-in" data-i="'+i+'" placeholder="例：売上の3.5割か時給1200の高い方"><button class="btn-ghost parse-go" data-i="'+i+'" style="white-space:nowrap;padding:9px 12px">読み取る</button></div></div>'
-      +'<div class="hint" style="margin:2px 2px 8px">給料の決め方を言葉で書いて「読み取る」→ 内容を"数字例つき"で確認して設定できます（時給/月給/日給/歩合/売上×率/件数×単価/固定＋歩合/高い方）。</div>';
+      +'<div class="hint" style="margin:2px 2px 8px">給料の決め方を言葉で書いて「読み取る」→ 内容を"数字例つき"で確認して設定できます（時給/月給/日給/歩合/売上×率/件数×単価/固定＋歩合/高い方/段階制「◯万まで◯％超◯％」）。</div>';
   }
   function empCardBody(e,i){
     var dOpen=!!state.open['D'+e.id];

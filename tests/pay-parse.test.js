@@ -47,6 +47,29 @@ T('★複合★「固定18万＋売上3.5割か時給1200のいい方」→ 固�
   eq(r.payType, 'カスタム'); eq(r.fields.payRule.fixed, '180000');
   var v = r.fields.payRule.variable; eq(v.mode, 'max'); eq(v.parts.length, 2);
 });
+/* 段階制/スライド率(累進)=保守的に明確な2段だけ読む */
+T('★段階制★「売上100万まで3%、超えたら5%」→ tiered[{0,3},{100万,5}]', function () {
+  var r = PP.parse('売上100万まで3%、超えたら5%');
+  eq(r.payType, 'カスタム');
+  var v = r.fields.payRule.variable; eq(v.parts.length, 1); eq(v.parts[0].type, 'tiered');
+  eq(v.parts[0].tiers.length, 2);
+  eq(v.parts[0].tiers[0].from, '0'); eq(v.parts[0].tiers[0].rate, '3');
+  eq(v.parts[0].tiers[1].from, '1000000'); eq(v.parts[0].tiers[1].rate, '5');
+});
+T('段階制: 「50万までは2割、それ以上4割」(割表記)', function () {
+  var r = PP.parse('50万までは2割、それ以上4割');
+  var t = r.fields.payRule.variable.parts[0]; eq(t.type, 'tiered');
+  eq(t.tiers[0].rate, '20'); eq(t.tiers[1].from, '500000'); eq(t.tiers[1].rate, '40');
+});
+T('段階制: 固定給と併用「固定20万＋売上80万まで3%超5%」', function () {
+  var r = PP.parse('固定20万＋売上80万まで3%超5%');
+  eq(r.fields.payRule.fixed, '200000');
+  var t = r.fields.payRule.variable.parts[0]; eq(t.type, 'tiered');
+  eq(t.tiers[1].from, '800000');
+});
+T('段階制でない単一率は従来どおりrate(誤検出しない)', function () {
+  var r = PP.parse('売上35%'); eq(r.fields.payRule.variable.parts[0].type, 'rate');
+});
 T('空/意味不明→ ok:false(要手入力)', function () {
   eq(PP.parse('').ok, false); eq(PP.parse('あいうえお').ok, false);
 });
