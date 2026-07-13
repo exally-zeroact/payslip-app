@@ -81,3 +81,7 @@ T('zengin build: 金額0以下は除外', function () {
   var r = Z.build(committer, [t1, { bankNo: '0009', account: '1', name: 'ゼロ', amount: 0 }]);
   eq(r.count, 1); eq(r.total, 328710);
 });
+T('zengin build: 負の金額は符号を保持して除外(正額に化けない)', function () {
+  var r = Z.build(committer, [t1, { bankNo: '0009', branchNo: '001', account: '1', name: 'ﾏｲﾅｽ', amount: -500 }]);
+  eq(r.count, 1); eq(r.total, 328710); // -500 が +500 として通らない
+});

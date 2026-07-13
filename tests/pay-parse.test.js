@@ -70,6 +70,31 @@ T('段階制: 固定給と併用「固定20万＋売上80万まで3%超5%」', f
 T('段階制でない単一率は従来どおりrate(誤検出しない)', function () {
   var r = PP.parse('売上35%'); eq(r.fields.payRule.variable.parts[0].type, 'rate');
 });
+/* 複合入力のバグ回帰(監査B1/B2) */
+T('B1: 日給を含む複合で日給が消えない(高い方)', function () {
+  var r = PP.parse('日給1万か歩合の高い方');
+  eq(r.payType, 'カスタム'); var v = r.fields.payRule.variable;
+  eq(v.mode, 'max'); var types = v.parts.map(function (p) { return p.type; });
+  ok(types.indexOf('daily') >= 0, '日給(daily)が部品に残る: ' + types.join(','));
+  ok(types.indexOf('commission') >= 0, '歩合も残る');
+});
+T('B1: 日給単独は従来どおり日給制', function () {
+  var r = PP.parse('日給1万'); eq(r.payType, '日給'); eq(r.fields.base, '10000');
+});
+T('B1: 固定+日給の複合でも日給が残る', function () {
+  var r = PP.parse('固定5万＋日給1万'); eq(r.payType, 'カスタム');
+  var types = r.fields.payRule.variable.parts.map(function (p) { return p.type; });
+  ok(types.indexOf('daily') >= 0, '日給が残る: ' + types.join(','));
+});
+T('B2: 「＋(両方)」で2変動部品は器で合算不可→自信低(low)で確認を促す', function () {
+  var r = PP.parse('時給1200＋歩合');
+  eq(r.payType, 'カスタム');
+  eq(r.low, true); // ＋(合算)意図は none/one/max では表現できない=要確認フラグ
+});
+T('B2: 「高い方」明示は自信あり(low=false)', function () {
+  var r = PP.parse('時給1200か歩合の高い方');
+  eq(r.low, false);
+});
 T('空/意味不明→ ok:false(要手入力)', function () {
   eq(PP.parse('').ok, false); eq(PP.parse('あいうえお').ok, false);
 });

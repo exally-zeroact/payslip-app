@@ -63,14 +63,19 @@ T('給与所得(令和8) = 収入 − 給与所得控除', function () {
   eq(N.kyuyoShotokuR8(700000), 0);                  // 収入<控除→0
 });
 
-/* ── 基礎控除(令和8・9年分) 国税庁 令和8年4月改正あらまし(p1・目視照合2026-07) ──
-   合計所得: ≤489万→104万 / 489超〜655万→67万 / 655超〜2350万→62万 / 2350超は改正なし(48/32/16/0) */
-T('基礎控除R8: 合計所得別(≤489万=104万/489-655=67万/655-2350=62万)', function () {
-  eq(N.kisoKojoR8(4000000), 1040000);
-  eq(N.kisoKojoR8(4890000), 1040000);
-  eq(N.kisoKojoR8(5000000), 670000);
+/* ── 基礎控除(令和8年分) 国税庁「令和8年4月 源泉所得税の改正のあらまし」p1 表 ──
+   出典PDF: nta.go.jp/publication/pamph/gensen/2026kaisei.pdf。改正後 令和8・9年分列(基礎額62万+加算)。
+   合計所得: ≤132万→104万(62+42) / 132超〜489万→99万(62+37) / 489超〜655万→67万(62+5) / 655超〜2350万→62万(基礎)
+   / 2350超は改正なし=48/32/16/0万。★≤132と132-489は別段(以前は≤489一律104万で132-489が+5万過大だった)★ */
+T('基礎控除R8: ≤132万=104万 / 132超-489万=99万 / 489-655=67万 / 655-2350=62万', function () {
+  eq(N.kisoKojoR8(1000000), 1040000);  // ≤132万
+  eq(N.kisoKojoR8(1320000), 1040000);  // 132万ちょうど
+  eq(N.kisoKojoR8(1320001), 990000);   // 132万超→99万
+  eq(N.kisoKojoR8(4000000), 990000);   // 一般的な正社員帯(合計所得400万)=99万
+  eq(N.kisoKojoR8(4890000), 990000);   // 489万ちょうど
+  eq(N.kisoKojoR8(4890001), 670000);   // 489万超→67万
   eq(N.kisoKojoR8(6550000), 670000);
-  eq(N.kisoKojoR8(7000000), 620000);
+  eq(N.kisoKojoR8(6550001), 620000);   // 655万超→62万
   eq(N.kisoKojoR8(23500000), 620000);
 });
 T('基礎控除R8: 2350万超は改正なし(48/32/16/0万)', function () {
@@ -152,16 +157,16 @@ T('年調年税額: 復興税込1.021・100円未満切捨', function () {
 });
 
 /* ── 年末調整 総合計算(worked example) ── */
-T('年調 総合: 給与500万・社保75万・生保新10万・基礎104万・源泉9万→還付', function () {
+T('年調 総合: 給与500万・社保75万・生保新10万・基礎99万・源泉9万→追徴', function () {
   var r = N.computeNencho({ kyuyoShunyu: 5000000, shakaiHoken: 750000, seimei: { generalNew: 100000 }, genzenZumi: 90000 });
   eq(r.kyuyoShotoku, 3560000);                 // 500万-給与所得控除144万
-  eq(r.kojoList.kiso, 1040000);                // 合計所得356万≤489万→基礎104万
+  eq(r.kojoList.kiso, 990000);                 // 合計所得356万(132超〜489万)→基礎99万
   eq(r.kojoList.seimei, 40000);                // 新10万→控除4万
-  eq(r.kojoGoukei, 1040000 + 750000 + 40000);  // 183万
-  eq(r.kazeiKyuyoShotoku, 1730000);            // 356万-183万=173万
-  eq(r.sanshutuZei, 86500);
-  eq(r.nenchouNenzei, 88300);
-  eq(r.kabusoku, 88300 - 90000);               // -1700(還付1,700)
+  eq(r.kojoGoukei, 990000 + 750000 + 40000);   // 178万
+  eq(r.kazeiKyuyoShotoku, 1780000);            // 356万-178万=178万
+  eq(r.sanshutuZei, 89000);                    // 178万×5%
+  eq(r.nenchouNenzei, 90800);                  // 89000×1.021=90869→百円未満切捨
+  eq(r.kabusoku, 90800 - 90000);               // +800(追徴800)。※旧実装(基礎104万)は還付1700=約2,500円/年 過少税だった
 });
 
 /* ── 地震保険料控除 No.1145 ──
@@ -178,12 +183,12 @@ T('地震保険料控除: 地震のみ / 旧長期のみ / 併用(上限5万)', 
 
 /* ── hydrate(中央上書き)→反映 / 不正はフォールバック / 令和8数値表のみ対象 ── */
 T('nenmatsu hydrate: 基礎控除表を中央値で上書き→computeに反映、正規値で復元=回帰ゼロ', function () {
-  var before = N.kisoKojoR8(3560000); // ≤489万→104万
-  eq(before, 1040000);
+  var before = N.kisoKojoR8(3560000); // 356万(132超〜489万)→99万
+  eq(before, 990000);
   N.hydrate(2026, { kisoKojo: [{ upto: null, flat: 0 }] }); // 全域 基礎控除0
   eq(N.kisoKojoR8(3560000), 0);
   // 正規の令和8 基礎控除で復元
-  N.hydrate(2026, { kisoKojo: [{ upto: 4890000, flat: 1040000 }, { upto: 6550000, flat: 670000 }, { upto: 23500000, flat: 620000 }, { upto: 24000000, flat: 480000 }, { upto: 24500000, flat: 320000 }, { upto: 25000000, flat: 160000 }, { upto: null, flat: 0 }] });
+  N.hydrate(2026, { kisoKojo: [{ upto: 1320000, flat: 1040000 }, { upto: 4890000, flat: 990000 }, { upto: 6550000, flat: 670000 }, { upto: 23500000, flat: 620000 }, { upto: 24000000, flat: 480000 }, { upto: 24500000, flat: 320000 }, { upto: 25000000, flat: 160000 }, { upto: null, flat: 0 }] });
   eq(N.kisoKojoR8(3560000), before);
 });
 T('nenmatsu hydrate: 速算表を上書き→sanshutuShotokuZeiに反映、復元', function () {
@@ -207,7 +212,7 @@ T('nenmatsu hydrate: 不正オブジェクト表/短い配列/不正行は表ご
   var shougaiDoukyo = N.shougaiKojo('doukyo'); // 750000
   var hai = N.haiguushaKojo(9800000, false);   // tier2の値
   var san = N.sanshutuShotokuZei(1730000);     // 86500
-  var kiso = N.kisoKojoR8(3560000);            // 1040000
+  var kiso = N.kisoKojoR8(3560000);            // 990000(356万→99万)
   N.hydrate(2026, { fuyoKojo: { ippan: 'abc' } }); // 不正値+キー欠落→破棄(他キー消えない)
   eq(N.fuyoKojo('tokutei'), fuyoTok, 'fuyoKojo不正→破棄・他キー保持');
   eq(N.fuyoKojo('ippan'), 380000);
