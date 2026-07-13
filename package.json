@@ -1,0 +1,14 @@
+{
+  "name": "payslip-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "給料明細アプリ（静的HTML/JS・アプリ本体は依存ゼロ）。jsdomはapp.js層の統合テスト専用のdevDependency。",
+  "scripts": {
+    "test": "node tests/run.js",
+    "test:integration": "node tests/integration.mjs",
+    "test:all": "node tests/run.js && node tests/integration.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1"
+  }
+}

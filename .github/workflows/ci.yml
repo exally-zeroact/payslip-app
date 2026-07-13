@@ -1,7 +1,8 @@
 name: CI
 
 # 給与計算の単体テストと、法定データのドリフトガードを毎push/PRで実行。
-#  ・test: tests/run.js(実リテラル+統合+hydrate・依存なしのnode製ハーネス)
+#  ・test: tests/run.js(実リテラル+回帰・依存なしのnode製ハーネス)
+#  ・integration: tests/integration.mjs=jsdomで本物のapp.jsを読み込み配線/UI/状態/描画を検証(RC1対策)
 #  ・statutory-drift: scripts/verify-statutory.mjs で lib のハードコード値 == 中央Supabase statutory を検証。
 #    不一致(=ドリフト)なら赤。中央取得不可(オフライン等)は緑スキップ。anon公開鍵でREST読取のみ(秘密情報不要)。
 on:
@@ -17,7 +18,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Unit tests (tests/run.js)
+      - name: Unit tests (tests/run.js・依存なし)
         run: node tests/run.js
+      - name: Install test deps (jsdom)
+        run: npm install --no-audit --no-fund
+      - name: Integration tests (tests/integration.mjs・app.js層をjsdomで)
+        run: node tests/integration.mjs
       - name: Statutory drift guard (lib == 中央statutory)
         run: node scripts/verify-statutory.mjs
