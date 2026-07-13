@@ -415,7 +415,7 @@
     if(state.onboardDone || doneN===steps.length){ box.innerHTML=''; return; } // 手動で閉じた or 全完了→自動で消える
     box.innerHTML='<div class="card ob-card">'
       +'<div class="ob-hd"><b>はじめかたガイド（'+doneN+'/'+steps.length+'）</b>'
-      +'<button data-onboard-close="1" class="ob-x" title="あとで">×</button></div>'
+      +'<button data-onboard-close="1" class="ob-x" title="あとで" aria-label="ガイドを閉じる">×</button></div>'
       +'<div class="ob-lead">未完のステップをタップすると、その画面へ移動します。</div>'
       +steps.map(function(s,i){ return '<button class="ob-step'+(s.done?' done':'')+'" data-onboard-goto="'+s.go+'">'
           +'<span class="ob-ck">'+(s.done?'✓':(i+1))+'</span>'
@@ -442,7 +442,7 @@
       '<div class="wdays">'+WDAYS.map(function(d,i){return '<span class="wday'+((c.holidays||[]).indexOf(i)>=0?' on':'')+'" data-wd="'+i+'">'+d+'</span>';}).join('')+'</div><div class="ri-note">複数えらべます。法律上の休み(法定休日)は自動で特定。例：日曜だけ＝週休1日(現場系OK)。</div>'); }
     if(on.companyHol){
       var coh=(c.companyHolidays||[]);
-      var cohRows=coh.map(function(d,di){ return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:5px"><input type="date" class="finput" data-coh="'+di+'" value="'+attr(d)+'" style="flex:1"><button class="b-del" data-coh-del="'+di+'" style="width:30px">×</button></div>'; }).join('');
+      var cohRows=coh.map(function(d,di){ return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:5px"><input type="date" class="finput" data-coh="'+di+'" value="'+attr(d)+'" style="flex:1"><button class="b-del" data-coh-del="'+di+'" style="width:30px" aria-label="この休日を削除">×</button></div>'; }).join('');
       h+=ruleItemHTML('companyHol','会社独自の休日','年末年始・夏季休暇など','','<div>'+cohRows+'</div><button class="mini add" data-coh-add="1" style="margin-top:4px">＋ 休日を追加</button><div class="ri-note">国民の祝日は<b>自動</b>です。ここは会社が独自に決めた休み（創立記念日・年末年始・夏季休暇など）だけ。当月の所定労働日数に反映します。</div>'); }
     if(on.shotei){ h+=ruleItemHTML('shotei','1日の働く時間','所定労働','shotei',
       '<span class="dur"><input class="cr-f cr-dur" data-cf="dailyWorkH" inputmode="numeric" value="'+attr(c.dailyWorkH)+'"><i>時間</i><input class="cr-f cr-dur" data-cf="dailyWorkM" inputmode="numeric" value="'+attr(c.dailyWorkM)+'"><i>分</i></span>'); }
@@ -526,7 +526,7 @@
       var head='<div class="bx-row">'
         +'<select class="finput pr-type" data-prtype="'+i+':'+idx+'" style="flex:1.3;min-width:0">'+TYPES.map(function(t){return '<option value="'+t[0]+'"'+(p.type===t[0]?' selected':'')+'>'+t[1]+'</option>';}).join('')+'</select>'
         +(isTiered?'':(isCom?'<span style="font-size:10px;color:#6E907E;flex:1">歩合額は毎月「入力」で</span>':'<input class="finput num pr-amt" data-pramt="'+i+':'+idx+'" inputmode="numeric" value="'+attr(fmtN(p.amount))+'" placeholder="'+amtPh(p.type)+'" style="width:90px">'))
-        +'<button class="btn-ghost bx-del" data-prdel="'+i+':'+idx+'">×</button></div>';
+        +'<button class="btn-ghost bx-del" data-prdel="'+i+':'+idx+'" aria-label="この項目を削除">×</button></div>';
       if(!isTiered) return head;
       var tiers=(p.tiers&&p.tiers.length)?p.tiers:[{from:0,rate:''}];
       var tiersHtml=tiers.map(function(tr,tidx){ return '<div class="bx-row" style="gap:4px;padding-left:8px">'
@@ -534,7 +534,7 @@
         +'<span style="font-size:11px;color:#6E907E">円〜</span>'
         +'<input class="finput pr-tier-r" data-prtier="'+i+':'+idx+':'+tidx+':rate" inputmode="decimal" value="'+attr(tr.rate==null?'':tr.rate)+'" placeholder="率" style="width:58px">'
         +'<span style="font-size:11px;color:#6E907E">%</span>'
-        +'<button class="btn-ghost bx-del" data-prtierdel="'+i+':'+idx+':'+tidx+'">×</button></div>'; }).join('');
+        +'<button class="btn-ghost bx-del" data-prtierdel="'+i+':'+idx+':'+tidx+'" aria-label="この段を削除">×</button></div>'; }).join('');
       return head+'<div class="pr-tiers" style="margin:2px 0 6px">'+tiersHtml
         +'<div class="addcustom"><button class="btn-ghost" data-prtieradd="'+i+':'+idx+'" style="padding:6px 10px">＋段を追加</button></div>'
         +'<div class="ri-note" style="margin:2px 2px 0">超過分だけその率（累進＝境目で急に増えない）。下限0円から順に。売上は毎月「入力」で。</div></div>';
@@ -740,7 +740,7 @@
             +'<span class="hd-chip'+(e.workStatus&&e.workStatus!=='normal'?' on':'')+'" data-goleave="'+i+'">'+(e.workStatus&&e.workStatus!=='normal'?esc(WS_LABEL(e.workStatus)):'休暇')+'</span>'
             +'<span class="hd-chip" data-goretire="'+i+'">退職</span>'
             +'<span class="mco-sub">'+esc(e.payType)+(e.role?' / '+esc(e.role):'')+'</span>'
-            +(visibleEmpIdx().length>1?'<span class="mco-ord"><button class="ord-b" data-moveup="'+i+'" title="上へ">▲</button><button class="ord-b" data-movedn="'+i+'" title="下へ">▼</button></span>':'')
+            +(visibleEmpIdx().length>1?'<span class="mco-ord"><button class="ord-b" data-moveup="'+i+'" title="上へ" aria-label="上へ移動">▲</button><button class="ord-b" data-movedn="'+i+'" title="下へ" aria-label="下へ移動">▼</button></span>':'')
             +'<span class="mco-cv">▾</span></div>'
           +(op?empCardBody(e,i):'')+'</div>';
       });
@@ -769,7 +769,7 @@
           ? '<label class="row-hz" title="項目名から自動で非課税" style="font-size:10px;color:#3D9E72;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:2px"><input type="checkbox" checked disabled>非課税</label>'
           : '<label title="チェックで所得税の非課税にする(社保は対象)" style="font-size:10px;color:'+(it.hikazei?'#3D9E72':'#6E907E')+';font-weight:'+(it.hikazei?'700':'400')+';white-space:nowrap;display:inline-flex;align-items:center;gap:2px"><input type="checkbox" class="ck" data-g="shikyu" data-ri="'+ri+'"'+(it.hikazei?' checked':'')+'>非課税</label>';
       }
-      return '<div class="row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px"><input class="finput" data-g="'+g+'" data-ri="'+ri+'" data-f="label" value="'+attr(it.label)+'" style="flex:1.3" placeholder="項目"><input class="finput num" data-g="'+g+'" data-ri="'+ri+'" data-f="value" value="'+attr(it.value)+'" style="flex:1" placeholder="'+(g==='kintai'?'値':'金額')+'">'+hz+'<button class="b-del m-del" data-g="'+g+'" data-ri="'+ri+'">×</button></div>';
+      return '<div class="row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px"><input class="finput" data-g="'+g+'" data-ri="'+ri+'" data-f="label" value="'+attr(it.label)+'" style="flex:1.3" placeholder="項目"><input class="finput num" data-g="'+g+'" data-ri="'+ri+'" data-f="value" value="'+attr(it.value)+'" style="flex:1" placeholder="'+(g==='kintai'?'値':'金額')+'">'+hz+'<button class="b-del m-del" data-g="'+g+'" data-ri="'+ri+'" aria-label="この項目を削除">×</button></div>';
     }).join('');
   }
   function fmtH(min){ var h=min/60; return (Math.round(h*100)/100)+'h'; }
@@ -877,7 +877,7 @@
   function otherKinRows(e){
     return (e.kintai||[]).map(function(it,ri){
       if(/出勤|欠勤|有給|代休取得|振替休日/.test(it.label||'')) return '';
-      return '<div class="row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px"><input class="finput" data-g="kintai" data-ri="'+ri+'" data-f="label" value="'+attr(it.label)+'" style="flex:1.3" placeholder="項目"><input class="finput num" data-g="kintai" data-ri="'+ri+'" data-f="value" value="'+attr(it.value)+'" style="flex:1" placeholder="値"><button class="b-del m-del" data-g="kintai" data-ri="'+ri+'">×</button></div>';
+      return '<div class="row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px"><input class="finput" data-g="kintai" data-ri="'+ri+'" data-f="label" value="'+attr(it.label)+'" style="flex:1.3" placeholder="項目"><input class="finput num" data-g="kintai" data-ri="'+ri+'" data-f="value" value="'+attr(it.value)+'" style="flex:1" placeholder="値"><button class="b-del m-del" data-g="kintai" data-ri="'+ri+'" aria-label="この勤怠項目を削除">×</button></div>';
     }).join('');
   }
   // 前月比/差分: 先月の保存値(pay_payslips)と今月の計算(手取り)を比較
@@ -1023,9 +1023,9 @@
           +dailyInputHTML(e,i)
           +(e.payType==='役員'?'':warimashiInputHTML(e))
           +daikyuInputHTML(e)
-          +'<div class="grp"><div class="grp-h">その他の勤怠<button class="mini add" data-add="kintai" data-i="'+i+'">＋</button></div><div class="rows">'+otherKinRows(e)+'</div></div>'
-          +'<div class="grp"><div class="grp-h">支給<button class="mini add" data-add="shikyu" data-i="'+i+'">＋</button></div><div class="rows">'+rowsHTML('shikyu',e.shikyu)+'</div></div>'
-          +'<div class="grp"><div class="grp-h">法定外控除<button class="mini add" data-add="extraKojo" data-i="'+i+'">＋</button></div><div class="rows">'+rowsHTML('extraKojo',e.extraKojo)+'</div></div>'
+          +'<div class="grp"><div class="grp-h">その他の勤怠<button class="mini add" data-add="kintai" data-i="'+i+'" aria-label="勤怠項目を追加">＋</button></div><div class="rows">'+otherKinRows(e)+'</div></div>'
+          +'<div class="grp"><div class="grp-h">支給<button class="mini add" data-add="shikyu" data-i="'+i+'" aria-label="支給項目を追加">＋</button></div><div class="rows">'+rowsHTML('shikyu',e.shikyu)+'</div></div>'
+          +'<div class="grp"><div class="grp-h">法定外控除<button class="mini add" data-add="extraKojo" data-i="'+i+'" aria-label="控除項目を追加">＋</button></div><div class="rows">'+rowsHTML('extraKojo',e.extraKojo)+'</div></div>'
           +'<div class="calc-wrap">'+calcBoxHTML(e)+'</div></div></div>';
     }).join('');
     // 空状態(この月に在籍する従業員が0名)=次の一手CTA。カレンダーや確定ボタンだけが浮くのを防ぐ(UX🟠#8)
@@ -1164,11 +1164,11 @@
         +'<input class="finput bx-lbl" data-bsl="'+e.id+':'+idx+'" value="'+attr(it.label)+'" placeholder="項目名">'
         +'<input class="finput num bx-val" data-bsv="'+e.id+':'+idx+'" inputmode="numeric" value="'+attr(fmtN(it.value))+'" placeholder="円">'
         +'<label class="bx-hik"><input type="checkbox" data-bsh="'+e.id+':'+idx+'"'+(it.hikazei?' checked':'')+'>非課税</label>'
-        +'<button class="btn-ghost bx-del" data-bsx="'+e.id+':'+idx+'">×</button></div>'; }).join('');
+        +'<button class="btn-ghost bx-del" data-bsx="'+e.id+':'+idx+'" aria-label="この支給項目を削除">×</button></div>'; }).join('');
       var kItems=(en.addKojo||[]).map(function(it,idx){ return '<div class="bx-row">'
         +'<input class="finput bx-lbl" data-bkl="'+e.id+':'+idx+'" value="'+attr(it.label)+'" placeholder="項目名">'
         +'<input class="finput num bx-val" data-bkv="'+e.id+':'+idx+'" inputmode="numeric" value="'+attr(fmtN(it.value))+'" placeholder="円">'
-        +'<button class="btn-ghost bx-del" data-bkx="'+e.id+':'+idx+'">×</button></div>'; }).join('');
+        +'<button class="btn-ghost bx-del" data-bkx="'+e.id+':'+idx+'" aria-label="この控除項目を削除">×</button></div>'; }).join('');
       var editor='<div class="sec-lb" style="font-size:11px;margin-top:10px">追加の支給項目<span class="hint2">賞与に上乗せ・任意</span></div>'+sItems
         +'<div class="addcustom"><input class="finput ac-inp" data-bsaddl="'+e.id+'" placeholder="例：特別賞与・寸志"><button class="btn-ghost" data-bsadd="'+e.id+'" style="padding:9px 12px">＋支給</button></div>'
         +'<div class="sec-lb" style="font-size:11px">任意の控除項目<span class="hint2">法定は自動・これは任意分</span></div>'+kItems
@@ -1617,7 +1617,7 @@
       +'<input class="finput dl-f" data-dl="'+i+':'+idx+':ymd" type="date" value="'+attr(d.ymd||'')+'">'
       +'<input class="finput dl-f dl-hm" data-dl="'+i+':'+idx+':hm" value="'+attr(d.hm||'')+'" placeholder="時:分">'
       +'<input class="finput num dl-f dl-amt" data-dl="'+i+':'+idx+':amount" inputmode="numeric" value="'+attr(fmtN(d.amount))+'" placeholder="金額">'
-      +'<button class="btn-ghost dl-del" data-dldel="'+i+':'+idx+'">×</button></div>'; }).join('');
+      +'<button class="btn-ghost dl-del" data-dldel="'+i+':'+idx+'" aria-label="この日を削除">×</button></div>'; }).join('');
     var dv=buildDailyData(e);
     var tot=dv?('<div class="dl-tot">合計 '+(dv.count)+'日 ・ '+esc(dv.totalMinLabel)+' ・ '+yen(dv.totalAmount)+(dv.tax!=null?'（所得税 '+esc(dv.taxLabel||'日額表')+' '+yen(dv.tax)+'）':'')+'</div>'):'';
     return '<div class="grp"><div class="grp-h">日別（'+(cyc==='weekly'?'週払い':'日払い')+'）<span class="help-i" data-help="daily">💡</span></div>'
