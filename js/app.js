@@ -379,7 +379,7 @@
   // 支給サイクルの説明(表示のみ・計算方式は月単位で不変)。日払いは丙欄へ誘導。
   function payCycleNote(){ var el=$('#paycycle-note'); if(!el)return; var c=(state.company&&state.company.payCycle)||'monthly';
     var m={ monthly:'月に1回まとめて支給。', semimonthly:'月に2回に分けて支給。明細に区分を表示します。', weekly:'毎週支給。明細に「週払い」を表示します。', daily:'1日ごとに支給。<b>所得税は日額表</b>で日ごとに計算します（従業員ごとの税区分：甲＝扶養反映／乙／丙＝日雇い）。' };
-    el.innerHTML=(m[c]||'')+'<br><span style="color:#8FA89A">※月の社会保険・所得税の計算方式は変わりません（本設定は明細の表示と税区分の目安）。任意期間で締め直す本格計算は対象外。</span>'; }
+    el.innerHTML=(m[c]||'')+'<br><span style="color:#6E907E">※月の社会保険・所得税の計算方式は変わりません（本設定は明細の表示と税区分の目安）。任意期間で締め直す本格計算は対象外。</span>'; }
   function monthLabel(){ var y=Number((state.month||'2026-06').slice(0,4)), m=Number((state.month||'2026-06').slice(5,7)); var k=['','一','二','三','四','五','六','七','八','九','十','十一','十二']; return '令 和 '+(y-2018)+' 年 '+k[m]+' 月 分'; }
 
   /* ---------- ナビ ---------- */
@@ -402,7 +402,7 @@
     if(state.onboardDone){ box.innerHTML=''; return; }
     box.innerHTML='<div class="card" style="border:1px solid #C8ECD8;background:linear-gradient(180deg,#F4FBF7,#ffffff)">'
       +'<div style="display:flex;justify-content:space-between;align-items:center"><b style="color:#2E7D54">はじめに（4ステップ）</b>'
-      +'<button data-onboard-close="1" title="閉じる" style="border:none;background:none;color:#7aa08c;font-size:20px;cursor:pointer;line-height:1;padding:0 4px">×</button></div>'
+      +'<button data-onboard-close="1" title="閉じる" style="border:none;background:none;color:#5C7E6C;font-size:20px;cursor:pointer;line-height:1;padding:0 4px">×</button></div>'
       +'<div style="font-size:12.5px;color:#3D6B53;margin-top:6px;line-height:1.95">'
         +'<b>①</b> この画面で<b>会社情報</b>（会社名・締め日・支給日）を入れる<br>'
         +'<b>②</b> 上のタブ「<b>従業員マスタ</b>」で従業員を追加（※最初の「山田 太郎」はサンプルです。書き換えか削除でOK）<br>'
@@ -506,15 +506,15 @@
     var partsHtml=(v.parts||[]).map(function(p,idx){ var isCom=(p.type==='commission'), isTiered=(p.type==='tiered');
       var head='<div class="bx-row">'
         +'<select class="finput pr-type" data-prtype="'+i+':'+idx+'" style="flex:1.3;min-width:0">'+TYPES.map(function(t){return '<option value="'+t[0]+'"'+(p.type===t[0]?' selected':'')+'>'+t[1]+'</option>';}).join('')+'</select>'
-        +(isTiered?'':(isCom?'<span style="font-size:10px;color:#8FA89A;flex:1">歩合額は毎月「入力」で</span>':'<input class="finput num pr-amt" data-pramt="'+i+':'+idx+'" inputmode="numeric" value="'+attr(fmtN(p.amount))+'" placeholder="'+amtPh(p.type)+'" style="width:90px">'))
+        +(isTiered?'':(isCom?'<span style="font-size:10px;color:#6E907E;flex:1">歩合額は毎月「入力」で</span>':'<input class="finput num pr-amt" data-pramt="'+i+':'+idx+'" inputmode="numeric" value="'+attr(fmtN(p.amount))+'" placeholder="'+amtPh(p.type)+'" style="width:90px">'))
         +'<button class="btn-ghost bx-del" data-prdel="'+i+':'+idx+'">×</button></div>';
       if(!isTiered) return head;
       var tiers=(p.tiers&&p.tiers.length)?p.tiers:[{from:0,rate:''}];
       var tiersHtml=tiers.map(function(tr,tidx){ return '<div class="bx-row" style="gap:4px;padding-left:8px">'
         +'<input class="finput num pr-tier-f" data-prtier="'+i+':'+idx+':'+tidx+':from" inputmode="numeric" value="'+attr(fmtN(tr.from))+'" placeholder="下限(円)" style="width:104px">'
-        +'<span style="font-size:11px;color:#8FA89A">円〜</span>'
+        +'<span style="font-size:11px;color:#6E907E">円〜</span>'
         +'<input class="finput pr-tier-r" data-prtier="'+i+':'+idx+':'+tidx+':rate" inputmode="decimal" value="'+attr(tr.rate==null?'':tr.rate)+'" placeholder="率" style="width:58px">'
-        +'<span style="font-size:11px;color:#8FA89A">%</span>'
+        +'<span style="font-size:11px;color:#6E907E">%</span>'
         +'<button class="btn-ghost bx-del" data-prtierdel="'+i+':'+idx+':'+tidx+'">×</button></div>'; }).join('');
       return head+'<div class="pr-tiers" style="margin:2px 0 6px">'+tiersHtml
         +'<div class="addcustom"><button class="btn-ghost" data-prtieradd="'+i+':'+idx+'" style="padding:6px 10px">＋段を追加</button></div>'
@@ -542,7 +542,7 @@
     var pats=state.payPatterns||[];
     return '<div class="frow"><div class="flabel">給与パターン<span class="hint2">任意</span></div>'
       +'<div style="display:flex;gap:6px;align-items:center">'
-      +(pats.length?'<select class="finput pat-apply" data-i="'+i+'" style="flex:1"><option value="">— 選んで適用 —</option>'+pats.map(function(p){return '<option value="'+attr(p.id)+'">'+esc(p.name)+'</option>';}).join('')+'</select>':'<span style="flex:1;font-size:11px;color:#8FA89A">まだパターンがありません</span>')
+      +(pats.length?'<select class="finput pat-apply" data-i="'+i+'" style="flex:1"><option value="">— 選んで適用 —</option>'+pats.map(function(p){return '<option value="'+attr(p.id)+'">'+esc(p.name)+'</option>';}).join('')+'</select>':'<span style="flex:1;font-size:11px;color:#6E907E">まだパターンがありません</span>')
       +'<button class="btn-ghost pat-save" data-i="'+i+'" style="padding:9px 10px;white-space:nowrap;font-size:12px">この設定を保存</button></div></div>'
       +'<div class="hint" style="margin:2px 2px 8px">'+(pats.length?'選ぶと 給与形態・決め方・支給/控除項目 をこの人に反映（氏名・扶養・通勤などは変わりません）。':'「この設定を保存」で いまの給与形態・決め方・項目 を"パターン"化 → 他の人へ一括適用できます。')+'</div>';
   }
@@ -677,7 +677,7 @@
     }
     var soho=r.si.health+r.si.pension+(r.si.kaigo||0);
     var tag=isAuto?' 自動':undet?' 暫定':'';
-    return '<div class="sh-hero"><div class="lb">毎月この人から天引きする社会保険（本人負担）</div><div class="big">'+yen(soho)+(tag?'<span style="font-size:12px;color:#7aa08c;font-family:\'Noto Sans JP\'">'+tag+'</span>':'')+'</div>'
+    return '<div class="sh-hero"><div class="lb">毎月この人から天引きする社会保険（本人負担）</div><div class="big">'+yen(soho)+(tag?'<span style="font-size:12px;color:#5C7E6C;font-family:\'Noto Sans JP\'">'+tag+'</span>':'')+'</div>'
       +'<div class="bd">健康保険 <b>'+yen(r.si.health)+'</b>　＋　厚生年金 <b>'+yen(r.si.pension)+'</b>'+(r.si.kaigo?'　＋　介護保険 <b>'+yen(r.si.kaigo)+'</b>':'')+'</div></div>'
       +'<div class="sh-sub">もとになる「標準報酬月額」＝<b>'+yen(r.hyojun)+'</b>'+(isAuto?'（基本給＋手当から自動）':undet?'（暫定：当月支給ベース）':'（保険料計算の“ものさし”・自動で決まる）')+'／適用：'+period+'</div>';
   }
@@ -738,7 +738,7 @@
       if(g==='shikyu'){
         hz = labelAuto
           ? '<label class="row-hz" title="項目名から自動で非課税" style="font-size:10px;color:#3D9E72;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:2px"><input type="checkbox" checked disabled>非課税</label>'
-          : '<label title="チェックで所得税の非課税にする(社保は対象)" style="font-size:10px;color:'+(it.hikazei?'#3D9E72':'#A9C4B6')+';font-weight:'+(it.hikazei?'700':'400')+';white-space:nowrap;display:inline-flex;align-items:center;gap:2px"><input type="checkbox" class="ck" data-g="shikyu" data-ri="'+ri+'"'+(it.hikazei?' checked':'')+'>非課税</label>';
+          : '<label title="チェックで所得税の非課税にする(社保は対象)" style="font-size:10px;color:'+(it.hikazei?'#3D9E72':'#6E907E')+';font-weight:'+(it.hikazei?'700':'400')+';white-space:nowrap;display:inline-flex;align-items:center;gap:2px"><input type="checkbox" class="ck" data-g="shikyu" data-ri="'+ri+'"'+(it.hikazei?' checked':'')+'>非課税</label>';
       }
       return '<div class="row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px"><input class="finput" data-g="'+g+'" data-ri="'+ri+'" data-f="label" value="'+attr(it.label)+'" style="flex:1.3" placeholder="項目"><input class="finput num" data-g="'+g+'" data-ri="'+ri+'" data-f="value" value="'+attr(it.value)+'" style="flex:1" placeholder="'+(g==='kintai'?'値':'金額')+'">'+hz+'<button class="b-del m-del" data-g="'+g+'" data-ri="'+ri+'">×</button></div>';
     }).join('');
@@ -814,7 +814,7 @@
       return '<div class="grp"><div class="grp-h">歩合給（出来高）</div>'
         +'<label class="ic-f ic-f2"><span>歩合給額<small>円</small></span><input class="finput num cm-f ic-in" data-cmf="commissionAmt" inputmode="numeric" placeholder="0" value="'+attr(fmtN(e.commissionAmt))+'"></label>'
         +'<div class="basepay-note">'+basePayNoteOnly(e)+'</div>'
-        +'<div style="font-size:10px;color:#7aa08c;margin:-4px 2px 8px">保障給の時給は「設定▸従業員マスタ」で。割増は下の「歩合の上乗せ」で。</div></div>'; }
+        +'<div style="font-size:10px;color:#5C7E6C;margin:-4px 2px 8px">保障給の時給は「設定▸従業員マスタ」で。割増は下の「歩合の上乗せ」で。</div></div>'; }
     if(e.payType==='カスタム'){ var spc=ensurePayRule(e); var prts=(spc.variable&&spc.variable.parts)||[];
       var hasCom=prts.some(function(p){return p.type==='commission';}), hasRate=prts.some(function(p){return p.type==='rate'||p.type==='tiered';}), hasPiece=prts.some(function(p){return p.type==='piece';});
       var hh='<div class="grp"><div class="grp-h">給与（カスタム）</div>';
@@ -822,7 +822,7 @@
       if(hasPiece) hh+='<label class="ic-f ic-f2"><span>当月の件数<small>件</small></span><input class="finput num cm-f ic-in" data-cmf="pieceCount" inputmode="numeric" placeholder="0" value="'+attr(fmtN(e.pieceCount))+'"></label>';
       if(hasRate) hh+='<label class="ic-f ic-f2"><span>当月の売上<small>円</small></span><input class="finput num cm-f ic-in" data-cmf="salesAmt" inputmode="numeric" placeholder="0" value="'+attr(fmtN(e.salesAmt))+'"></label>';
       hh+='<div class="basepay-note">'+basePayNoteOnly(e)+'</div>';
-      hh+='<div style="font-size:10px;color:#7aa08c;margin:-4px 2px 8px">決め方（固定・時給・率など）は「設定▸従業員マスタ」で。割増は下で。</div></div>';
+      hh+='<div style="font-size:10px;color:#5C7E6C;margin:-4px 2px 8px">決め方（固定・時給・率など）は「設定▸従業員マスタ」で。割増は下で。</div></div>';
       return hh; }
     return '<div class="basepay-note"></div>';
   }
@@ -945,12 +945,12 @@
       '<div class="cal-box" style="background:#F0FAF4;border:1px solid #C8ECD8;border-radius:12px;padding:10px 12px;margin-bottom:12px">'
       +'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">'
         +'<b style="color:#2E7D54;font-size:13px">当月の所定労働日数 '+sche+'日</b>'
-        +'<span style="font-size:10.5px;color:#7aa08c">（休みの曜日・祝日・会社休を除く）</span>'
+        +'<span style="font-size:10.5px;color:#5C7E6C">（休みの曜日・祝日・会社休を除く）</span>'
         +'<button class="cal-fill" data-fillsche="'+sche+'" style="margin-left:auto;padding:7px 12px;border:1px solid #3D9E72;background:#fff;color:#2E7D54;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer">全員の出勤を所定('+sche+'日)で埋める</button>'
         +'<button data-csvimport="1" style="padding:7px 12px;border:1px solid #C8ECD8;background:#fff;color:#3D6B53;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer" title="他社勤怠システム/Excelの勤怠CSVを取り込む">📄 勤怠CSV取込 <span class="help-i" data-help="kintaicsv" style="cursor:help">💡</span></button>'
       +'</div>'
       +'<div style="font-size:10.5px;color:#3D6B53;margin-top:5px">祝日: '+esc(holStr)+'</div>'
-      +'<div style="font-size:10px;color:#7aa08c;margin-top:3px">出勤日数は所定を初期表示。各自で手修正できます（赤で止めません）。会社独自の休みは「設定▸会社の決まり」で追加できます。</div>'
+      +'<div style="font-size:10px;color:#5C7E6C;margin-top:3px">出勤日数は所定を初期表示。各自で手修正できます（赤で止めません）。会社独自の休みは「設定▸会社の決まり」で追加できます。</div>'
       +'</div>';
     var cnt=reviewCounts(), reviewOnly=!!state._reviewOnly;
     var progHTML='<div class="cal-box" style="background:#fff;border:1px solid #d4eae0;border-radius:12px;padding:10px 12px;margin-bottom:12px">'
@@ -958,9 +958,9 @@
         +'<b style="color:#2E7D54;font-size:13px">確認 '+cnt.done+'/'+cnt.total+'名</b>'
         +(cnt.need>0?'<span style="background:#fff8e1;border:1px solid #F4D8A8;color:#92500A;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">未確認 '+cnt.need+'名</span>':'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 全員確認済</span>')
         +'<label style="font-size:11px;color:#3D6B53;display:inline-flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" data-reviewonly'+(reviewOnly?' checked':'')+'>要確認だけ表示</label>'
-        +'<span id="save-status" style="margin-left:auto;font-size:10.5px;color:#A9C4B6">'+(state._savedAt?'自動保存済 '+esc(state._savedAt):'')+'</span>'
+        +'<span id="save-status" style="margin-left:auto;font-size:10.5px;color:#6E907E">'+(state._savedAt?'自動保存済 '+esc(state._savedAt):'')+'</span>'
       +'</div>'
-      +'<div style="font-size:10px;color:#7aa08c;margin-top:4px">前月と変わった人だけ「確認」を。変わっていない人は自動で確認済み扱いです。</div>'
+      +'<div style="font-size:10px;color:#5C7E6C;margin-top:4px">前月と変わった人だけ「確認」を。変わっていない人は自動で確認済み扱いです。</div>'
       +'</div>';
     // 入力ビュー切替(カード/表)。2人以上のときだけ表を出す(1人は表の意味が薄い)
     var activeCount=state.employees.filter(function(e){return isActiveInMonth(e,state.month);}).length;
@@ -998,7 +998,7 @@
     var emptyMsg=(reviewOnly && !cards) ? '<p class="hint" style="text-align:center;padding:18px 0">要確認の人はいません（全員確認済み）。</p>' : '';
     var confirmBtn='<div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px"><button class="btn-primary" data-confirm-month style="flex:0 0 auto;padding:11px 18px;font-size:14px">今月を確定（台帳・年調に反映）</button>'
       +(cnt.need>0?'<span style="font-size:11px;color:#92500A;font-weight:700">未確認 '+cnt.need+'名</span>':'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 確認済</span>')
-      +'<span style="font-size:10px;color:#7aa08c"><b>保存は自動</b>です。「確定」は全員を確認済みにし、<b>賃金台帳・年末調整の集計対象</b>として今月を記録します（あとで直せます）。</span></div>';
+      +'<span style="font-size:10px;color:#5C7E6C"><b>保存は自動</b>です。「確定」は全員を確認済みにし、<b>賃金台帳・年末調整の集計対象</b>として今月を記録します（あとで直せます）。</span></div>';
     host.innerHTML=statutoryStaleWarn()+calHTML+progHTML+viewToggle+cards+emptyMsg+confirmBtn;
   }
   // 表でまとめて入力(全従業員1画面・弥生の弱点/Exallyモデル)。列は既存と同じdata属性を再利用=同じハンドラで書ける。
@@ -1139,7 +1139,7 @@
         +'<div style="padding:0 12px 12px">'
         +'<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><span style="font-size:12px;color:#2E7D54;font-weight:700;min-width:54px">賞与額</span><input class="finput num" data-ba="'+e.id+'" inputmode="numeric" value="'+attr(en.amount)+'" placeholder="円" style="flex:1"></div>'
         +prevBox
-        +'<div style="font-size:11px;color:#4b6b58;margin:5px 0">本年度の既往賞与（標準賞与額）累計 <input class="finput num" data-by="'+e.id+'" inputmode="numeric" value="'+attr(en.ytd)+'" placeholder="0" style="width:110px"> 円 <span style="color:#8FA89A">（2回目以降のみ・健保 年573万上限用）</span></div>'
+        +'<div style="font-size:11px;color:#4b6b58;margin:5px 0">本年度の既往賞与（標準賞与額）累計 <input class="finput num" data-by="'+e.id+'" inputmode="numeric" value="'+attr(en.ytd)+'" placeholder="0" style="width:110px"> 円 <span style="color:#6E907E">（2回目以降のみ・健保 年573万上限用）</span></div>'
         +editor
         +(caps?'<div style="margin:4px 0">'+caps+'</div>':'')+warn
         +'<div class="calc-box"><div class="ch">賞与の自動計算（標準賞与額 '+yen(hyojun)+'）</div>'
@@ -1368,7 +1368,7 @@
     function chk(field,label){ return '<label style="font-size:12px;display:inline-flex;align-items:center;gap:4px;margin-right:12px"><input type="checkbox" data-eid="'+attr(eid)+'" data-nf="'+field+'"'+(n[field]?' checked':'')+'>'+label+'</label>'; }
     var shougaiOpts=[['','障害者なし'],['ippan','一般障害者(27万)'],['tokubetsu','特別障害者(40万)'],['doukyo','同居特別障害者(75万)']].map(function(o){return '<option value="'+o[0]+'"'+((n.shougai||'')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('');
     return '<div class="nen-detail" id="nen-detail-'+attr(eid)+'" style="display:none;border-top:1px dashed #d4eae0;margin-top:8px;padding-top:8px">'
-      +'<div style="font-size:11px;color:#7aa08c;margin-bottom:6px">自動集計を上書きする場合のみ入力（空欄=履歴から自動）</div>'
+      +'<div style="font-size:11px;color:#5C7E6C;margin-bottom:6px">自動集計を上書きする場合のみ入力（空欄=履歴から自動）</div>'
       +'<div class="nrow"><span class="nlbl">給与収入(年)</span>'+nf(eid,'shunyuOverride',n.shunyuOverride,fmtN(agg.shunyu))+'<span class="nlbl">源泉徴収済(年)</span>'+nf(eid,'genzenOverride',n.genzenOverride,fmtN(agg.genzen))+'</div>'
       +'<div class="nrow"><span class="nlbl">社保(天引・上書)</span>'+nf(eid,'shahoOverride',n.shahoOverride,fmtN(agg.shaho))+'<span class="nlbl">社保(申告追加)</span>'+nf(eid,'shinkokuShaho',n.shinkokuShaho)+'</div>'
       +'<div class="nsec">生命保険料（支払保険料）</div>'
@@ -1991,12 +1991,12 @@
           var consentState=p.consentAt?'<span style="font-size:10.5px;color:#2E7D54">・同意済</span>':'<span style="font-size:10.5px;color:#92500A">・未同意</span>';
           var codeRow = (!p.hasPassword && p.initCode)
             ? '<div style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:#3D6B53;min-width:52px">初回コード</span><input class="finput num" readonly value="'+attr(p.initCode)+'" style="flex:1;font-size:13px;letter-spacing:.12em;padding:7px 9px" onclick="this.select()"><button class="btn-ghost wm-copy" data-link="'+attr(p.initCode)+'" style="padding:7px 10px;font-size:11px">コピー</button></div>'
-            : '<div style="font-size:10.5px;color:#7aa08c;margin-top:5px">初回コードは設定後に非表示（忘れた/漏れたら「再発行」）<button class="btn-ghost wm-reissue" data-token="'+attr(p.token)+'" style="padding:4px 8px;font-size:10.5px;margin-left:6px">初回コード再発行</button></div>';
+            : '<div style="font-size:10.5px;color:#5C7E6C;margin-top:5px">初回コードは設定後に非表示（忘れた/漏れたら「再発行」）<button class="btn-ghost wm-reissue" data-token="'+attr(p.token)+'" style="padding:4px 8px;font-size:10.5px;margin-left:6px">初回コード再発行</button></div>';
           return '<div style="border:1px solid #d4eae0;border-radius:10px;padding:9px 11px;margin-bottom:7px">'
             +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:13px">'+esc(p.name||'(氏名未取得)')+'</b><span>'+pwState+consentState+'</span></div>'
             +'<div style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:#3D6B53;min-width:52px">リンク</span><input class="finput" readonly value="'+attr(origin+p.link)+'" style="flex:1;font-size:11px;padding:7px 9px" onclick="this.select()"><button class="btn-ghost wm-copy" data-link="'+attr(origin+p.link)+'" style="padding:7px 10px;font-size:11px">コピー</button></div>'
             +codeRow
-            +'<div style="font-size:10.5px;color:#7aa08c;margin-top:5px">公開: '+openedTxt+'</div></div>';
+            +'<div style="font-size:10.5px;color:#5C7E6C;margin-top:5px">公開: '+openedTxt+'</div></div>';
         }).join('');
     });
   }

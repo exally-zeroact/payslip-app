@@ -7,14 +7,14 @@ input,select,button{font-family:inherit;}
 /* ---- appbar ---- */
 .appbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;height:52px;padding:0 16px;background:#fff;border-bottom:1px solid #e3ede8;box-shadow:0 1px 4px rgba(30,60,40,.06);}
 .logo{font-family:'DM Mono',monospace;font-size:20px;font-weight:500;letter-spacing:-0.5px;color:#52B788;}
-.appbar-sub{font-size:10px;letter-spacing:.18em;color:#7aa08c;}
+.appbar-sub{font-size:10px;letter-spacing:.18em;color:#5C7E6C;}
 .appbar-month{margin-left:auto;display:flex;align-items:center;gap:6px;}
-.appbar-month label{font-size:10px;color:#7aa08c;}
+.appbar-month label{font-size:10px;color:#5C7E6C;}
 .appbar-tab{margin-left:auto;font-size:15px;font-weight:700;color:#3D6B53;letter-spacing:.04em;}
 .scr-head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;}
 .scr-head .scr-title{margin-bottom:8px;}
 .scr-month-wrap{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
-.scr-month-wrap label{font-size:10px;color:#7aa08c;}
+.scr-month-wrap label{font-size:10px;color:#5C7E6C;}
 
 /* ---- main / screens ---- */
 .main{max-width:880px;margin:0 auto;padding:16px 16px 84px;}
@@ -22,7 +22,7 @@ input,select,button{font-family:inherit;}
 .screen.active{display:block;padding-top:14px;}
 .scr-period{font-size:13px;color:#3D6B53;font-weight:500;}
 .scr-title{font-size:17px;font-weight:700;color:#1a4a2e;margin:4px 0 12px;}
-.scr-sub{font-size:12px;color:#7aa08c;font-weight:400;margin-left:8px;}
+.scr-sub{font-size:12px;color:#5C7E6C;font-weight:400;margin-left:8px;}
 
 /* ---- card ---- */
 .card{background:#fff;border:1px solid #d4eae0;border-radius:16px;padding:14px;margin-bottom:14px;box-shadow:0 1px 4px rgba(30,80,46,.06);}
@@ -33,12 +33,12 @@ input,select,button{font-family:inherit;}
 .frow2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
 .frow2>*{min-width:0;}
 .frow2 label,.frow label,.flabel{font-size:11px;font-weight:700;color:#3D6B53;}
-.flabel .hint2{font-weight:400;color:#7aa08c;font-size:10px;margin-left:4px;}
+.flabel .hint2{font-weight:400;color:#5C7E6C;font-size:10px;margin-left:4px;}
 .finput{width:100%;min-width:0;padding:10px 12px;border:1.5px solid #d4eae0;border-radius:10px;font-size:14px;color:#1A4A2E;background:#fff;-webkit-appearance:none;appearance:none;}
 .finput.num{font-family:'DM Mono',monospace;text-align:right;}
 select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8"><path d="M1 1l5 5 5-5" stroke="%237aa08c" stroke-width="2" fill="none"/></svg>');background-repeat:no-repeat;background-position:right 12px center;padding-right:30px;}
 /* 従業員マスタ accordion + グループ + チップ */
-.grp-hd{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#7aa08c;margin:8px 2px 6px;}
+.grp-hd{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#5C7E6C;margin:8px 2px 6px;}
 .grp-hd::after{content:"";flex:1;height:1px;background:#C8ECD8;}
 .mco{border:1px solid #d4eae0;border-radius:12px;margin-bottom:10px;overflow:hidden;background:#fff;}
 .mco-hd{display:flex;align-items:center;gap:8px;padding:12px;background:#fff;cursor:pointer;}
@@ -47,22 +47,22 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .mco-ord{display:inline-flex;flex-direction:column;gap:1px;margin-left:2px;}
 .mco-ord .ord-b{width:22px;height:15px;line-height:1;padding:0;border:1px solid #D4EAE0;background:#fff;color:#3D9E72;border-radius:5px;font-size:9px;cursor:pointer;}
 .mco-ord .ord-b:active{background:#F0FAF4;}
-.mco-cv{color:#A9C4B6;transition:transform .2s;}
+.mco-cv{color:#6E907E;transition:transform .2s;}
 .mco.open .mco-cv{transform:rotate(180deg);}
 .mco-body{display:none;padding:12px;border-top:1px solid #d4eae0;}
 .mco.open .mco-body{display:block;}
 .emp-dtgl{display:flex;align-items:center;font-size:12px;font-weight:700;color:#2E7D54;cursor:pointer;padding:10px 2px 8px;margin-top:8px;border-top:1px dashed #d4eae0;}
-.emp-dtgl .mco-cv{color:#A9C4B6;transition:transform .2s;}
+.emp-dtgl .mco-cv{color:#6E907E;transition:transform .2s;}
 .emp-detail{padding-top:4px;}
 .emp-sub{border:1px solid #E3F0E8;border-radius:10px;margin-bottom:8px;overflow:hidden;}
 .emp-sub-h{display:flex;align-items:center;padding:11px 12px;font-size:12.5px;font-weight:700;color:#3D6B53;background:#F7FCF9;cursor:pointer;-webkit-tap-highlight-color:transparent;}
-.emp-sub-h .mco-cv{color:#A9C4B6;transition:transform .2s;}
+.emp-sub-h .mco-cv{color:#6E907E;transition:transform .2s;}
 .emp-sub-b{padding:10px 12px 4px;}
 /* 従業員マスタ 絞り込み(在籍中/休暇中/退職者/全員) */
 .emp-filter{display:flex;gap:6px;margin:0 0 10px;flex-wrap:wrap;}
-.emp-filter .ef-b{flex:1;min-width:64px;text-align:center;border:1.5px solid #d4eae0;border-radius:9px;padding:7px 4px;font-size:12px;font-weight:700;color:#7aa08c;background:#fff;cursor:pointer;}
+.emp-filter .ef-b{flex:1;min-width:64px;text-align:center;border:1.5px solid #d4eae0;border-radius:9px;padding:7px 4px;font-size:12px;font-weight:700;color:#5C7E6C;background:#fff;cursor:pointer;}
 .emp-filter .ef-b.on{border-color:#52B788;background:#F0FAF4;color:#2E7D54;}
-.emp-filter .ef-b .ef-n{display:inline-block;margin-left:4px;font-size:11px;color:#A9C4B6;font-family:'DM Mono',monospace;}
+.emp-filter .ef-b .ef-n{display:inline-block;margin-left:4px;font-size:11px;color:#6E907E;font-family:'DM Mono',monospace;}
 .emp-filter .ef-b.on .ef-n{color:#3D9E72;}
 .sec-lb{font-size:11px;font-weight:700;color:#2E7D54;margin:14px 0 6px;padding-top:10px;border-top:1px dashed #d4eae0;}
 .chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
@@ -73,16 +73,16 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .btn-add{width:100%;padding:11px;background:#3D9E72;color:#fff;border:none;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 3px 12px rgba(61,158,114,.32);margin-top:4px;}
 /* 社会保険セクション */
 .sh-seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:2px 0 8px;}
-.sh-seg b{text-align:center;border:1.5px solid #d4eae0;border-radius:9px;padding:8px 4px;font-size:11px;font-weight:700;color:#7aa08c;cursor:pointer;background:#fff;}
+.sh-seg b{text-align:center;border:1.5px solid #d4eae0;border-radius:9px;padding:8px 4px;font-size:11px;font-weight:700;color:#5C7E6C;cursor:pointer;background:#fff;}
 .sh-seg b.on{border-color:#52B788;background:#F0FAF4;color:#2E7D54;}
-.sh-seg b .j{display:block;font-size:9px;color:#A9C4B6;font-weight:400;margin-top:1px;}
+.sh-seg b .j{display:block;font-size:9px;color:#6E907E;font-weight:400;margin-top:1px;}
 .sh-auto-lead{background:#F0FAF4;border:1.5px solid #C8ECD8;border-radius:9px;padding:9px 11px;font-size:12px;color:#2E7D54;margin:2px 0 6px;}.sh-auto-lead b{color:#1a4a2e;}
-.sh-dtgl{display:inline-flex;align-items:center;font-size:11.5px;color:#7aa08c;cursor:pointer;padding:2px 2px 8px;}
-.sh-tip{font-size:10.5px;color:#7aa08c;line-height:1.5;margin:0 0 8px;}.sh-tip b{color:#3D6B53;}
+.sh-dtgl{display:inline-flex;align-items:center;font-size:11.5px;color:#5C7E6C;cursor:pointer;padding:2px 2px 8px;}
+.sh-tip{font-size:10.5px;color:#5C7E6C;line-height:1.5;margin:0 0 8px;}.sh-tip b{color:#3D6B53;}
 .f3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:4px 0 6px;}.f3>*{min-width:0;}
 .mcol{display:flex;flex-direction:column;gap:4px;}.mcol .mlb{font-size:11px;font-weight:700;color:#3D6B53;}
 .mcol .finput{padding:8px 8px;}
-.drow{display:flex;align-items:center;gap:3px;font-size:9.5px;color:#7aa08c;}.drow span{flex-shrink:0;}
+.drow{display:flex;align-items:center;gap:3px;font-size:9.5px;color:#5C7E6C;}.drow span{flex-shrink:0;}
 .dinp{width:100%;min-width:0;padding:5px 4px;border:1.5px solid #d4eae0;border-radius:7px;font-size:13px;font-family:'DM Mono',monospace;text-align:center;color:#1a4a2e;-webkit-appearance:none;}
 .mcol.ex .finput,.mcol.ex .dinp{background:#f7fcf9;color:#9cbbab;border-color:#d4eae0;}
 .exinfo{background:#EEF7F1;border:1px solid #cfe6da;border-radius:8px;padding:7px 9px;font-size:10.5px;color:#3D6B53;margin:2px 0 8px;line-height:1.5;}.exinfo b{color:#2E7D54;}
@@ -94,22 +94,22 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .sh-warn{background:#fff8e1;border:1px solid #F4D8A8;border-radius:8px;padding:7px 9px;font-size:10.5px;color:#92500A;line-height:1.55;margin-bottom:9px;}.sh-warn b{color:#7A3F00;}
 /* 割増（時間/分） */
 .dur{display:flex;align-items:center;gap:4px;}
-.dur i{font-style:normal;font-size:10px;color:#7aa08c;}
+.dur i{font-style:normal;font-size:10px;color:#5C7E6C;}
 .dur-in{width:48px!important;padding:8px 4px!important;text-align:center;font-family:'DM Mono',monospace;}
 .wi-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
 .wi-l{flex:1;min-width:0;font-size:12px;color:#1a4a2e;font-weight:500;}
-.wi-l small{display:block;font-size:10px;color:#7aa08c;font-weight:400;}
+.wi-l small{display:block;font-size:10px;color:#5C7E6C;font-weight:400;}
 .wi-f{width:46px;padding:7px 4px;border:1.5px solid #d4eae0;border-radius:8px;font-size:15px;font-family:'DM Mono',monospace;text-align:center;color:#1a4a2e;-webkit-appearance:none;}
 .wi-res{font-size:12px;color:#2E7D54;font-weight:700;margin-top:6px;}
 .wi-res b{font-family:'DM Mono',monospace;}
-.wi-res .wi-sub{display:block;font-size:10px;color:#7aa08c;font-weight:400;margin-top:1px;}
-.wi-res.wi-zero{color:#7aa08c;font-weight:400;font-size:11px;}
+.wi-res .wi-sub{display:block;font-size:10px;color:#5C7E6C;font-weight:400;margin-top:1px;}
+.wi-res.wi-zero{color:#5C7E6C;font-weight:400;font-size:11px;}
 /* 会社の決まり */
 .rule-item{position:relative;border:1px solid #EEF6F1;border-radius:10px;padding:10px 11px;margin-bottom:9px;}
 .rule-item .ri-x{position:absolute;top:8px;right:9px;font-size:11px;color:#C0392B;cursor:pointer;}
-.ri-note{font-size:10px;color:#7aa08c;line-height:1.5;margin-top:5px;}
+.ri-note{font-size:10px;color:#5C7E6C;line-height:1.5;margin-top:5px;}
 .wdays{display:flex;gap:5px;flex-wrap:wrap;margin:5px 0;}
-.wday{width:34px;height:34px;border:1.5px solid #d4eae0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#7aa08c;cursor:pointer;}
+.wday{width:34px;height:34px;border:1.5px solid #d4eae0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#5C7E6C;cursor:pointer;}
 .wday.on{border-color:#52B788;background:#3D9E72;color:#fff;}
 .cr-f{padding:9px 10px;border:1.5px solid #d4eae0;border-radius:9px;font-family:'DM Mono',monospace;font-size:14px;color:#1a4a2e;background:#fff;-webkit-appearance:none;text-align:right;width:130px;}
 .cr-f.cr-dur{width:58px;text-align:center;}
@@ -137,14 +137,14 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .cp-toggle{display:inline-flex;align-items:center;gap:6px;border:1.5px solid #d4eae0;border-radius:10px;background:#fff;padding:7px 10px;font-size:11.5px;font-weight:700;color:#3D6B53;cursor:pointer;}
 .cp-toggle.open{border-color:#52B788;background:#F0FAF4;}
 .cp-reset{color:#9A7B5A;border-color:#E6DCC9;background:#FBF7F0;}
-.cp-toggle .cp-cv{color:#A9C4B6;font-size:10px;transition:transform .15s;}
+.cp-toggle .cp-cv{color:#6E907E;font-size:10px;transition:transform .15s;}
 .cp-toggle.open .cp-cv{transform:rotate(180deg);}
 .cp-cur{display:inline-block;width:16px;height:16px;border-radius:4px;border:1px solid rgba(0,0,0,.12);}
 .cp-sw{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;padding:8px;background:#f7fcf9;border:1px solid #e3ede8;border-radius:10px;}
 .cw{width:24px;height:24px;border-radius:5px;border:1px solid rgba(0,0,0,.12);cursor:pointer;}
 .cw.on{outline:2px solid #52B788;outline-offset:1px;}
 /* 配色プリセット */
-.cp-lb{font-size:11px;font-weight:700;color:#7aa08c;margin:0 0 6px;}
+.cp-lb{font-size:11px;font-weight:700;color:#5C7E6C;margin:0 0 6px;}
 .cp-preset{display:flex;flex-wrap:wrap;gap:6px;}
 .cp-ps{display:inline-flex;align-items:center;gap:7px;border:1.5px solid #d4eae0;border-radius:10px;background:#fff;padding:6px 10px 6px 7px;font-size:11.5px;font-weight:700;color:#3D6B53;cursor:pointer;}
 .cp-ps.on{border-color:#52B788;background:#F0FAF4;}
@@ -168,18 +168,18 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .cr-ok{font-size:10.5px;color:#2E7D54;font-weight:700;margin-top:6px;}
 .cr-warn{font-size:10.5px;color:#92500A;background:#fff8e1;border:1px solid #F4D8A8;border-radius:7px;padding:7px 9px;margin-top:6px;line-height:1.55;}
 .wi-seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;}
-.wi-seg b{text-align:center;border:1.5px solid #d4eae0;border-radius:9px;padding:7px 4px;font-size:12px;font-weight:700;color:#7aa08c;background:#fff;cursor:pointer;}
+.wi-seg b{text-align:center;border:1.5px solid #d4eae0;border-radius:9px;padding:7px 4px;font-size:12px;font-weight:700;color:#5C7E6C;background:#fff;cursor:pointer;}
 .wi-seg b.on{border-color:#52B788;background:#F0FAF4;color:#2E7D54;}
 .imode-seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 10px;}
-.imode-seg .imode,.imode-seg .pmode,.imode-seg .dls{text-align:center;border:1.5px solid #d4eae0;border-radius:9px;padding:8px 4px;font-size:13px;font-weight:700;color:#7aa08c;background:#fff;cursor:pointer;}
+.imode-seg .imode,.imode-seg .pmode,.imode-seg .dls{text-align:center;border:1.5px solid #d4eae0;border-radius:9px;padding:8px 4px;font-size:13px;font-weight:700;color:#5C7E6C;background:#fff;cursor:pointer;}
 .imode-seg .imode.on,.imode-seg .pmode.on,.imode-seg .dls.on{border-color:#52B788;background:#F0FAF4;color:#2E7D54;}
-.imode-seg .ivw{text-align:center;border:1.5px solid #d4eae0;border-radius:9px;padding:8px 4px;font-size:13px;font-weight:700;color:#7aa08c;background:#fff;cursor:pointer;}
+.imode-seg .ivw{text-align:center;border:1.5px solid #d4eae0;border-radius:9px;padding:8px 4px;font-size:13px;font-weight:700;color:#5C7E6C;background:#fff;cursor:pointer;}
 .imode-seg .ivw.on{border-color:#52B788;background:#F0FAF4;color:#2E7D54;}
 /* 入力=表でまとめて(全従業員1画面・横スクロール・数値右揃え・1列目固定) */
 .in-table-wrap{overflow-x:auto;border:1px solid #d4eae0;border-radius:12px;margin-bottom:10px;-webkit-overflow-scrolling:touch;}
 .in-table{border-collapse:separate;border-spacing:0;font-size:12.5px;min-width:100%;white-space:nowrap;}
 .in-table th{background:#F0FAF4;color:#2E7D54;font-weight:700;font-size:11px;padding:8px 8px;border-bottom:1px solid #C8ECD8;text-align:right;position:sticky;top:0;}
-.in-table th small{display:block;font-size:9px;color:#7aa08c;font-weight:400;}
+.in-table th small{display:block;font-size:9px;color:#5C7E6C;font-weight:400;}
 .in-table th.tnm{text-align:left;}
 .in-table td{padding:5px 8px;border-bottom:1px solid #eef4f0;vertical-align:middle;}
 .in-table tr:last-child td{border-bottom:none;}
@@ -187,27 +187,27 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .in-table th.tnm{position:sticky;left:0;z-index:2;background:#F0FAF4;}
 .in-table .tnum{text-align:right;}
 .in-table .tcell{width:52px;text-align:right;padding:5px 6px;font-variant-numeric:tabular-nums;}
-.in-table .thm{display:inline-flex;align-items:center;gap:2px;color:#8FA89A;}
+.in-table .thm{display:inline-flex;align-items:center;gap:2px;color:#6E907E;}
 .in-table .thm .tcell{width:38px;}
 .in-table .tnet{text-align:right;}
 .in-table .tnet-v{font-weight:700;color:#23261f;font-variant-numeric:tabular-nums;}
-.in-table .tdim{color:#C0CFC7;text-align:right;}
-.in-table .thint{color:#A9C4B6;font-size:10px;}
+.in-table .tdim{color:#7E9E8C;text-align:right;}
+.in-table .thint{color:#6E907E;font-size:10px;}
 .in-table .tmw{color:#C0392B;cursor:help;}
 .in-table .tconf{text-align:center;}
 .in-table .tstack{display:inline-flex;flex-direction:column;gap:3px;align-items:flex-end;}
 .cap-badge{display:inline-block;font-size:10px;font-weight:700;color:#92500A;background:#fff8e1;border:1px solid #F4D8A8;border-radius:6px;padding:2px 7px;margin-right:5px;}
 .wi-df{width:46px;padding:7px 4px;border:1.5px solid #d4eae0;border-radius:8px;font-size:15px;font-family:'DM Mono',monospace;text-align:center;color:#1a4a2e;-webkit-appearance:none;}
-.wi-note2{font-size:10px;color:#7aa08c;line-height:1.5;margin:4px 0 2px;}
+.wi-note2{font-size:10px;color:#5C7E6C;line-height:1.5;margin:4px 0 2px;}
 .wi-bkw{margin-top:6px;}
 .wi-bk{font-size:10.5px;color:#4A6B5A;line-height:1.7;}
 .wi-bk b{color:#1a4a2e;font-family:'DM Mono',monospace;}
 .wb-box{margin-top:10px;background:#f7fcf9;border:1px solid #e3ede8;border-radius:10px;padding:9px 10px;}
 .wb-h{font-size:11px;font-weight:700;color:#2E7D54;margin-bottom:6px;display:flex;align-items:center;gap:5px;}
 .wb-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:5px;}
-.wb-chip{font-size:11.5px;padding:4px 9px;border:1px solid #d4eae0;border-radius:13px;background:#fff;color:#A9C4B6;cursor:pointer;}
+.wb-chip{font-size:11.5px;padding:4px 9px;border:1px solid #d4eae0;border-radius:13px;background:#fff;color:#6E907E;cursor:pointer;}
 .wb-chip.on{border-color:#52B788;background:#52B788;color:#fff;font-weight:700;}
-.wb-note{font-size:10px;color:#7aa08c;line-height:1.5;}
+.wb-note{font-size:10px;color:#5C7E6C;line-height:1.5;}
 /* 💡 ヘルプ */
 .help-i{cursor:pointer;margin-left:4px;font-size:13px;line-height:1;user-select:none;}
 .help-ov{display:none;position:fixed;inset:0;z-index:60;background:rgba(20,40,28,.42);align-items:center;justify-content:center;padding:20px;}
@@ -248,7 +248,7 @@ input[type="date"].finput:not(.finput-sm),input[type="month"].finput:not(.finput
 .pr-type{font-size:12px;padding:7px 8px;}
 /* 給与パターンの管理ストリップ */
 .pat-strip{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 2px 8px;}
-.pat-strip-l{font-size:11px;color:#7aa08c;font-weight:700;}
+.pat-strip-l{font-size:11px;color:#5C7E6C;font-weight:700;}
 .pat-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;background:#EAF4EE;color:#2E7D54;border-radius:14px;padding:4px 6px 4px 11px;font-weight:700;}
 .pat-chip .pat-del{color:#8FB3A1;cursor:pointer;font-weight:700;width:18px;height:18px;line-height:18px;text-align:center;border-radius:50%;}
 .pat-chip .pat-del:active{background:#d7ebe0;}
@@ -258,7 +258,7 @@ input[type="date"].finput:not(.finput-sm),input[type="month"].finput:not(.finput
 .dl-f{padding:7px 6px;font-size:12px;}
 .dl-del{padding:4px 8px;color:#C0392B;border-color:#f0d4cf;font-weight:700;}
 .dl-tot{font-size:12px;color:#3D6B53;font-weight:700;margin:4px 2px 8px;padding:6px 8px;background:#EAF4EE;border-radius:8px;}
-.hint{font-size:11px;color:#7aa08c;line-height:1.6;margin-top:6px;}
+.hint{font-size:11px;color:#5C7E6C;line-height:1.6;margin-top:6px;}
 
 /* ---- buttons / chips ---- */
 .btn-row{display:flex;gap:10px;margin-top:6px;}
@@ -288,7 +288,7 @@ input[type="date"].finput:not(.finput-sm),input[type="month"].finput:not(.finput
 .diffb.up{color:#2E7D54;background:#E2F4EA;}
 .diffb.dn{color:#C0392B;background:#FDF1F0;}
 .diffb.sm{color:#7AA08C;background:#F0FAF4;}
-.acc-cv{font-size:14px;color:#7aa08c;transition:transform .2s;}
+.acc-cv{font-size:14px;color:#5C7E6C;transition:transform .2s;}
 .acc.open .acc-cv{transform:rotate(180deg);}
 .acc-body{display:none;padding:0 14px 14px;border-top:1px solid #EEF6F1;}
 .acc.open .acc-body{display:block;}
@@ -306,7 +306,7 @@ input[type="date"].finput:not(.finput-sm),input[type="month"].finput:not(.finput
 .ic-f2{flex:1.4 1 128px;}
 .ic-hm{display:flex;align-items:center;gap:4px;}
 .ic-hm .ic-in{flex:1;width:auto;min-width:0;text-align:center;padding:9px 4px;}
-.ic-hm i{color:#7aa08c;font-style:normal;font-family:'DM Mono',monospace;}
+.ic-hm i{color:#5C7E6C;font-style:normal;font-family:'DM Mono',monospace;}
 
 /* rows in editor */
 .grp{margin-top:12px;}
@@ -317,7 +317,7 @@ input[type="date"].finput:not(.finput-sm),input[type="month"].finput:not(.finput
 .row .lbl{flex:1.3;}
 .row .val{flex:1;text-align:right;font-family:'DM Mono',monospace;}
 .row input{padding:7px 9px;border:1px solid #d4eae0;border-radius:8px;font-size:13px;min-width:0;}
-.row .hz{display:flex;align-items:center;gap:3px;font-size:10px;color:#7aa08c;white-space:nowrap;}
+.row .hz{display:flex;align-items:center;gap:3px;font-size:10px;color:#5C7E6C;white-space:nowrap;}
 .row .b-del{width:26px;height:30px;border:1px solid #e3ede8;border-radius:8px;background:#fff;color:#C62828;cursor:pointer;}
 
 /* auto-calc summary (法定控除) */
@@ -343,7 +343,7 @@ input[type="date"].finput:not(.finput-sm),input[type="month"].finput:not(.finput
 .sumtab tr.total td{font-weight:700;background:#F0FAF4;}
 .pay-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 2px;border-bottom:1px solid #eef4f0;font-size:13px;}
 .pay-row .num{font-family:'DM Mono',monospace;color:#1a4a2e;font-weight:700;white-space:nowrap;}
-.pay-sub{font-size:10.5px;color:#8FA89A;font-weight:400;margin-left:6px;}
+.pay-sub{font-size:10.5px;color:#6E907E;font-weight:400;margin-left:6px;}
 /* 帳票: 部署別・賃金台帳 */
 .sumtab tr.dept-h td{background:#EEF7F1;color:#2E7D54;font-weight:700;font-size:11px;}
 .dc-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
@@ -367,7 +367,7 @@ input[type="date"].finput:not(.finput-sm),input[type="month"].finput:not(.finput
 
 /* ---- bottom nav ---- */
 .botnav{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;background:#fff;border-top:1px solid #e3ede8;padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -2px 10px rgba(30,60,40,.06);}
-.bn{flex:1;border:none;background:transparent;padding:8px 2px 9px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;color:#7aa08c;}
+.bn{flex:1;border:none;background:transparent;padding:8px 2px 9px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;color:#5C7E6C;}
 .bn-i{font-size:18px;line-height:1;}
 .bn-l{font-size:10px;font-weight:700;}
 .bn.on{color:#3D9E72;}
@@ -379,3 +379,20 @@ input[type="date"].finput:not(.finput-sm),input[type="month"].finput:not(.finput
 .nen-detail .nrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:5px 0;}
 .nen-detail .nlbl{font-size:11.5px;color:#3D6B53;min-width:96px;}
 .nen-detail .nlbl .hint2{display:block;font-size:9.5px;color:#9bb5a8;font-weight:400;}
+
+/* ───────── モバイル基礎 UX監査(2026-07-13) : iOSズーム防止 / 可視フォーカス / 44pxタップ ───────── */
+/* ① iOS Safariは16px未満のinputフォーカスで画面を自動ズーム→戻らない。全テキスト入力を16pxに(スマホ主眼の最重要) */
+.finput,.ic-in,.dinp,.bx-val,.dl-f,.wi-f,.wk-f,.cm-f,.parse-in,.wi-df,.dl-hm,.dl-amt,.sh-pay,.cr-f,.ac-inp,select.finput,.in-table .tcell{font-size:16px;}
+.in-table .tcell{width:60px;}.in-table .thm .tcell{width:46px;}
+/* ② 可視フォーカス(WCAG2.4.7)。outline:noneだけの状態を是正=キーボード/スイッチ操作で現在地が見える */
+a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible,
+.chip:focus-visible,.bn:focus-visible,.imode:focus-visible,.pmode:focus-visible,.dls:focus-visible,.ivw:focus-visible,
+.ef-b:focus-visible,.sh-seg b:focus-visible,.wi-mode:focus-visible,.seg-b:focus-visible,.tpl-card:focus-visible,
+.mco-hd:focus-visible,.emp-dtgl:focus-visible,.emp-sub-h:focus-visible,.help-i:focus-visible{outline:2px solid #2E7D54;outline-offset:2px;border-radius:6px;}
+.finput:focus-visible,.dinp:focus-visible,.ic-in:focus-visible,.wi-f:focus-visible,.tcell:focus-visible{outline:2px solid #2E7D54;outline-offset:1px;border-color:#52B788;}
+/* ③ タップ40px(iOS44目安)=破壊/小操作の実サイズを拡大。誤削除防止に直結(隣接クリック干渉を避け直接サイズ指定) */
+.m-del,.b-del,.dl-del,.bx-del{min-width:40px;min-height:40px;display:inline-flex;align-items:center;justify-content:center;}
+.mini{min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;}
+.mco-ord .ord-b{width:30px;height:26px;font-size:11px;}
+/* ④ 動きの低減(前庭障害配慮) */
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;}}
