@@ -431,3 +431,11 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
 .rule-item.open .ri-cv{transform:rotate(180deg);}
 .ri-body{padding:10px 12px 12px;border-top:1px solid #eef4f0;}
 .rule-item .ri-x{position:static;color:#C0392B;font-size:11px;font-weight:700;cursor:pointer;}
+
+/* ── 従業員 氏名検索(UX#9) ── */
+.emp-search-wrap{display:flex;align-items:center;gap:8px;margin:0 0 10px;}
+.emp-search-wrap #emp-search{flex:1;}
+.emp-search-count{font-size:11px;font-weight:700;color:#3D9E72;white-space:nowrap;}
+
+/* ── 警告のジャンプ導線(UX#10) ── */
+.mw-fix{color:#92500A;text-decoration:underline;cursor:pointer;font-weight:700;white-space:nowrap;}

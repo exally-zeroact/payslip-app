@@ -158,6 +158,30 @@ T('UX#7: 月の状態バッジ 下書き↔確定済', function () {
   ok(/mstate-fixed/.test(win.document.querySelector('#input-list').innerHTML), '全員確認→確定済');
 });
 
+// ── UX#9 氏名検索: 一致しない従業員カードを隠す ──
+T('UX#9: 氏名検索でカードを絞り込む', function () {
+  const st = A.state; st.employees = [A.defEmp('山田 太郎'), A.defEmp('佐藤 花子'), A.defEmp('鈴木 次郎')]; st.empFilter = 'all';
+  A.renderEmpMaster();
+  const search = win.document.querySelector('#emp-search'); search.value = '佐藤';
+  A.filterEmpSearch();
+  const cards = [...win.document.querySelectorAll('#emp-list .mco')];
+  const visible = cards.filter(c => c.style.display !== 'none');
+  eq(visible.length, 1, '佐藤のみ表示');
+  ok(/佐藤/.test(visible[0].querySelector('.mco-nm').textContent), '佐藤が残る');
+  search.value = ''; A.filterEmpSearch(); // クリアで全表示に戻る
+  eq([...win.document.querySelectorAll('#emp-list .mco')].filter(c => c.style.display !== 'none').length, 3, 'クリアで全員');
+});
+
+// ── UX#10 最賃割れ警告に「直す→」ジャンプ導線が出る ──
+T('UX#10: 最賃割れの入力カード警告に data-fix-emp(直すリンク)', function () {
+  const st = A.state; const e = A.defEmp('低賃金'); e.payType = '時給'; e.hourly = '300'; e.pref = 'tokyo';
+  st.employees = [e]; st.month = '2026-06'; st.inputView = 'card'; st.confirmed = {};
+  A.renderInput();
+  const html = win.document.querySelector('#input-list').innerHTML;
+  ok(/最低賃金/.test(html), '最賃警告が出る');
+  ok(/data-fix-emp/.test(html) && /を直す/.test(html), '該当従業員へのジャンプ導線がある');
+});
+
 // ── 出勤クランプ: 出勤マイナスで負支給にならない ──
 T('出勤クランプ: 日給 出勤-5 → effShukkin=0・支給非負', function () {
   const e = A.defEmp('日給'); e.payType = '日給'; e.base = '12000';

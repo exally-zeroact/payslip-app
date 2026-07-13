@@ -746,6 +746,16 @@
       });
     });
     var _sy=window.scrollY; host.innerHTML=html; if(_sy) window.scrollTo(0,_sy); // 全再描画でスクロール位置が飛ぶのを防ぐ(H2)
+    filterEmpSearch(); // 検索語があれば再描画後も絞り込みを維持(UX#9)
+  }
+  // 氏名検索(全競合が持つtable-stakes)。#emp-searchは静的なので再描画で焦点が飛ばない。カードを表示/非表示で絞る。
+  function filterEmpSearch(){
+    var inp=$('#emp-search'), host=$('#emp-list'); if(!inp||!host) return;
+    var term=String(inp.value||'').trim().toLowerCase(); var cards=host.querySelectorAll('.mco'); var shown=0;
+    cards.forEach(function(c){ var nm=((c.querySelector('.mco-nm')||{}).textContent||'').toLowerCase(); var hit=!term||nm.indexOf(term)>=0; c.style.display=hit?'':'none'; if(hit)shown++; });
+    // 部署見出し(.grp-hd): 直後の可視カードが無ければ隠す
+    host.querySelectorAll('.grp-hd').forEach(function(gh){ var any=false, n=gh.nextElementSibling; while(n && !n.classList.contains('grp-hd')){ if(n.classList.contains('mco')&&n.style.display!=='none'){any=true;break;} n=n.nextElementSibling; } gh.style.display=(term&&!any)?'none':''; });
+    var cnt=$('#emp-search-count'); if(cnt) cnt.textContent=term?(shown+'名'):'';
   }
 
   /* ---------- 入力（自動計算） ---------- */
@@ -1007,7 +1017,7 @@
       return '<div class="acc icard'+(open?' open':'')+'" data-i="'+i+'">'
         +'<div class="ic-top"><span class="acc-nm">'+esc(e.name)+wsBadge(e)+'</span><span class="acc-net">'+yen(r.net)+'</span><span class="diffb-wrap">'+diffBadge(e,r)+'</span>'+confHTML+'<button class="ic-detail" data-toggle="'+i+'">詳細<span class="acc-cv">▾</span></button></div>'
         +compactKinHTML(e)+prorateNote(e)
-        +((mw&&!mw.ok)?'<div class="cr-warn" style="margin:0 12px 10px">⚠ 最低賃金（'+esc(mw.prefName)+'：時給'+fmtN(mw.minWage)+'円）を下回っています（約'+fmtN(mw.hourly)+'円）。設定▸従業員マスタで'+(e.payType==='時給'?'時給':'基本給')+'を上げてください。</div>':'')
+        +((mw&&!mw.ok)?'<div class="cr-warn" style="margin:0 12px 10px">⚠ 最低賃金（'+esc(mw.prefName)+'：時給'+fmtN(mw.minWage)+'円）を下回っています（約'+fmtN(mw.hourly)+'円）。<b class="mw-fix" data-fix-emp="'+i+'">'+(e.payType==='時給'?'時給':'基本給')+'を直す →</b></div>':'')
         +'<div class="acc-body">'
           +basePayInputHTML(e,i)
           +dailyInputHTML(e,i)
@@ -1766,6 +1776,7 @@
         else if(g==='input'){ showScreen('scr-input'); } else if(g==='print'){ showScreen('scr-print'); }
         return; }
       if(e.target.closest('[data-goto-empmaster]')){ showScreen('scr-settings'); var eb=$('#set-seg .seg-b[data-set="emp"]'); if(eb)eb.click(); return; } // 空状態CTA→従業員マスタ
+      var fe=e.target.closest('[data-fix-emp]'); if(fe){ var fi=+fe.dataset.fixEmp; var femp=state.employees[fi]; if(femp){ state.open[femp.id]=true; showScreen('scr-settings'); var eb2=$('#set-seg .seg-b[data-set="emp"]'); if(eb2)eb2.click(); renderEmpMaster(); setTimeout(function(){ var c=$('#emp-list .mco[data-i="'+fi+'"]'); if(c)c.scrollIntoView({block:'center'}); },30); } return; } // 警告→該当従業員のマスタを開く(UX#10)
       var gs=e.target.closest('[data-scr]'); if(gs && !gs.classList.contains('bn')){ showScreen(gs.dataset.scr); return; } }); // CTA等 ナビ外の画面遷移
     $('#help-x').addEventListener('click',function(){ $('#help-ov').classList.remove('on'); });
     $('#help-ov').addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); });
@@ -1831,7 +1842,8 @@
     });
     rh.addEventListener('input',function(ev){ if(ev.target.tagName==='SELECT')return; var f=ev.target.dataset.cf; if(f) state.company[f]=ev.target.value.replace(/[^0-9]/g,''); });
     rh.addEventListener('change',function(ev){ if(ev.target.dataset.coh!=null){ state.company.companyHolidays=(state.company.companyHolidays||[]); state.company.companyHolidays[+ev.target.dataset.coh]=ev.target.value; return; } var f=ev.target.dataset.cf; if(f==='gyoshu'){ state.company.gyoshu=ev.target.value; return; } if(f==='shahoTiming'){ state.company.shahoTiming=ev.target.value; return; } if(f==='paymentDaysMethod'){ state.company.paymentDaysMethod=ev.target.value; return; } if(f==='kekkinMethod'){ state.company.kekkinMethod=ev.target.value; return; } if(f==='kanzenGekkyu'){ state.company.kanzenGekkyu=ev.target.checked; renderCompanyRules(); return; } if(f==='daikyuDeduct'){ state.company.daikyuDeduct=ev.target.checked; return; } if(f==='annualHolidays'||f==='dailyWorkH'||f==='dailyWorkM') renderCompanyRules(); });
-    $('#b-add-emp').addEventListener('click',function(){ var e=defEmp('従業員 '+(state.employees.length+1)); state.employees.push(e); state.open[e.id]=true; renderEmpMaster(); });
+    $('#b-add-emp').addEventListener('click',function(){ var e=defEmp('従業員 '+(state.employees.length+1)); state.employees.push(e); state.open[e.id]=true; if($('#emp-search'))$('#emp-search').value=''; renderEmpMaster(); });
+    (function(){ var es=$('#emp-search'); if(es) es.addEventListener('input', filterEmpSearch); })(); // 氏名検索(UX#9)
 
     // 従業員マスタ操作
     var el=$('#emp-list');
@@ -2079,7 +2091,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';
