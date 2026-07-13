@@ -427,8 +427,14 @@
     var host=$('#rule-chips'); if(!host)return; var on=state.company.ruleOn||{};
     host.innerHTML=RULE_ITEMS.map(function(it){var o=!!on[it[0]];return '<span class="chip'+(o?' on':'')+'" data-rule="'+it[0]+'">'+(o?'✓ ':'')+it[1]+'</span>';}).join('');
   }
+  // 会社の決まりの各項目=折りたたみ(既定は閉じ)。初回の過積載を解消(UX🟠#6)。タップで展開して編集。
   function ruleItemHTML(key,title,sub,helpKey,inner){
-    return '<div class="rule-item"><span class="ri-x" data-rule-x="'+key+'">× 外す</span><div class="flabel">'+title+(sub?'<span class="hint2">（'+sub+'）</span>':'')+(helpKey?'<span class="help-i" data-help="'+helpKey+'">💡</span>':'')+'</div>'+inner+'</div>';
+    var open=!!(state._ruleOpen&&state._ruleOpen[key]);
+    return '<div class="rule-item'+(open?' open':'')+'">'
+      +'<div class="ri-hd" data-rule-toggle="'+key+'"><span class="ri-ttl">'+title+(sub?'<span class="hint2">（'+esc(sub)+'）</span>':'')+'</span>'
+        +(helpKey?'<span class="help-i" data-help="'+helpKey+'">💡</span>':'')+'<span class="ri-cv">▾</span></div>'
+      +(open?'<div class="ri-body">'+inner+'<div style="text-align:right;margin-top:8px"><span class="ri-x" data-rule-x="'+key+'">× この項目を使わない</span></div></div>':'')
+      +'</div>';
   }
   function renderCompanyRules(){
     var host=$('#rule-host'); if(!host)return; var c=state.company, on=c.ruleOn||{}, h='';
@@ -1817,6 +1823,7 @@
     // 会社の決まり：曜日・外す・数値
     var rh=$('#rule-host');
     rh.addEventListener('click',function(ev){
+      var rt=ev.target.closest('[data-rule-toggle]'); if(rt && !ev.target.closest('.help-i')){ if(!state._ruleOpen)state._ruleOpen={}; var rk=rt.dataset.ruleToggle; state._ruleOpen[rk]=!state._ruleOpen[rk]; renderCompanyRules(); return; } // 折りたたみ開閉(💡は除く)
       var wd=ev.target.closest('.wday'); if(wd){ var i=+wd.dataset.wd; var hs=state.company.holidays||[]; var p=hs.indexOf(i); if(p>=0)hs.splice(p,1); else hs.push(i); state.company.holidays=hs; renderCompanyRules(); return; }
       if(ev.target.closest('[data-coh-add]')){ state.company.companyHolidays=(state.company.companyHolidays||[]); state.company.companyHolidays.push(''); renderCompanyRules(); return; }
       var cd=ev.target.closest('[data-coh-del]'); if(cd){ (state.company.companyHolidays||[]).splice(+cd.dataset.cohDel,1); renderCompanyRules(); return; }
