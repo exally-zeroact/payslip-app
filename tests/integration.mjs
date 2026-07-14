@@ -218,5 +218,20 @@ T('A11y: ボタンのaria-labelは維持(labelInputsA11yはinput/selectのみ対
   ok(!up || up.getAttribute('aria-label') === '上へ移動', '並べ替えボタンのaria-label不変');
 });
 
+// ── 警告一貫性: 表ビューの最賃⚠ tooltip がカードと同じ情報(県/時給/下回り)を持つ ──
+T('警告一貫性: 表ビューの最賃⚠は「素っ気ない一言」でなく具体的な内容を伝える', function () {
+  const st = A.state; const e = A.defEmp('低賃金'); e.payType = '時給'; e.hourly = '300'; e.pref = 'tokyo';
+  st.employees = [e]; st.month = '2026-06'; st.confirmed = {};
+  const htmlT = A.renderInputTableHTML(false);
+  const dom3 = new (win.DOMParser)();
+  const doc = dom3.parseFromString('<table>' + htmlT.replace(/^[\s\S]*?<tbody>/, '<tbody>').replace(/<\/tbody>[\s\S]*$/, '</tbody>') + '</table>', 'text/html');
+  const mw = doc.querySelector('.tmw');
+  ok(mw, '最賃⚠(.tmw)が表示される');
+  const title = mw.getAttribute('title') || '';
+  ok(/最低賃金/.test(title), 'tooltipに「最低賃金」');
+  ok(/下回/.test(title), 'tooltipに「下回っています」(具体的説明・素っ気ない一言でない)');
+  ok(/円/.test(title), 'tooltipに金額(円)');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

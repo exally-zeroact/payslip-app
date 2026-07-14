@@ -157,6 +157,8 @@
     hourly=Math.floor(hourly);
     return { hourly:hourly, minWage:mw, prefName:((S.todofuken||{})[e.pref]||{}).name||'', ok:(hourly===0||hourly>=mw), stale:(S.saiteiStale?S.saiteiStale(state.month):false) };
   }
+  // 最賃割れのtooltip/説明文(表ビューの⚠とカードのバナーで文面を統一)。製品方針=黄色・非ブロック・具体的に伝える。
+  function mwWarnText(mw){ return '最低賃金（'+esc(mw.prefName)+'：時給'+fmtN(mw.minWage)+'円）を下回っています（約'+fmtN(mw.hourly)+'円）'; }
   // 対象月の法定値(社保料率・所得税額表・最低賃金)が未収録年度なら暫定計算の黄警告(silent-wrong防止)。値は捏造せず直近収録値で暫定。
   function statutoryStaleWarn(){
     var msgs=[]; var S=SHH();
@@ -1054,7 +1056,7 @@
       return '<div class="acc icard'+(open?' open':'')+'" data-i="'+i+'">'
         +'<div class="ic-top"><span class="acc-nm">'+esc(e.name)+wsBadge(e)+'</span><span class="acc-net">'+yen(r.net)+'</span><span class="diffb-wrap">'+diffBadge(e,r)+'</span>'+confHTML+'<button class="ic-detail" data-toggle="'+i+'">詳細<span class="acc-cv">▾</span></button></div>'
         +compactKinHTML(e)+prorateNote(e)
-        +((mw&&!mw.ok)?'<div class="cr-warn" style="margin:0 12px 10px">⚠ 最低賃金（'+esc(mw.prefName)+'：時給'+fmtN(mw.minWage)+'円）を下回っています（約'+fmtN(mw.hourly)+'円）。<b class="mw-fix" data-fix-emp="'+i+'">'+(e.payType==='時給'?'時給':'基本給')+'を直す →</b></div>':'')
+        +((mw&&!mw.ok)?'<div class="cr-warn" style="margin:0 12px 10px">⚠ '+mwWarnText(mw)+'。<b class="mw-fix" data-fix-emp="'+i+'">'+(e.payType==='時給'?'時給':'基本給')+'を直す →</b></div>':'')
         +'<div class="acc-body">'
           +basePayInputHTML(e,i)
           +dailyInputHTML(e,i)
@@ -1110,7 +1112,7 @@
       var cf=empConfirmed(e), nr=empNeedsReview(e,r);
       var conf=cf?'<input type="checkbox" class="econf" data-econf="'+i+'" checked title="確認済">'
         :nr?'<input type="checkbox" class="econf" data-econf="'+i+'" title="要確認">':'<span class="thint">—</span>';
-      var mw=minWageInfo(e); var mwWarn=(mw&&!mw.ok)?' <span class="tmw" title="最低賃金割れ">⚠</span>':'';
+      var mw=minWageInfo(e); var mwWarn=(mw&&!mw.ok)?' <span class="tmw" title="'+attr(mwWarnText(mw))+'">⚠</span>':'';
       return '<tr class="trow" data-i="'+i+'"><td class="tnm">'+esc(e.name)+wsBadge(e)+mwWarn+'</td>'
         +kinCell(e,i,/出勤/)+kinCell(e,i,/欠勤/)+kinCell(e,i,/有給/)
         +hmCell(0,0,e.workedH,e.workedM,'wk-f','data-wkf="workedH"','data-wkf="workedM"')
@@ -1127,7 +1129,7 @@
   }
   function refreshCard(i){ var e=state.employees[i];
     var trow=$('#input-list .trow[data-i="'+i+'"]'); if(trow){ var rt=compute(e); var nv=trow.querySelector('.tnet-v'); if(nv) nv.textContent=yen(rt.net); var td=trow.querySelector('.tdiff'); if(td) td.innerHTML=diffBadge(e,rt);
-      var nmc=trow.querySelector('.tnm'); if(nmc){ var mw=minWageInfo(e); var mwc=nmc.querySelector('.tmw'); if(mw&&!mw.ok){ if(!mwc){ var sp=document.createElement('span'); sp.className='tmw'; sp.title='最低賃金割れ'; sp.textContent=' ⚠'; nmc.appendChild(sp); } } else if(mwc){ mwc.remove(); } } // B7: 最賃⚠も即時更新
+      var nmc=trow.querySelector('.tnm'); if(nmc){ var mw=minWageInfo(e); var mwc=nmc.querySelector('.tmw'); if(mw&&!mw.ok){ if(!mwc){ var sp=document.createElement('span'); sp.className='tmw'; sp.title=mwWarnText(mw); sp.textContent=' ⚠'; nmc.appendChild(sp); } else { mwc.title=mwWarnText(mw); } } else if(mwc){ mwc.remove(); } } // B7: 最賃⚠も即時更新
       return; } // 表モードは手取り/前月比/最賃⚠セルを更新(フォーカス維持)
     var card=$('#input-list .acc[data-i="'+i+'"]'); if(!card) return; var r=compute(e); card.querySelector('.acc-net').textContent=yen(r.net); var dw=card.querySelector('.diffb-wrap'); if(dw) dw.innerHTML=diffBadge(e,r); var bn=card.querySelector('.basepay-note'); if(bn) bn.innerHTML=basePayNoteOnly(e); var cw=card.querySelector('.calc-wrap'); if(cw) cw.innerHTML=calcBoxHTML(e); var wr=card.querySelector('.wi-resw'); if(wr) wr.innerHTML=wiResHTML(e); }
 
