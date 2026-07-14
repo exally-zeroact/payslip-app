@@ -96,11 +96,12 @@
       });
     };
     // 初回ログインで(このアプリの)行が無ければ trial 行を自動作成(insertポリシーで plan='trial' 固定)。
+    // 管理画面で「誰か」を表示するため email も入れる(自分の行のみ)。
     Store.ensureAccount = function(){
-      return curUid().then(function(uid){ if(!uid) return null;
-        return sb.from('exally_entitlements').select('account_id').eq('account_id',uid).eq('app',APP).maybeSingle().then(function(r){
-          if(r.data) return { plan:'trial', existed:true };
-          return sb.from('exally_entitlements').insert({ account_id:uid, app:APP, plan:'trial' }).then(function(){ return { plan:'trial', existed:false }; });
+      return sb.auth.getUser().then(function(r){ var u=r.data&&r.data.user; var uid=u&&u.id; if(!uid) return null; var email=u.email||null;
+        return sb.from('exally_entitlements').select('account_id').eq('account_id',uid).eq('app',APP).maybeSingle().then(function(rr){
+          if(rr.data) return { plan:'trial', existed:true };
+          return sb.from('exally_entitlements').insert({ account_id:uid, app:APP, plan:'trial', email:email }).then(function(){ return { plan:'trial', existed:false }; });
         });
       });
     };

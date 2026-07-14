@@ -247,12 +247,15 @@ create table if not exists exally_entitlements (
   account_id  uuid not null references auth.users(id) on delete cascade,
   app         text not null,                    -- 'payslip' | 'invoice' | ...
   plan        text not null default 'trial',    -- trial | paid | free | disabled
+  email       text,                              -- 誰か表示用(登録時にアプリが自分のメールを入れる・管理画面で使う)
   expires_at  timestamptz,                       -- ★予約(将来の無料期間用)・現アプリは未参照★
   note        text,                              -- 司さん用メモ(誰か・何円で 等)
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   primary key (account_id, app)
 );
+-- 既に作成済みの環境向け(email列を後から足す)
+alter table exally_entitlements add column if not exists email text;
 
 alter table exally_entitlements enable row level security;
 -- 本人は自分の行を読める(各アプリが自分のplanを判定)
@@ -262,6 +265,32 @@ create policy ee_read_own on exally_entitlements for select using (account_id = 
 drop policy if exists ee_insert_own_trial on exally_entitlements;
 create policy ee_insert_own_trial on exally_entitlements for insert
   with check (account_id = auth.uid() and plan = 'trial' and expires_at is null);
--- update/delete ポリシーは作らない = 本人は plan を変更できない(service_role/ダッシュボードのみ)
-grant select, insert on exally_entitlements to authenticated;
--- 司さんが停止: update exally_entitlements set plan='disabled' where account_id='...' and app='payslip'; (Table editor直編集でも可)
+grant select, insert, update on exally_entitlements to authenticated;
+
+-- ── 管理者(司さん)だけが全ユーザーを操作できる層(管理画面 admin.html 用) ──
+-- ★service_roleキーはWebに絶対置かない。管理者権限は「exally_adminsに居るuidだけ」をRLSで強制する★
+create table if not exists exally_admins (
+  account_id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+alter table exally_admins enable row level security;
+-- 管理者判定関数(security definer=exally_adminsのRLSを迂回して評価。ポリシー内サブクエリの定番)
+create or replace function is_exally_admin() returns boolean
+  language sql security definer stable set search_path = public as $$
+    select exists (select 1 from exally_admins where account_id = auth.uid());
+  $$;
+-- 管理者は自分が管理者か確認できる(画面の権限判定用)。他人の管理者行は見せない。
+drop policy if exists ea_read_self on exally_admins;
+create policy ea_read_self on exally_admins for select using (account_id = auth.uid());
+grant select on exally_admins to authenticated;
+-- 管理者は 全ユーザーの entitlements を 閲覧+変更 できる(RLSで管理者以外は自分の行だけ)
+drop policy if exists ee_admin_read on exally_entitlements;
+create policy ee_admin_read on exally_entitlements for select using (is_exally_admin());
+drop policy if exists ee_admin_update on exally_entitlements;
+create policy ee_admin_update on exally_entitlements for update using (is_exally_admin()) with check (is_exally_admin());
+
+-- 既存行のemailを auth.users から埋める(初回一括・以後はアプリが登録時に入れる)
+update exally_entitlements e set email = u.email from auth.users u where u.id = e.account_id and e.email is null;
+
+-- ★司さんを管理者に登録(自分のログインメールに置き換えて実行)★
+-- insert into exally_admins (account_id) select id from auth.users where email = 'ここに司さんのログインメール';
