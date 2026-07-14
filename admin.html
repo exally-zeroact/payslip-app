@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Exally 管理 — ユーザー</title>
+<!-- PWA(ホーム画面/デスクトップに単独アプリとしてインストール) -->
+<link rel="manifest" href="/admin-manifest.json">
+<meta name="theme-color" content="#1A4A2E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Exally管理">
+<link rel="apple-touch-icon" href="/img/admin-192.png">
+<link rel="icon" type="image/png" href="/img/admin-192.png">
 <style>
   :root{ --ink:#1a4a2e; --accent:#2E7D54; --muted:#5C7E6C; --line:#d4eae0; --bg:#F0FAF4; }
   *{box-sizing:border-box;}
@@ -77,5 +85,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supa-config.js"></script>
   <script src="js/admin.js"></script>
+  <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script>
 </body>
 </html>
