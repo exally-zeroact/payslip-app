@@ -84,20 +84,23 @@
         });
       });
     };
-    // ── アカウントのプラン状態(pay_accounts): 司さんが 無料/有料/停止 を制御する層 ──
-    // 本人は自分の行を"読むだけ"(RLS)。plan変更は司さん(ダッシュボード/service role)のみ。
+    // ── アカウントのプラン状態(exally_entitlements): 司さんが 使える/停止 を制御する層 ──
+    // ★Exally共通テーブル: 1人×1アプリ=1行(account_id,app,plan)。請求書/給料明細/今後のアプリを1箇所で管理。
+    //   このアプリの識別子=APP。他アプリは app 値を変えて同じテーブルを読むだけ(DB変更不要でアプリ追加可)。
+    //   本人は自分の行を"読むだけ"(RLS)。plan変更は司さん(ダッシュボード/service role)のみ。
+    var APP = 'payslip';
     Store.getAccount = function(){
       return curUid().then(function(uid){ if(!uid) return null;
-        return sb.from('pay_accounts').select('plan,expires_at').eq('account_id',uid).maybeSingle()
+        return sb.from('exally_entitlements').select('plan,expires_at').eq('account_id',uid).eq('app',APP).maybeSingle()
           .then(function(r){ return r.data || null; });
       });
     };
-    // 初回ログインで行が無ければ trial 行を自動作成(insertポリシーで plan='trial' 固定を強制)。
+    // 初回ログインで(このアプリの)行が無ければ trial 行を自動作成(insertポリシーで plan='trial' 固定)。
     Store.ensureAccount = function(){
       return curUid().then(function(uid){ if(!uid) return null;
-        return sb.from('pay_accounts').select('account_id').eq('account_id',uid).maybeSingle().then(function(r){
+        return sb.from('exally_entitlements').select('account_id').eq('account_id',uid).eq('app',APP).maybeSingle().then(function(r){
           if(r.data) return { plan:'trial', existed:true };
-          return sb.from('pay_accounts').insert({ account_id:uid, plan:'trial' }).then(function(){ return { plan:'trial', existed:false }; });
+          return sb.from('exally_entitlements').insert({ account_id:uid, app:APP, plan:'trial' }).then(function(){ return { plan:'trial', existed:false }; });
         });
       });
     };
