@@ -37,9 +37,33 @@
   function jpErr(s){ s=String(s||''); if(/Invalid login/i.test(s))return 'メールかパスワードが違います'; if(/already registered|User already/i.test(s))return 'このメールは登録済みです。ログインしてください'; if(/at least 6/i.test(s))return 'パスワードは6文字以上にしてください'; if(/valid email/i.test(s))return 'メールアドレスの形式が正しくありません'; return s; }
 
   var curEmail='';
-  function afterLogin(email){ curEmail=email||curEmail; hide();
-    if(window.PayslipReloadCloud) window.PayslipReloadCloud().then(function(loaded){ if(!loaded && window.PayslipPersistSave) window.PayslipPersistSave(); /* 新規=今のローカルを初回アップ */ });
-    showLogout();
+  // プラン状態ゲート: 停止/期限切れなら利用させない。取得失敗やAccess未読込時は"締めない"(誤ロック回避)。
+  function gateCheck(){
+    if(!(Store.getAccount && window.Access)) return Promise.resolve({ ok:true, reason:'nogate' });
+    return Store.getAccount().then(function(acc){
+      if(!acc){ // 行が無い=初回=trialを自動作成してopen
+        return (Store.ensureAccount?Store.ensureAccount():Promise.resolve()).then(function(){ return { ok:true, reason:'new' }; });
+      }
+      return Access.accessState(acc);
+    }).catch(function(){ return { ok:true, reason:'error' }; });
+  }
+  function afterLogin(email){ curEmail=email||curEmail;
+    gateCheck().then(function(gate){
+      if(gate && !gate.ok){ showLock(); return; } // 停止アカウント=アプリを触らせない
+      hide();
+      if(window.PayslipReloadCloud) window.PayslipReloadCloud().then(function(loaded){ if(!loaded && window.PayslipPersistSave) window.PayslipPersistSave(); /* 新規=今のローカルを初回アップ */ });
+      showLogout();
+    });
+  }
+  // 利用停止アカウントの画面(ログイン画面と同じオーバーレイを流用してアプリを覆う)。
+  function showLock(){
+    var m=(window.Access&&Access.lockMessage)?Access.lockMessage():{ title:'このアカウントは現在ご利用いただけません', body:'' };
+    ov.innerHTML='<div class="auth-card"><div class="auth-logo">給与明細<small>ZEROACT</small></div>'
+      +'<p class="lead" style="color:#92500A;font-weight:700;margin:8px 0 14px">'+m.title+'</p>'
+      +(m.body?'<p class="lead" style="margin-top:-8px">'+m.body+'</p>':'')
+      +'<button class="b2" id="auth-lock-out">別のアカウントでログイン</button></div>';
+    show();
+    var lo=document.getElementById('auth-lock-out'); if(lo) lo.onclick=function(){ A.signOut().then(function(){ location.reload(); }); };
   }
   function showLogout(){ var sm=$('store-mode'); if(sm){ sm.innerHTML='ログイン中: '+ (curEmail||'') +'<span class="auth-out" id="auth-logout">ログアウト</span>'; var lo=$('auth-logout'); if(lo) lo.onclick=function(){ A.signOut().then(function(){ location.reload(); }); }; } }
 

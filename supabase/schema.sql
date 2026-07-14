@@ -230,3 +230,34 @@ alter table statutory enable row level security;
 drop policy if exists statutory_read on statutory;
 create policy statutory_read on statutory for select using (true); -- 全員読取可(法定データは公開情報)
 grant select on statutory to anon, authenticated;                  -- 書込みGRANTは無し=service_role/postgresのみ更新
+
+-- ================================================================
+-- アカウントのプラン状態(pay_accounts) — ★2026-07-14 使える/停止を司さんが制御する層★
+--   1アカウント1行。plan を司さんが切替 → アプリ(lib/access.js)が起動時に見て利用可否ゲート。
+--   plan: 'trial'(既定=使える) | 'paid'(有料) | 'free'(無料開放) | 'disabled'(停止)
+--   ★現段階(知人のお試し)は「使える or 停止」のシンプルなON/OFFのみ。
+--     無料期間(expires_at)や有料/無料の細分は、リリース後にプランを決める時に実装する(列は予約・アプリ未使用)。★
+--   ★本人は自分の行を"読むだけ"。plan変更は service_role(ダッシュボード直編集)のみ=自己アップグレード不可★
+--   新規登録: アプリが初回ログインで trial 行を自動作成(insertポリシーで plan='trial' 固定)。
+--   司さんの操作: Table editor で pay_accounts の該当行の plan を 'disabled' にすれば停止(将来 paid/free も)。
+-- ================================================================
+create table if not exists pay_accounts (
+  account_id  uuid primary key references auth.users(id) on delete cascade,
+  plan        text not null default 'trial',   -- trial | paid | free | disabled
+  expires_at  timestamptz,                      -- ★予約(将来の無料期間用)・現アプリは未参照★
+  note        text,                             -- 司さん用メモ(誰か・何円で 等)
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+alter table pay_accounts enable row level security;
+-- 本人は自分の状態を読める(利用可否の判定に必要)
+drop policy if exists pay_accounts_read_own on pay_accounts;
+create policy pay_accounts_read_own on pay_accounts for select using (account_id = auth.uid());
+-- 本人が自分の trial 行を"作る"のは許可(初回自動作成)。plan='trial' 固定=有料/無料開放を自称できない
+drop policy if exists pay_accounts_insert_own_trial on pay_accounts;
+create policy pay_accounts_insert_own_trial on pay_accounts for insert
+  with check (account_id = auth.uid() and plan = 'trial' and expires_at is null);
+-- update/delete ポリシーは作らない = 本人は plan を変更できない(service_role/ダッシュボードのみ)
+grant select, insert on pay_accounts to authenticated;
+-- 司さんが停止/課金化: update pay_accounts set plan='disabled' where account_id='...';  (ダッシュボードのTable editorで直編集でも可)

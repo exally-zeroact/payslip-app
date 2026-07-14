@@ -84,6 +84,23 @@
         });
       });
     };
+    // ── アカウントのプラン状態(pay_accounts): 司さんが 無料/有料/停止 を制御する層 ──
+    // 本人は自分の行を"読むだけ"(RLS)。plan変更は司さん(ダッシュボード/service role)のみ。
+    Store.getAccount = function(){
+      return curUid().then(function(uid){ if(!uid) return null;
+        return sb.from('pay_accounts').select('plan,expires_at').eq('account_id',uid).maybeSingle()
+          .then(function(r){ return r.data || null; });
+      });
+    };
+    // 初回ログインで行が無ければ trial 行を自動作成(insertポリシーで plan='trial' 固定を強制)。
+    Store.ensureAccount = function(){
+      return curUid().then(function(uid){ if(!uid) return null;
+        return sb.from('pay_accounts').select('account_id').eq('account_id',uid).maybeSingle().then(function(r){
+          if(r.data) return { plan:'trial', existed:true };
+          return sb.from('pay_accounts').insert({ account_id:uid, plan:'trial' }).then(function(){ return { plan:'trial', existed:false }; });
+        });
+      });
+    };
   }
   // ── 月次/賞与明細(pay_payslips): 定時決定の4-6月・年末調整の年集計の素 ──
   // 同じ月×同じ従業員は上書き。月次 id='ps_'+ym+'_'+eid / 賞与 id='psb_'+ym+'_'+eid(同月に給与と賞与が併存しても衝突しない)。
