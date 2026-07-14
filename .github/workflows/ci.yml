@@ -24,5 +24,7 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Integration tests (tests/integration.mjs・app.js層をjsdomで)
         run: node tests/integration.mjs
+      - name: Full-feature real-data verification (①全機能を実データで検証・給与全パターン)
+        run: node tests/payroll-patterns.mjs
       - name: Statutory drift guard (lib == 中央statutory)
         run: node scripts/verify-statutory.mjs
