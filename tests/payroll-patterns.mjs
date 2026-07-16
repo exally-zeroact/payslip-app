@@ -264,5 +264,22 @@ T('年調集計: 通勤15万超の超過分が年間給与収入に入る(月次
   near(agg.shunyu, 257700, 1, '課税給与収入=基本給250,000+通勤超過7,700'); // 旧バグ実装だと250,000で7,700欠落
 });
 
+// ── 産育休/法定控除オフ: si自体を0にし 集計/賃金台帳(shakaiRows=r.si直読み) と 明細(kojo) を一致させる ──
+T('産休・育休: si.total=0 (集計/台帳が休職者に社保を出さない・kojoと一致)', function () {
+  for (const ws of ['sankyu', 'ikukyu']) {
+    const r = A.compute(emp({ name: ws, payType: '月給', base: '300000', workStatus: ws, leaveStartYmd: '2026-06-01', leaveEndYmd: '2026-08-31', leaveDaysInMonth: '30' }));
+    const si = r.si || {};
+    ok((si.health + si.pension + (si.kaigo || 0)) === 0, ws + ' の si 社保が0でない(健' + si.health + '/厚' + si.pension + '/介' + si.kaigo + ')');
+    const kojoSocial = (r.kojo || []).filter(k => /健康保険|介護保険|厚生年金/.test(k.label)).reduce((a, k) => a + k.value, 0);
+    ok(kojoSocial === 0, ws + ' の kojo に社保が残る');
+  }
+});
+T('法定控除オフ(役員=雇用なし/非加入=健保厚年なし): siも0で集計と一致', function () {
+  const r = A.compute(emp({ name: '役員', payType: '月給', base: '500000', apply: { health: false, pension: false, kaigo: false, employ: false } }));
+  const si = r.si || {};
+  ok(si.health === 0 && si.pension === 0 && (si.kaigo || 0) === 0 && si.employ === 0, 'オフにした社保のsiが0でない: ' + JSON.stringify(si));
+  ok((si.total || 0) === 0, 'si.total=0でない(' + si.total + ')');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
