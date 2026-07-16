@@ -190,6 +190,29 @@ T('社保 翌月徴収(shahoTiming=next): 入社月は当月0', function () {
   ok(kojo(r, '健康保険') === 0 && kojo(r, '厚生年金') === 0, '翌月徴収の入社月は社保0');
 });
 
+// ── ⑨d 割増 詳細モード/月60時間超(1.5倍) ──
+T('割増: 詳細モードで60時間超(1.5)が効く・RATEが法定', function () {
+  ok(win.Warimashi.RATE.ot === 1.25 && win.Warimashi.RATE.over60 === 1.5 && win.Warimashi.RATE.over60Night === 1.75, 'RATE法定(ot1.25/60超1.5/60超深夜1.75)');
+  const e = emp({ payType: '月給', base: '300000', warimashi: { mode: 'detail', detail: { ot: { h: '40', m: '0' }, over60: { h: '20', m: '0' } } } });
+  const w = (A.compute(e).shikyu || []).find(x => /割増/.test(x.label));
+  ok(w && w.value > 0, '詳細+60h超で割増賃金が出る');
+});
+
+// ── ⑨e 全銀ファイル(総合振込): 120桁固定レコード・件数・合計 ──
+T('全銀ファイル: 120桁固定×5レコード・件数/合計が正しい(money-critical)', function () {
+  const Z = win.Zengin; ok(Z && Z.build, 'Zengin露出');
+  const committer = { code: '0123456789', name: 'ｶ)ｾﾞﾛｱｸﾄ', torikumiMMDD: '0625', bankNo: '0001', bankName: 'ﾐｽﾞﾎ', branchNo: '001', branchName: 'ﾎﾝﾃﾝ', yokin: '1', account: '1234567' };
+  const tr = [
+    { bankNo: '0005', bankName: 'UFJ', branchNo: '002', branchName: 'ｼﾌﾞﾔ', yokin: '1', account: '7654321', name: 'ﾔﾏﾀﾞ ﾀﾛｳ', amount: 252310 },
+    { bankNo: '0009', bankName: 'SMBC', branchNo: '003', branchName: 'ｼﾝｼﾞｭｸ', yokin: '2', account: '1112223', name: 'ｻﾄｳ ﾊﾅｺ', amount: 198000 },
+  ];
+  const r = Z.build(committer, tr);
+  near(r.count, 2, 0, '件数'); near(r.total, 450310, 0, '合計');
+  const lines = String(r.text || '').split(/\r?\n/).filter(Boolean);
+  near(lines.length, 5, 0, 'レコード数(ヘッダ+データ2+トレーラ+エンド)');
+  ok(lines.every(l => l.length === 120), '全レコード120桁固定');
+});
+
 // ── ⑩ 網羅: 全形態×扶養0-3×県5×年齢4=480 → NaN/差引不一致/手取りマイナス ゼロ ──
 T('網羅480ケース: NaN・差引不一致・手取りマイナス ゼロ', function () {
   const PT = [['月給', 'base', '280000'], ['時給', 'hourly', '1500'], ['日給', 'base', '13000'], ['歩合', 'commissionAmt', '300000'], ['役員', 'base', '600000'], ['カスタム', '_pr', '']];
