@@ -26,5 +26,7 @@ jobs:
         run: node tests/integration.mjs
       - name: Full-feature real-data verification (①全機能を実データで検証・給与全パターン)
         run: node tests/payroll-patterns.mjs
+      - name: UI smoke (②全ボタンをクリックしてJS例外0・jsdom)
+        run: node tests/ui-smoke.mjs
       - name: Statutory drift guard (lib == 中央statutory)
         run: node scripts/verify-statutory.mjs

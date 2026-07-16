@@ -1,0 +1,87 @@
+// ui-smoke.mjs — ★②UI 全ボタン検証(永久テスト)★
+//  本物の index.html + js/app.js を jsdom に読み込み、全タブ/全セグメント/全ボタン(＋/×/▲▼/詳細/確定 等)を
+//  実際にクリックして「JS例外0・各画面が中身を描画」を保証する。手作業UI検証(2026-07-16)を回帰自動化。
+//  ★破壊/DL/印刷/公開系(印刷・Excel・全銀・Web公開・従業員全削除)はデナイリストで除外(ダイアログ/DL/データ作成回避)。
+//  この"全ボタンをクリックして例外0"の形は全アプリ共通の②ハーネス=各アプリはセレクタを差し替えて再利用する。
+//  依存: jsdom。使い方: node tests/ui-smoke.mjs (jsdom未導入なら SKIP=exit0)。CIに組込。
+import fs from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.join(__dirname, '..');
+let JSDOM; try { ({ JSDOM } = await import('jsdom')); }
+catch { console.log('SKIP: jsdom未導入=UIスモークをスキップ(npm i jsdom)。'); process.exit(0); }
+
+let pass = 0, fail = 0;
+function T(name, fn) { try { fn(); pass++; console.log('  ✓ ' + name); } catch (e) { fail++; console.log('  ✗ ' + name + ' — ' + (e && e.message)); } }
+function ok(c, m) { if (!c) throw new Error(m || 'expected truthy'); }
+
+let html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+const srcs = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]).filter(s => !/^https?:/.test(s) && !/supabase|supa-config|auth/.test(s));
+const dom = new JSDOM(html.replace(/<script[\s\S]*?<\/script>/g, ''), { runScripts: 'dangerously', url: 'http://localhost/', pretendToBeVisual: true });
+const win = dom.window, doc = win.document;
+win.fetch = () => Promise.reject(new Error('no net'));
+const errs = [];
+win.addEventListener('error', e => errs.push('window.error: ' + (e.message || e)));
+win.print = () => {}; // 印刷ダイアログ無効化(万一押されても安全)
+for (const src of srcs) { const el = doc.createElement('script'); el.textContent = fs.readFileSync(path.join(ROOT, src), 'utf8'); doc.body.appendChild(el); }
+const A = win.__PAYSLIP_TEST; ok(A, '__PAYSLIP_TEST 露出(init成功)');
+
+// サンプルデータ(2名)を入れて画面に中身を持たせる
+A.state.company.name = '株式会社テスト';
+A.state.employees = [A.defEmp('山田 太郎'), A.defEmp('佐藤 花子')];
+A.state.employees[0].base = '300000'; A.state.employees[1].payType = '時給'; A.state.employees[1].hourly = '1500';
+A.state.month = '2026-06';
+
+// クリックしてはいけない(破壊/DL/印刷/公開)ボタンの判定
+const DENY = /b-print|b-xlsx|データ|全銀|Excel|印刷|公開|webpub|dl-|csvimport|従業員を削除|この従業員/i;
+function denied(el) {
+  if (el.id && DENY.test(el.id)) return true;
+  var t = (el.textContent || '').slice(0, 30), dl = el.getAttribute('data-link') || '', dw = el.getAttribute('data-webpub') || '';
+  if (DENY.test(t) || dl || dw) return true;
+  if (el.hasAttribute('data-del-emp') || el.className && /m-del-emp|del-emp/.test(el.className)) return true;
+  return false;
+}
+
+console.log('\n[ui-smoke] 全ボタンUI検証(jsdom)');
+
+// ── 各画面を開いて、その画面の全ボタンをクリック(例外0) ──
+const SCREENS = ['scr-settings', 'scr-input', 'scr-list', 'scr-print'];
+let clicked = 0, skipped = 0;
+T('全タブ→全ボタンをクリックしても例外0・各画面が描画', function () {
+  const q = s => doc.querySelector(s), qa = s => [...doc.querySelectorAll(s)];
+  for (const scr of SCREENS) {
+    const tab = q('.bn[data-scr="' + scr + '"]'); ok(tab, 'タブ ' + scr);
+    tab.click();
+    const el = doc.getElementById(scr);
+    ok(el && el.classList.contains('active'), scr + ' がactive');
+    ok(el.innerHTML.length > 500, scr + ' が中身を描画(' + el.innerHTML.length + ')');
+    // 設定画面は3セグメントも回す
+    if (scr === 'scr-settings') for (const s of ['company', 'emp', 'design']) { const b = q('#set-seg .seg-b[data-set="' + s + '"]'); if (b) b.click(); }
+    if (scr === 'scr-list') for (const v of ['list', 'sum', 'cho', 'nen']) { const b = q('.seg-b[data-view="' + v + '"]'); if (b) b.click(); }
+    // この画面の全ボタンを順にクリック(デナイリスト除外)
+    const before = errs.length;
+    qa('#' + scr + ' button').forEach(function (btn) {
+      if (denied(btn)) { skipped++; return; }
+      try { btn.click(); clicked++; } catch (e) { errs.push('click例外[' + scr + ' "' + (btn.textContent || '').slice(0, 12) + '"]: ' + e.message); }
+    });
+    ok(errs.length === before, scr + ' のボタンで例外: ' + errs.slice(before).join(' | '));
+  }
+});
+
+T('入力→氏名/基本給を入力すると手取りが再計算される(配線)', function () {
+  const q = s => doc.querySelector(s);
+  q('.bn[data-scr="scr-input"]').click();
+  const dt = q('#input-list [data-toggle]'); if (dt) dt.click();
+  const otH = q('#input-list input[data-wk="otH"]');
+  const netEl = () => (q('#input-list .acc-net') || {}).textContent;
+  const before = netEl();
+  if (otH) { otH.value = '45'; otH.dispatchEvent(new win.Event('input', { bubbles: true })); }
+  ok(netEl() !== before, '割増入力で手取りが再計算された(' + before + '→' + netEl() + ')');
+});
+
+T('UI操作を通してJS例外・window.error が0', function () {
+  ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
+});
+
+console.log('  (クリックしたボタン ' + clicked + ' / 除外(破壊DL印刷公開) ' + skipped + ')');
+console.log('\n' + pass + ' passed, ' + fail + ' failed');
+process.exit(fail ? 1 : 0);
