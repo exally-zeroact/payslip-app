@@ -61,16 +61,28 @@
   // RLSで本人(account_id=auth.uid)のみ。未ログイン時はnull/no-op(app.js側はlocalStorageで動作)
   if(hasSupa){
     function curUid(){ return sb.auth.getUser().then(function(r){ return r.data && r.data.user && r.data.user.id; }); }
+    // ★このセッションでクラウドと同期できたか(読めた or 書けた)。差分削除はこれがtrueの時だけ許可
+    //  =クラウド読込に失敗した古い/空の端末が、本番の従業員を物理削除するのを防ぐ(データ消失対策)。
+    var cloudSynced = false;
     Store.cloudSaveState = function(state){
-      return curUid().then(function(uid){ if(!uid) return null; var now=new Date().toISOString();
-        var settings={ company:state.company, month:state.month, theme:state.theme, prefer:state.prefer, depts:state.depts, roles:state.roles, showRetired:state.showRetired };
+      return curUid().then(function(uid){ if(!uid) return { ok:false, reason:'no-user' }; var now=new Date().toISOString();
+        // ★employees以外の全スナップショット項目を保存(確定印/年末調整/賞与/カスタム給テンプレ/onboard等も載せる=端末替えで消えない)
+        var settings={}; for(var k in state){ if(Object.prototype.hasOwnProperty.call(state,k) && k!=='employees') settings[k]=state[k]; }
         var emps=(state.employees||[]).map(function(e,i){ return { id:e.id, account_id:uid, sort:i, data:e, updated_at:now }; });
         var ids=emps.map(function(e){ return e.id; });
-        return Promise.all([
+        var ops=[
           sb.from('pay_companies').upsert({ account_id:uid, data:settings, updated_at:now }),
-          emps.length? sb.from('pay_employees').upsert(emps) : Promise.resolve(),
-          sb.from('pay_employees').select('id').eq('account_id',uid).then(function(r){ var ex=(r.data||[]).map(function(x){return x.id;}); var rm=ex.filter(function(id){ return ids.indexOf(id)<0; }); return rm.length? sb.from('pay_employees').delete().in('id',rm) : null; })
-        ]);
+          emps.length? sb.from('pay_employees').upsert(emps) : Promise.resolve({ error:null })
+        ];
+        // ★差分削除は「同期済み(cloudSynced)かつ手元に従業員が居る」時だけ=空/古い端末が本番を消さない
+        if(cloudSynced && emps.length>0){
+          ops.push(sb.from('pay_employees').select('id').eq('account_id',uid).then(function(r){ var ex=(r.data||[]).map(function(x){return x.id;}); var rm=ex.filter(function(id){ return ids.indexOf(id)<0; }); return rm.length? sb.from('pay_employees').delete().in('id',rm) : { error:null }; }));
+        }
+        return Promise.all(ops).then(function(res){
+          var bad=res.filter(function(x){ return x && x.error; })[0];
+          if(!bad) cloudSynced=true; // 書き込み成功=手元の集合が本番の正=以後の差分削除OK
+          return { ok:!bad, reason: bad?((bad.error&&bad.error.message)||'error'):null };
+        }).catch(function(e){ return { ok:false, reason:(e&&e.message)||'exception' }; });
       });
     };
     Store.cloudLoadState = function(){
@@ -80,6 +92,7 @@
           sb.from('pay_employees').select('data,sort').eq('account_id',uid).order('sort',{ascending:true})
         ]).then(function(res){
           var co=res[0].data && res[0].data.data; var emps=(res[1].data||[]).map(function(r){ return r.data; });
+          cloudSynced=true; // クラウドと通信できた=同期済み(空でも=新規アカウントとして差分削除を許可)
           if(!co && !emps.length) return null; var s=co||{}; s.employees=emps; return s;
         });
       });

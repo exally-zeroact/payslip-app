@@ -2149,8 +2149,22 @@
   function stripTransient(e){ var o={}; for(var k in e){ if(Object.prototype.hasOwnProperty.call(e,k)&&k.charAt(0)!=='_') o[k]=e[k]; } return o; }
   function snapshot(){ return { v:1, company:state.company, employees:(state.employees||[]).map(stripTransient), month:state.month, theme:state.theme, prefer:state.prefer, depts:state.depts, roles:state.roles, showRetired:state.showRetired, bonus:state.bonus, confirmed:state.confirmed, nencho:state.nencho, onboardDone:state.onboardDone, onboardOutput:state.onboardOutput, payPatterns:state.payPatterns }; }
   var _saveT=null;
-  function persistSave(){ try{ localStorage.setItem(PKEY, JSON.stringify(snapshot())); }catch(e){} if(window.Store&&Store.cloudSaveState){ try{ Store.cloudSaveState(snapshot()); }catch(e){} } try{ saveMonthlyPayslips(); }catch(e){}
-    try{ var d=new Date(); state._savedAt=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); var ss=document.getElementById('save-status'); if(ss) ss.textContent='自動保存済 '+state._savedAt; }catch(e){} }
+  function persistSave(){
+    var snap=snapshot(), lsOk=true;
+    try{ localStorage.setItem(PKEY, JSON.stringify(snap)); }catch(e){ lsOk=false; }
+    var d=new Date(), hhmm=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+    var setS=function(t){ var e=document.getElementById('save-status'); if(e) e.textContent=t; };
+    if(!lsOk) setS('⚠ 保存できません（このブラウザの空き容量）'); // 容量超過を握り潰さず表示
+    if(window.Store&&Store.cloudSaveState){
+      // ★クラウド保存の成否を待ってから表示(失敗を「保存済」と嘘表示しない)
+      Promise.resolve().then(function(){ return Store.cloudSaveState(snap); }).then(function(r){
+        // no-user=未ログイン=クラウド対象外(ローカル保存が正)→警告しない。ログイン中の実失敗のみ警告。
+        if(r&&r.ok===false&&r.reason!=='no-user'){ setS('⚠ クラウド未保存（'+(r.reason||'通信エラー')+'）'); }
+        else if(lsOk){ state._savedAt=hhmm; setS('自動保存済 '+hhmm); }
+      }).catch(function(){ if(lsOk) setS('⚠ ローカルのみ保存（クラウド通信エラー）'); });
+    } else if(lsOk){ state._savedAt=hhmm; setS('自動保存済 '+hhmm); }
+    try{ saveMonthlyPayslips(); }catch(e){}
+  }
   function persistSaveDebounced(){ if(_saveT)clearTimeout(_saveT); _saveT=setTimeout(persistSave, 500); }
   // 旧テンプレ名→新テンプレ名(実体準拠)への移行。保存済みstate.preferを吸収
   var PREFER_MIGRATE={cols:'col2_1',cols2:'col2_2',cols3:'col2_3',vstack:'col1_1',vstack2:'col1_2',strips:'col1_3'};

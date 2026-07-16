@@ -8,7 +8,8 @@
     "test:integration": "node tests/integration.mjs",
     "test:patterns": "node tests/payroll-patterns.mjs",
     "test:ui": "node tests/ui-smoke.mjs",
-    "test:all": "node tests/run.js && node tests/integration.mjs && node tests/payroll-patterns.mjs && node tests/ui-smoke.mjs"
+    "test:cloud": "node tests/cloud-sync.mjs",
+    "test:all": "node tests/run.js && node tests/integration.mjs && node tests/payroll-patterns.mjs && node tests/ui-smoke.mjs && node tests/cloud-sync.mjs"
   },
   "devDependencies": {
     "jsdom": "^29.1.1"
