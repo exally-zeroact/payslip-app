@@ -121,13 +121,16 @@ T('B3/B4: 表でmax(売上,歩合)は両欄・役員は割増欄なし', functio
 // ── はじめかたガイド(ライブToDo): 各ステップの達成判定 ──
 T('オンボーディング: 達成判定(会社名✓/サンプルemp未/確定で入力✓/出力flag✓)', function () {
   const st = A.state;
-  st.company = Object.assign(st.company, { name: '株式会社 ゼロアクト' });
+  st.company = Object.assign(st.company, { name: '株式会社 ゼロアクト' }); // 既定サンプル名
   st.employees = [A.defEmp('山田 太郎')]; st.month = '2026-06'; st.confirmed = {}; st.onboardOutput = false;
   let s = A.onboardSteps();
-  eq(s[0].done, true, '会社名あり→①完了');
+  eq(s[0].done, false, '既定サンプル会社名→①未完(従業員と対称)');
   eq(s[1].done, false, 'サンプルのみ→②未完');
   eq(s[2].done, false, '未確定→③未完');
   eq(s[3].done, false, '未出力→④未完');
+  // 自社名に変更→①完了
+  st.company.name = '有限会社サンプル商店';
+  eq(A.onboardSteps()[0].done, true, '実名に変更→①完了');
   // 本物の従業員を追加→②完了
   st.employees.push(A.defEmp('佐藤 花子'));
   eq(A.onboardSteps()[1].done, true, '本物emp追加→②完了');
