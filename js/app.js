@@ -441,8 +441,20 @@
         // 数字/記号/単位だけ=名前として無意味 → 付けない(placeholderのままの方がマシ)
         if(name && !/^[\s0-9%.,＋+\-〜()円]*$/.test(name)) el.setAttribute('aria-label', name);
       }
+      // div/b/span のトグル(開閉・モード・チップ・ヘルプ)をキーボード操作可能に(:focus-visible CSSが活きる)。
+      //  クリックは委譲ハンドラなので tabindex+role だけ付ければ下のkeydownで click() 発火できる。
+      var tg=root.querySelectorAll(A11Y_TOGGLE_SEL);
+      for(var j=0;j<tg.length;j++){ var t=tg[j];
+        if(t.tagName==='BUTTON'||t.tagName==='A'||t.tagName==='INPUT') continue;
+        if(t.classList.contains('chip-dim')) continue; // 無効チップは操作対象外
+        if(!t.hasAttribute('tabindex')) t.setAttribute('tabindex','0');
+        // role=button は「フォーカス可能な子孫を含まない」トグルだけに付与(ARIAネスト違反回避)。
+        //  複合見出し(.mco-hd 等・内部に▲▼ボタンを持つ)は tabindex のみでキーボード操作は残す。
+        if(!t.getAttribute('role') && !t.querySelector('button,a,input,select,textarea,[tabindex]')) t.setAttribute('role','button');
+      }
     }catch(_e){}
   }
+  var A11Y_TOGGLE_SEL='.mco-hd,.emp-dtgl,.emp-sub-h,.sh-mode,.imode,.pmode,.dls,.chip,.help-i,.ef-b,.sh-seg b';
 
   /* ---------- 設定: 会社情報 ---------- */
   function fillCompany(){ $('#c-name').value=state.company.name||''; $('#c-addr').value=state.company.addr||''; $('#c-close').value=state.company.close||''; $('#c-payrel').value=state.company.paydayRel||'next'; $('#c-payday-day').value=state.company.paydayDay||''; var pc=$('#c-paycycle'); if(pc)pc.value=state.company.payCycle||'monthly'; updatePaydayPreview(); payCycleNote(); renderRuleChips(); renderCompanyRules(); renderDesign(); }
@@ -2339,6 +2351,13 @@
   // A11y: 描画のたび見た目ラベルを入力のaria-labelへ伝播(全画面/再描画/将来の入力を自動カバー)
   try{ var _a11yObs=new MutationObserver(function(){ if(_a11yObs._t) return; _a11yObs._t=setTimeout(function(){ _a11yObs._t=null; labelInputsA11y(document); },0); }); _a11yObs.observe(document.body,{childList:true,subtree:true}); }catch(e){}
   labelInputsA11y(document);
+  // A11y: フォーカスした div/b/span トグルを Enter/Space で発火(委譲clickを叩く)。ネイティブ操作要素は素通り。
+  document.addEventListener('keydown', function(e){
+    if(e.key!=='Enter' && e.key!==' ' && e.key!=='Spacebar') return;
+    var t=e.target; if(!t||!t.matches) return;
+    if(t.tagName==='INPUT'||t.tagName==='SELECT'||t.tagName==='TEXTAREA'||t.tagName==='BUTTON'||t.tagName==='A') return;
+    if(t.matches(A11Y_TOGGLE_SEL)){ e.preventDefault(); t.click(); }
+  });
   // 変更を自動保存(入力/選択/クリック後・離脱時)
   ['input','change','click'].forEach(function(ev){ document.addEventListener(ev, persistSaveDebounced, true); });
   window.addEventListener('beforeunload', persistSave);

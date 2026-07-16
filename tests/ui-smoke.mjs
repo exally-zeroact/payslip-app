@@ -170,6 +170,20 @@ T('個別「確認済」で当月スナップショットが保存される(確�
   ok(A.state.confirmed['2026-06'] && A.state.confirmed['2026-06'][emp.id], '確定フラグも立つ');
 });
 
+T('キーボードa11y: div/bトグルがfocus可能(tabindex/role)＋Enterで発火', function () {
+  const q = s => doc.querySelector(s);
+  q('.bn[data-scr="scr-input"]').click();
+  A.labelInputsA11y(doc); // フォーカス可能属性を付与(通常はMutationObserverが実行)
+  const imode = q('.imode:not(.on)'); ok(imode, '非選択の月次/賞与トグル');
+  ok(imode.getAttribute('tabindex') === '0', 'トグルがtabindex=0');
+  ok(imode.getAttribute('role') === 'button', 'トグルがrole=button');
+  const before = A.state.inputMode;
+  imode.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  ok(A.state.inputMode !== before, 'Enterでモードが切り替わる(' + before + '→' + A.state.inputMode + ')');
+  // 元に戻す
+  const back = q('.imode[data-imode="monthly"]'); if (back) back.click();
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });
