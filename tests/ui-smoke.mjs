@@ -78,6 +78,22 @@ T('入力→氏名/基本給を入力すると手取りが再計算される(配
   ok(netEl() !== before, '割増入力で手取りが再計算された(' + before + '→' + netEl() + ')');
 });
 
+T('退職金の計算モーダル: 帳票→退職金を計算→入力→結果表示・例外0', function () {
+  const q = s => doc.querySelector(s);
+  q('.bn[data-scr="scr-list"]').click();
+  const cho = q('.seg-b[data-view="cho"]'); if (cho) cho.click();
+  const btn = q('[data-taishoku-calc]'); ok(btn, '帳票に退職金ボタン');
+  const before = errs.length;
+  btn.click();
+  ok(q('#ts-gross'), '退職金モーダルが開く');
+  const set = (sel, v) => { const e = q(sel); if (e) { e.value = v; e.dispatchEvent(new win.Event('input', { bubbles: true })); } };
+  set('#ts-gross', '20000000'); set('#ts-join', '1996-04-01'); set('#ts-ret', '2026-06-30');
+  ok(errs.length === before, '退職金計算で例外: ' + errs.slice(before).join(' | '));
+  const res = q('#ts-result'); ok(res && /手取り/.test(res.textContent) && /15,700,000/.test(res.textContent), '控除・手取りが計算表示される');
+  // モーダルを閉じる
+  const cl = [...doc.querySelectorAll('.ui-modal-btn')].find(b => /閉じる/.test(b.textContent)); if (cl) cl.click();
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

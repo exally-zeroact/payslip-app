@@ -946,6 +946,7 @@
       var card=document.createElement('div'); card.className='ui-modal-card'; card.setAttribute('role','dialog');
       if(opts.title){ var t=document.createElement('div'); t.className='ui-modal-t'; t.textContent=opts.title; card.appendChild(t); }
       if(opts.msg){ var b=document.createElement('div'); b.className='ui-modal-b'; b.textContent=opts.msg; card.appendChild(b); }
+      if(opts.html){ var hb=document.createElement('div'); hb.className='ui-modal-b'; hb.innerHTML=opts.html; card.appendChild(hb); if(opts.onRender) try{ opts.onRender(hb, function(v){ close(v); }); }catch(_){} }
       var inp=null;
       if(opts.input){ inp=document.createElement('input'); inp.type='text'; inp.className='ui-modal-in finput'; inp.value=opts.input.def||''; if(opts.input.placeholder)inp.placeholder=opts.input.placeholder; card.appendChild(inp); }
       var bw=document.createElement('div'); bw.className='ui-modal-btns';
@@ -961,6 +962,54 @@
   }
   function uiAlert(msg,title){ return uiModal({title:title||'お知らせ', msg:msg, buttons:[{label:'OK',val:true,primary:true}]}); }
   function uiConfirm(msg,title){ return uiModal({title:title||'確認', msg:msg, buttons:[{label:'キャンセル',val:false},{label:'OK',val:true,primary:true}]}); }
+  // 勤続年数(入社日〜退職日・1年未満切上)。片方欠けたら0。
+  function kinzokuYears(joinYmd, retireYmd){
+    var pa=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(joinYmd||'')), pb=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(retireYmd||''));
+    if(!pa||!pb) return 0;
+    var da=new Date(+pa[1],+pa[2]-1,+pa[3]), db=new Date(+pb[1],+pb[2]-1,+pb[3]); if(db<da) return 0;
+    var y=db.getFullYear()-da.getFullYear(); var anniv=new Date(da.getFullYear()+y,da.getMonth(),da.getDate());
+    if(anniv>db) y--; // まだ応当日前=満年数-1
+    var full=new Date(da.getFullYear()+y,da.getMonth(),da.getDate());
+    return (full.getTime()===db.getTime())? y : y+1; // 1日でも端数あれば切上
+  }
+  // 退職金(退職所得)の源泉徴収 計算モーダル。★月次給与とは別系統(分離課税)★
+  function openTaishokuCalc(emp){
+    var TS=(typeof TaishokuShotoku!=='undefined')?TaishokuShotoku:(window&&window.TaishokuShotoku);
+    if(!TS){ uiAlert('退職所得モジュールが読み込まれていません'); return; }
+    var nm=(emp&&emp.name)||'', jymd=(emp&&emp.joinYmd)||'', tymd=(emp&&emp.taishokuYmd)||'';
+    var html=''
+      +'<div class="ri-note" style="margin:0 0 10px">退職金は毎月の給与とは<b>別の税金（退職所得・分離課税）</b>です。ここで源泉徴収額を計算します。金額は毎月の入力欄に入れないでください。</div>'
+      +'<div class="frow"><div class="flabel">氏名<span class="hint2">任意</span></div><input class="finput" id="ts-nm" value="'+attr(nm)+'"></div>'
+      +'<div class="frow"><div class="flabel">退職金の額<span class="hint2">円</span></div><input class="finput num" id="ts-gross" inputmode="numeric" placeholder="例 20000000" value=""></div>'
+      +'<div class="frow2"><div class="frow"><div class="flabel">入社日</div><input class="finput" id="ts-join" type="date" value="'+attr(jymd)+'"></div>'
+      +'<div class="frow"><div class="flabel">退職日</div><input class="finput" id="ts-ret" type="date" value="'+attr(tymd)+'"></div></div>'
+      +'<label class="cr-chk" style="display:flex;align-items:center;gap:6px;font-size:12px;margin:4px 0"><input type="checkbox" id="ts-report" checked>「退職所得の受給に関する申告書」を提出済み（未提出は一律20.42%）</label>'
+      +'<label class="cr-chk" style="display:flex;align-items:center;gap:6px;font-size:12px;margin:4px 0"><input type="checkbox" id="ts-officer">役員等で勤続5年以下（1/2課税なし）</label>'
+      +'<label class="cr-chk" style="display:flex;align-items:center;gap:6px;font-size:12px;margin:4px 0"><input type="checkbox" id="ts-short">勤続5年以下の一般従業員（短期退職手当等・300万超は1/2なし）</label>'
+      +'<div id="ts-result" style="margin-top:10px"></div>';
+    uiModal({ title:'退職金の税金（退職所得の源泉徴収）', html:html, buttons:[{label:'閉じる',val:true,primary:true}],
+      onRender:function(host){
+        function upd(){
+          var gross=num(host.querySelector('#ts-gross').value);
+          var years=kinzokuYears(host.querySelector('#ts-join').value, host.querySelector('#ts-ret').value);
+          var opts={ noReport:!host.querySelector('#ts-report').checked, officer:host.querySelector('#ts-officer').checked, shortTerm:host.querySelector('#ts-short').checked };
+          var r=TS.compute(Object.assign({gross:gross,years:years},opts));
+          var el=host.querySelector('#ts-result');
+          if(!gross||!years){ el.innerHTML='<div class="hint" style="color:#92500A">退職金の額と入社日・退職日を入れてください。</div>'; return; }
+          el.innerHTML='<div class="calc-wrap"><div class="calc-box">'
+            +'<div class="calc-line"><span>勤続年数（1年未満切上）</span><span class="v">'+years+'年</span></div>'
+            +'<div class="calc-line"><span>退職所得控除</span><span class="v">'+yen(r.kojo)+'</span></div>'
+            +'<div class="calc-line"><span>課税退職所得金額</span><span class="v">'+yen(r.kazei)+'</span></div>'
+            +'<div class="calc-line"><span>所得税（復興特別所得税込）</span><span class="v">'+yen(r.incomeTax)+'</span></div>'
+            +'<div class="calc-line"><span>住民税（分離・10%）</span><span class="v">'+yen(r.residentTax)+'</span></div>'
+            +'<div class="calc-line net tot"><span>差引 手取り</span><span class="v">'+yen(r.net)+'</span></div>'
+            +'</div><div class="hint" style="margin-top:6px">'+(opts.noReport?'※申告書未提出＝退職金×20.42%（住民税は別途分離）。':'※'+(opts.officer||opts.short?'1/2課税の制限を適用。':'(退職金−控除)×1/2に速算表。'))+'社会保険料は退職金にかかりません。</div></div>';
+        }
+        Array.prototype.forEach.call(host.querySelectorAll('input'), function(i){ i.addEventListener('input',upd); i.addEventListener('change',upd); });
+        upd();
+      }
+    });
+  }
   function uiPrompt(label,def,placeholder){ return uiModal({title:label, input:{def:def||'',placeholder:placeholder||''}, buttons:[{label:'キャンセル',val:false},{label:'OK',val:true,primary:true}]}); }
   // 入社月/退職月の日割・社保の注記(黄・ブロックしない)
   function prorateNote(e){ var pr=e._prorate, lw=e._leaveNoWork; var msg=[];
@@ -1386,7 +1435,8 @@
     +'<button class="seg-b'+(v==='shakai'?' on':'')+'" data-cho="shakai">社保一覧</button>'
     +'<button class="seg-b'+(v==='dept'?' on':'')+'" data-cho="dept">部署別</button>'
     +'<button class="seg-b'+(v==='daicho'?' on':'')+'" data-cho="daicho">賃金台帳</button></div>'; }
-  function renderChoView(){ var host=$('#view-cho'); if(!host)return; var v=state.choView||'shakai'; var sub=choSub(v);
+  function renderChoView(){ var host=$('#view-cho'); if(!host)return; var v=state.choView||'shakai'; var sub=choSub(v)
+    +'<div class="card" style="padding:12px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-size:13px;color:#2E7D54">退職金の税金</b><span class="hint" style="flex:1;min-width:150px">退職金は毎月の給与と別（退職所得・分離課税）。ここで源泉を計算。</span><button class="btn-ghost" data-taishoku-calc="1" style="white-space:nowrap">退職金を計算</button></div>';
     if(v==='dept') host.innerHTML=sub+deptSummaryHTML();
     else if(v==='daicho'){ host.innerHTML=sub+'<div class="card"><div class="card-h">賃金台帳</div><p class="hint">読込中…</p></div>'; renderChinginDaicho(sub); }
     else host.innerHTML=sub+shakaiListHTML(); }
@@ -1820,7 +1870,7 @@
   function bind(){
     $$('.bn').forEach(function(b){ b.addEventListener('click',function(){ showScreen(b.dataset.scr); }); });
     // 💡 ヘルプ（全画面共通）
-    document.addEventListener('click',function(e){ var hi=e.target.closest('.help-i'); if(hi){ openHelp(hi.dataset.help); return; } if(e.target.closest('[data-onboard-close]')){ state.onboardDone=true; renderOnboard(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
+    document.addEventListener('click',function(e){ var hi=e.target.closest('.help-i'); if(hi){ openHelp(hi.dataset.help); return; } if(e.target.closest('[data-taishoku-calc]')){ openTaishokuCalc(null); return; } if(e.target.closest('[data-onboard-close]')){ state.onboardDone=true; renderOnboard(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
       var gob=e.target.closest('[data-onboard-goto]'); if(gob){ var g=gob.dataset.onboardGoto; // はじめかたガイド: 未完ステップ→その画面へジャンプ
         if(g==='company'||g==='emp'){ showScreen('scr-settings'); var b=$('#set-seg .seg-b[data-set="'+g+'"]'); if(b)b.click(); }
         else if(g==='input'){ showScreen('scr-input'); } else if(g==='print'){ showScreen('scr-print'); }
