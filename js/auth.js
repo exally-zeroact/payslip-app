@@ -10,7 +10,7 @@
   var st=document.createElement('style');
   st.textContent='#auth-overlay{position:fixed;inset:0;z-index:1000;background:linear-gradient(160deg,#EAF6EF,#F0FAF4);display:none;align-items:center;justify-content:center;padding:20px;font-family:"Noto Sans JP",sans-serif;}'
     +'.auth-card{width:100%;max-width:360px;background:#fff;border:1px solid #d4eae0;border-radius:18px;box-shadow:0 10px 36px rgba(30,60,40,.12);padding:26px 22px;}'
-    +'.auth-logo{font-size:22px;font-weight:800;color:#1a4a2e;text-align:center;margin-bottom:4px;}.auth-logo small{display:block;font-size:10px;letter-spacing:.18em;color:#7aa08c;font-weight:500;margin-top:2px;}'
+    +'.auth-logo{font-family:\'DM Mono\',monospace;font-size:30px;font-weight:500;letter-spacing:-0.5px;color:#52B788;text-align:center;margin-bottom:10px;}'
     +'.auth-card p.lead{font-size:12px;color:#7aa08c;text-align:center;margin:8px 0 16px;}'
     +'.auth-card input{width:100%;padding:12px 12px;margin-bottom:10px;border:1.5px solid #d4eae0;border-radius:10px;font-size:15px;color:#1a4a2e;-webkit-appearance:none;}'
     +'.auth-card input:focus{outline:none;border-color:#52B788;}'
@@ -21,7 +21,7 @@
   document.head.appendChild(st);
 
   var ov=document.createElement('div'); ov.id='auth-overlay';
-  ov.innerHTML='<div class="auth-card"><div class="auth-logo">給与明細<small>ZEROACT</small></div>'
+  ov.innerHTML='<div class="auth-card"><div class="auth-logo">Kyually</div>'
     +'<p class="lead">ログインすると、どの端末でも同じ内容で使えます。</p>'
     +'<input id="auth-email" type="email" placeholder="メールアドレス" autocomplete="username">'
     +'<input id="auth-pw" type="password" placeholder="パスワード（6文字以上）" autocomplete="current-password">'
@@ -58,7 +58,7 @@
   // 利用停止アカウントの画面(ログイン画面と同じオーバーレイを流用してアプリを覆う)。
   function showLock(){
     var m=(window.Access&&Access.lockMessage)?Access.lockMessage():{ title:'このアカウントは現在ご利用いただけません', body:'' };
-    ov.innerHTML='<div class="auth-card"><div class="auth-logo">給与明細<small>ZEROACT</small></div>'
+    ov.innerHTML='<div class="auth-card"><div class="auth-logo">Kyually</div>'
       +'<p class="lead" style="color:#92500A;font-weight:700;margin:8px 0 14px">'+m.title+'</p>'
       +(m.body?'<p class="lead" style="margin-top:-8px">'+m.body+'</p>':'')
       +'<button class="b2" id="auth-lock-out">別のアカウントでログイン</button></div>';
