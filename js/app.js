@@ -1496,7 +1496,8 @@
     var rows=(recs||[]).filter(function(r){ return r.employee_id===eid; });
     var shunyu=0, genzen=0, shaho=0, months=0;
     rows.forEach(function(r){ var d=r.data||{};
-      var taxable=(d.shikyu&&d.shikyu.length)? d.shikyu.reduce(function(a,x){ return a+(x.hikazei?0:num(x.value)); },0) : num(d.shikyuTotal);
+      // 課税支給=月次源泉と同じ数え方(非課税は限度まで・超過分は課税)。PayslipCalc.taxableTotalで単一ソース化
+      var taxable=(d.shikyu&&d.shikyu.length)? PayslipCalc.taxableTotal(d.shikyu) : num(d.shikyuTotal);
       shunyu+=taxable; genzen+=num(d.tax);
       var si=d.si||{}; shaho += (si.health!=null||si.pension!=null)?(num(si.health)+num(si.kaigo)+num(si.pension)+num(si.employ)):num(d.siTotal);
       if(d.kind!=='bonus') months++; // 賞与は「保存済み○/12か月」の月数に数えない(金額は年収入/源泉/社保に合算=年調に含める)
@@ -2076,7 +2077,9 @@
           uiConfirm('「確認済」を外すと、この月の保存内容（賃金台帳・年末調整の集計）が現在の入力で再計算・更新される場合があります。よろしいですか？').then(function(ok){ if(!ok){ renderInput(); return; } setConfirm(emc.id,false); renderInput(); persistSaveDebounced(); });
           return;
         }
-        setConfirm(emc.id, true); renderInput(); persistSaveDebounced(); return; }
+        // ★確定前に現在値のスナップショットを保存してから凍結★(一括「今月を確定」と同じ順)。
+        //  先に確定するとsaveMonthlyPayslipsが確定済みをスキップし当月slipが未保存になる不具合を防ぐ。
+        try{ saveMonthlyPayslips(); }catch(_){} setConfirm(emc.id, true); renderInput(); persistSave(); return; }
       if(e.target.dataset.reviewonly!=null){ state._reviewOnly=e.target.checked; renderInput(); return; }
       var ivw=e.target.closest('[data-ivw]'); if(ivw){ state.inputView=ivw.dataset.ivw==='table'?'table':'card'; renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
       var cmb=e.target.closest('[data-confirm-month]');
@@ -2238,7 +2241,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

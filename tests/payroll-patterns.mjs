@@ -253,5 +253,16 @@ T('本人加算(甲): 障害者+勤労学生で扶養+2ぶん下がる', functio
   near(t3, tFuyou3, 1, '2加算=扶養+2(=計3)と等価');
 });
 
+// ── 年末調整の集計が通勤手当の「非課税限度 超過分」を課税収入に含める(月次源泉と一致・配線) ──
+T('年調集計: 通勤15万超の超過分が年間給与収入に入る(月次と非対称でない)', function () {
+  // マイカー通勤(限度7,300)で通勤15,000=超過7,700。保存済み明細1か月を模して nenAggregate に流す
+  const slip = { employee_id: 'E1', data: { kind: 'monthly', tax: 0, si: {}, shikyu: [
+    { label: '基本給', value: 250000 },
+    { label: '通勤手当', value: 15000, hikazei: true, nonTaxLimit: 7300 }
+  ] } };
+  const agg = A.nenAggregate([slip], 'E1');
+  near(agg.shunyu, 257700, 1, '課税給与収入=基本給250,000+通勤超過7,700'); // 旧バグ実装だと250,000で7,700欠落
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

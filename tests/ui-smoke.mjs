@@ -154,6 +154,22 @@ T('本人の人的加算チップ(甲): ひとり親をタップ→state反映+�
   ok(A.compute(A.state.employees[0]).incomeTax < taxBefore, '甲欄税が下がる(' + taxBefore + '→' + A.compute(A.state.employees[0]).incomeTax + ')');
 });
 
+T('個別「確認済」で当月スナップショットが保存される(確定前保存・データ欠落しない)', function () {
+  const q = s => doc.querySelector(s);
+  // Storeをスタブして savePayslip の呼び出しを捕捉
+  const saved = [];
+  win.Store = { savePayslip: (ym, eid, data) => { saved.push({ ym, eid, data }); }, getPayslipsByYm: () => Promise.resolve([]) };
+  A.state.month = '2026-06';
+  A.state.confirmed = {}; // 未確定に戻す
+  q('.bn[data-scr="scr-input"]').click();
+  const cb = q('#input-list .econf'); ok(cb, '個別「確認済」チェックボックス');
+  const eci = +cb.dataset.econf; const emp = A.state.employees[eci];
+  ok(!cb.checked, '初期は未確認');
+  cb.click(); // 確認ON → 確定前に saveMonthlyPayslips が走るはず
+  ok(saved.some(s => s.eid === emp.id && s.ym === '2026-06'), '確定した従業員の当月slipが保存された(' + saved.map(s => s.eid).join(',') + ')');
+  ok(A.state.confirmed['2026-06'] && A.state.confirmed['2026-06'][emp.id], '確定フラグも立つ');
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });
