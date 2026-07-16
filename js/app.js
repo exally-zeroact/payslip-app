@@ -189,7 +189,7 @@
       annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0', dailyEntries:[],
       kintai:[{label:'出勤日数',value:'21'},{label:'欠勤日数',value:'0'},{label:'有給取得',value:'1'}],
       shikyu:[{label:'基本給',value:'250000'},{label:'住宅手当',value:'10000'}],
-      apply:{}, taxClass:'ko', retired:false, workStatus:'normal', leavePay:'', leaveStartYmd:'', leaveEndYmd:'', leaveDaysInMonth:'',
+      apply:{}, taxClass:'ko', honninShogai:false, honninKafuHitorioya:'', honninKinrou:false, retired:false, workStatus:'normal', leavePay:'', leaveStartYmd:'', leaveEndYmd:'', leaveDaysInMonth:'',
       warimashi:{ mode:'easy', otH:'', otM:'', nightH:'', nightM:'', holidayH:'', holidayM:'',
         detail:{ ot:{h:'',m:''}, otNight:{h:'',m:''}, over60:{h:'',m:''}, over60Night:{h:'',m:''}, night:{h:'',m:''}, holiday:{h:'',m:''}, holidayNight:{h:'',m:''} } },
       wbInclude:[], wbExclude:[],
@@ -316,6 +316,11 @@
     var noWork=H.scheduledWorkdaysBetween(ym, rest, comp, e.leaveStartYmd, e.leaveEndYmd);
     return { total:total, noWork:noWork, partial:(noWork<total) };
   }
+  // 甲欄の「扶養親族等の数」に足す本人の人的加算(障害者/寡婦orひとり親/勤労学生)。甲(ko)のみ、乙/丙は0。
+  function jintekiOf(e, taxClass){
+    if(taxClass!=='ko' || !(window.PayrollCalc&&PayrollCalc.honninJintekiCount)) return 0;
+    return PayrollCalc.honninJintekiCount({ shogai:!!e.honninShogai, kafuHitorioya:e.honninKafuHitorioya||'', kinrou:!!e.honninKinrou });
+  }
   function compute(e){
     syncCommute(e); syncBasePay(e);
     var pr=prorateInfo(e, state.month); e._prorate=pr;
@@ -367,7 +372,9 @@
     var _tim=(state.company||{}).shahoTiming, _shMult=1, _shMonth=pr.shahoMonth;
     if(_tim==='next'){ var _zk=ZK(); if(_zk&&_zk.shahoChargeMonths) _shMult=_zk.shahoChargeMonths({timing:'next', ym:state.month, joinYmd:e.joinYmd, taishokuYmd:e.taishokuYmd}); _shMonth=true; /* 翌月はmultで表現し旧shahoMonth抑止 */ }
     var effTaxClass=(e.taxClass==='hei' && e.payType!=='日給') ? 'ko' : e.taxClass; // 丙×非日給は甲で計算
-    return PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:num(e.fuyou), taxClass:effTaxClass, heiTaxAmount:heiAmt, residentTax:residentTaxOf(e), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:apply, extraKojo:e.extraKojo, shahoMonth:_shMonth, shahoMult:_shMult });
+    // 甲欄のみ: 本人の人的加算(障害者/寡婦orひとり親/勤労学生)を扶養親族等の数に足す(乙/丙は対象外)
+    var effFuyou=num(e.fuyou)+jintekiOf(e, effTaxClass);
+    return PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:effFuyou, taxClass:effTaxClass, heiTaxAmount:heiAmt, residentTax:residentTaxOf(e), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:apply, extraKojo:e.extraKojo, shahoMonth:_shMonth, shahoMult:_shMult });
   }
   function payDateObj(){
     var ym=state.month||'2026-06', y=Number(ym.slice(0,4)), m=Number(ym.slice(5,7)), c=state.company||{};
@@ -647,6 +654,14 @@
         +'<div class="frow"><div class="flabel">1日の所定労働</div><span class="dur"><input class="finput m-f dur-in" data-f="dailyWorkH" inputmode="numeric" value="'+attr(e.dailyWorkH)+'"><i>時</i><input class="finput m-f dur-in" data-f="dailyWorkM" inputmode="numeric" value="'+attr(e.dailyWorkM)+'"><i>分</i></span></div></div>';
     var gZei=''
       +'<div class="frow"><div class="flabel">扶養人数<span class="hint2">配偶者含</span><span class="help-i" data-help="fuyou">💡</span></div><input class="finput num m-f" data-f="fuyou" value="'+attr(e.fuyou)+'"></div>'
+      +((e.taxClass||'ko')==='ko'
+        ? '<div class="chip-row" style="margin:-2px 0 4px;align-items:center"><span style="font-size:11px;color:#3D6B53;font-weight:700;margin-right:2px">本人の事情</span>'
+          +'<span class="chip'+(e.honninShogai?' on':'')+'" data-honnin="shogai">'+(e.honninShogai?'✓ ':'')+'障害者</span>'
+          +'<span class="chip'+(e.honninKafuHitorioya==='kafu'?' on':'')+'" data-honnin="kafu">'+(e.honninKafuHitorioya==='kafu'?'✓ ':'')+'寡婦</span>'
+          +'<span class="chip'+(e.honninKafuHitorioya==='hitorioya'?' on':'')+'" data-honnin="hitorioya">'+(e.honninKafuHitorioya==='hitorioya'?'✓ ':'')+'ひとり親</span>'
+          +'<span class="chip'+(e.honninKinrou?' on':'')+'" data-honnin="kinrou">'+(e.honninKinrou?'✓ ':'')+'勤労学生</span></div>'
+          +'<div class="hint" style="margin:0 2px 10px;font-size:10px;color:#527A66">該当すると甲欄の源泉税で「扶養親族等の数」に＋1（該当ごと）。扶養親族が障害者の場合は年末調整で精算します。</div>'
+        : '')
       +'<div class="chip-row" style="margin:-2px 0 10px;align-items:center"><span style="font-size:11px;color:#3D6B53;font-weight:700;margin-right:2px">所得税区分</span>'
         +[['ko','甲（通常）'],['otsu','乙（副業）'],['hei','丙（日雇い）']].map(function(o){ var on=(e.taxClass||'ko')===o[0]; return '<span class="chip'+(on?' on':'')+'" data-taxc="'+o[0]+'">'+(on?'✓ ':'')+o[1]+'</span>'; }).join('')
         +'<span class="help-i" data-help="taxclass" style="margin-left:4px">💡</span></div>'
@@ -1254,7 +1269,7 @@
     e._bonusExempt=bonusExempt;
     var tax={tax:0}, noPrev=false;
     if(prevAfter==null) noPrev=true;
-    else if(SZl) tax=SZl.calcBonusTax({ bonus:base, bonusSI:si.total, prevSalary:prevAfter, prevSI:0, fuyou:num(e.fuyou), taxClass:e.taxClass, payYm:ym });
+    else if(SZl) tax=SZl.calcBonusTax({ bonus:base, bonusSI:si.total, prevSalary:prevAfter, prevSI:0, fuyou:num(e.fuyou)+jintekiOf(e, e.taxClass==='otsu'?'otsu':'ko'), taxClass:e.taxClass, payYm:ym });
     var taxAmt=noPrev?0:(tax.tax||0);
     return { bonus:bonus, base:base, totalGross:totalGross, addShikyu:addShikyu, addKojo:addKojo, addTaxable:addTaxable, addNonTax:addNonTax, addKojoTotal:addKojoTotal,
       prevAfter:prevAfter, fromHistory:(!manualPrev&&histPrev), noPrev:noPrev, si:si, tax:tax, taxAmt:taxAmt, net:totalGross-si.total-taxAmt-addKojoTotal };
@@ -1667,7 +1682,7 @@
     var hei=HEI(), nichi=NICHI(), fuyou=num(e.fuyou), dayTaxFn=null, taxLabel='';
     if(cls==='hei'){ if(hei){ dayTaxFn=function(t){ return hei.heiTax(t,{year:year}); }; taxLabel='丙欄'; } }
     else if(cls==='otsu'){ if(nichi){ dayTaxFn=function(t){ return nichi.nichiTax(t,{taxClass:'otsu',year:year}); }; taxLabel='乙欄'; } }
-    else { if(nichi){ dayTaxFn=function(t){ return nichi.nichiTax(t,{taxClass:'ko',deps:fuyou,year:year}); }; taxLabel='甲欄'; } }
+    else { var depsK=fuyou+jintekiOf(e,'ko'); if(nichi){ dayTaxFn=function(t){ return nichi.nichiTax(t,{taxClass:'ko',deps:depsK,year:year}); }; taxLabel='甲欄'; } } // 甲=本人の人的加算を扶養数に反映(月次と整合)
     var dd=dp.computeDaily(entries, { taxClass:cls, year:year, dayTaxFn:dayTaxFn });
     var cyc=(state.company&&state.company.payCycle)||'monthly';
     var days=dd.days.map(function(d){ return { dateLabel:dateLabel(d.ymd), ymd:d.ymd, hhmm:dp.hhmm(d.min), amount:d.amount }; });
@@ -1992,6 +2007,11 @@
       if(ev.target.dataset.shfixed){ if(!emp.shaho)emp.shaho={months:[]}; emp.shaho.fixedChanged=!emp.shaho.fixedChanged; renderEmpMaster(); return; }
       if(ev.target.dataset.rtik){ emp.residentTaxIkkatsu=!emp.residentTaxIkkatsu; renderEmpMaster(); return; }
       if(ev.target.dataset.taxc){ emp.taxClass=ev.target.dataset.taxc; renderEmpMaster(); return; }
+      if(ev.target.dataset.honnin){ var hk=ev.target.dataset.honnin; // 本人の人的加算(甲欄+1)。寡婦↔ひとり親は排他
+        if(hk==='shogai') emp.honninShogai=!emp.honninShogai;
+        else if(hk==='kinrou') emp.honninKinrou=!emp.honninKinrou;
+        else { emp.honninKafuHitorioya=(emp.honninKafuHitorioya===hk)?'':hk; }
+        renderEmpMaster(); return; }
       if(ev.target.classList.contains('wb-chip')){ var wlab=ev.target.dataset.wb; emp.wbInclude=emp.wbInclude||[]; emp.wbExclude=emp.wbExclude||[];
         if(isInBasis(emp,wlab)){ emp.wbInclude=emp.wbInclude.filter(function(x){return x!==wlab;}); if(emp.wbExclude.indexOf(wlab)<0)emp.wbExclude.push(wlab); }
         else { emp.wbExclude=emp.wbExclude.filter(function(x){return x!==wlab;}); if(emp.wbInclude.indexOf(wlab)<0)emp.wbInclude.push(wlab); }

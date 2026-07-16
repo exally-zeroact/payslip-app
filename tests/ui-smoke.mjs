@@ -139,6 +139,21 @@ T('対象月グローバル化: ヘッダーの対象月が入力/一覧で表�
   A.state.month = '2026-06'; // 後続テストのため戻す
 });
 
+T('本人の人的加算チップ(甲): ひとり親をタップ→state反映+甲欄税が下がる', function () {
+  const q = s => doc.querySelector(s);
+  const e0 = A.state.employees[0]; e0.base = '300000'; e0.fuyou = '0'; e0.taxClass = 'ko';
+  e0.honninShogai = false; e0.honninKafuHitorioya = ''; e0.honninKinrou = false;
+  const id0 = e0.id;
+  A.state.open = A.state.open || {}; A.state.open[id0] = true; A.state.open['D' + id0] = true; A.state.open['DS' + id0 + 'zei'] = true;
+  q('.bn[data-scr="scr-settings"]').click();
+  const seg = q('#set-seg .seg-b[data-set="emp"]'); seg.click(); seg.click();
+  const taxBefore = A.compute(e0).incomeTax;
+  const chip = q('#emp-list [data-honnin="hitorioya"]'); ok(chip, 'ひとり親チップ(甲)');
+  chip.click();
+  ok(A.state.employees[0].honninKafuHitorioya === 'hitorioya', 'stateにひとり親が反映');
+  ok(A.compute(A.state.employees[0]).incomeTax < taxBefore, '甲欄税が下がる(' + taxBefore + '→' + A.compute(A.state.employees[0]).incomeTax + ')');
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

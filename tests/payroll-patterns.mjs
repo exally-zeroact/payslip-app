@@ -231,5 +231,27 @@ T('網羅480ケース: NaN・差引不一致・手取りマイナス ゼロ', fu
   ok(nan === 0, 'NaN=' + nan); ok(mism === 0, '差引不一致=' + mism); ok(neg === 0, '手取りマイナス=' + neg + '/' + n);
 });
 
+// ── 本人の人的加算(甲欄): ひとり親/障害者/勤労学生で扶養親族等の数+1 → 甲欄所得税が下がる。乙欄は不変(配線確認) ──
+T('本人加算(甲): ひとり親で甲欄所得税が「扶養+1」ぶん下がる・乙欄は不変', function () {
+  const base = { payType: '月給', base: '300000', fuyou: '0' };
+  const t0 = A.compute(emp(Object.assign({ name: 'K0' }, base))).incomeTax;
+  const tHitori = A.compute(emp(Object.assign({ name: 'K1' }, base, { honninKafuHitorioya: 'hitorioya' }))).incomeTax;
+  const tFuyou1 = A.compute(emp(Object.assign({ name: 'K2' }, base, { fuyou: '1' }))).incomeTax;
+  ok(tHitori < t0, 'ひとり親で甲欄税が下がる(' + t0 + '→' + tHitori + ')');
+  near(tHitori, tFuyou1, 1, 'ひとり親=扶養+1と等価');
+  // 乙欄は人的加算の対象外(税額が変わらない)
+  const oBase = A.compute(emp(Object.assign({ name: 'O0', taxClass: 'otsu' }, base))).incomeTax;
+  const oHitori = A.compute(emp(Object.assign({ name: 'O1', taxClass: 'otsu' }, base, { honninKafuHitorioya: 'hitorioya' }))).incomeTax;
+  near(oHitori, oBase, 1, '乙欄は本人加算で変わらない');
+});
+T('本人加算(甲): 障害者+勤労学生で扶養+2ぶん下がる', function () {
+  const base = { payType: '月給', base: '350000', fuyou: '1' };
+  const t1 = A.compute(emp(Object.assign({ name: 'J1' }, base))).incomeTax;
+  const t3 = A.compute(emp(Object.assign({ name: 'J3' }, base, { honninShogai: true, honninKinrou: true }))).incomeTax;
+  const tFuyou3 = A.compute(emp(Object.assign({ name: 'J9', payType: '月給', base: '350000', fuyou: '3' }))).incomeTax;
+  ok(t3 < t1, '障害者+勤労学生で下がる(' + t1 + '→' + t3 + ')');
+  near(t3, tFuyou3, 1, '2加算=扶養+2(=計3)と等価');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
