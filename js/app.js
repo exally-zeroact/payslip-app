@@ -735,8 +735,12 @@
     }
     var soho=r.si.health+r.si.pension+(r.si.kaigo||0);
     var tag=isAuto?' 自動':undet?' 暫定':'';
+    var sohoParts=[]; // 年齢資格喪失(厚年70/健保75)で0の保険は表示しない
+    if(r.si.health>0) sohoParts.push('健康保険 <b>'+yen(r.si.health)+'</b>');
+    if(r.si.pension>0) sohoParts.push('厚生年金 <b>'+yen(r.si.pension)+'</b>');
+    if(r.si.kaigo>0) sohoParts.push('介護保険 <b>'+yen(r.si.kaigo)+'</b>');
     return '<div class="sh-hero"><div class="lb">毎月この人から天引きする社会保険（本人負担）</div><div class="big">'+yen(soho)+(tag?'<span style="font-size:12px;color:#5C7E6C;font-family:\'Noto Sans JP\'">'+tag+'</span>':'')+'</div>'
-      +'<div class="bd">健康保険 <b>'+yen(r.si.health)+'</b>　＋　厚生年金 <b>'+yen(r.si.pension)+'</b>'+(r.si.kaigo?'　＋　介護保険 <b>'+yen(r.si.kaigo)+'</b>':'')+'</div></div>'
+      +'<div class="bd">'+(sohoParts.length?sohoParts.join('　＋　'):'年齢により社会保険の対象外です')+'</div></div>'
       +'<div class="sh-sub">もとになる「標準報酬月額」＝<b>'+yen(r.hyojun)+'</b>'+(isAuto?'（基本給＋手当から自動）':undet?'（暫定：当月支給ベース）':'（保険料計算の“ものさし”・自動で決まる）')+'／適用：'+period+'</div>';
   }
   function refreshShaho(i){
@@ -1167,6 +1171,13 @@
       bonusExempt=(be==null)?true:be; // 日付未設定→従来どおり全免除
     }
     if(bonusExempt){ si={ total:si.employ, health:0, pension:0, kaigo:0, employ:si.employ, hyojun:si.hyojun, kenpoBase:si.kenpoBase, koseiBase:si.koseiBase }; }
+    // 年齢資格: 厚年70歳到達で保険料0・健保75歳到達で後期高齢へ移行=0(月次計算 calc.js と対称)。
+    var _PC=window.PayrollCalc;
+    if(_PC){
+      if(_PC.isPensionTarget && !_PC.isPensionTarget(e.birthYmd,ym)) si.pension=0;
+      if(_PC.isHealthTarget && !_PC.isHealthTarget(e.birthYmd,ym)){ si.health=0; si.kaigo=0; }
+      si.total=num(si.health)+num(si.pension)+num(si.kaigo)+num(si.employ);
+    }
     e._bonusExempt=bonusExempt;
     var tax={tax:0}, noPrev=false;
     if(prevAfter==null) noPrev=true;
@@ -1225,9 +1236,9 @@
         +'<div class="calc-box"><div class="ch">賞与の自動計算（標準賞与額 '+yen(hyojun)+'）</div>'
           +'<div class="calc-line"><span>賞与額</span><span class="v">'+yen(c.bonus)+'</span></div>'
           +addSLines
-          +'<div class="calc-line"><span>健康保険</span><span class="v">'+yen(c.si.health)+'</span></div>'
+          +(c.si.health>0?'<div class="calc-line"><span>健康保険</span><span class="v">'+yen(c.si.health)+'</span></div>':'')
           +(c.si.kaigo>0?'<div class="calc-line"><span>介護保険</span><span class="v">'+yen(c.si.kaigo)+'</span></div>':'')
-          +'<div class="calc-line"><span>厚生年金</span><span class="v">'+yen(c.si.pension)+'</span></div>'
+          +(c.si.pension>0?'<div class="calc-line"><span>厚生年金</span><span class="v">'+yen(c.si.pension)+'</span></div>':'')
           +'<div class="calc-line"><span>雇用保険</span><span class="v">'+yen(c.si.employ)+'</span></div>'
           +taxLine
           +addKLines
@@ -2130,7 +2141,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

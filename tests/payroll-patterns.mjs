@@ -112,6 +112,32 @@ T('賞与(ShoyoZei): 税率表(復興税込)・厚年150万/回上限・健保57
   ok(si3.kenpoBase === 30000, '健保573万年度上限(残3万)');
 });
 
+// ── ⑧b 高齢: 70歳以上=厚年資格喪失(0) / 75歳以上=健保資格喪失(後期高齢・0) ──
+T('高齢: 70歳以上は厚年0 / 75歳以上は健保0(資格喪失・kojo基準)', function () {
+  const y68 = A.compute(emp({ payType: '月給', base: '400000', birthYmd: '1958-01-01' })); // 2026-06で68歳
+  ok(kojo(y68, '厚生年金') > 0 && kojo(y68, '健康保険') > 0, '68歳は厚年・健保あり');
+  const y71 = A.compute(emp({ payType: '月給', base: '400000', birthYmd: '1955-01-01' })); // 71歳
+  ok(kojo(y71, '厚生年金') === 0, '71歳は厚年0(70歳資格喪失)');
+  ok(kojo(y71, '健康保険') > 0, '71歳は健保あり(75未満)');
+  const y76 = A.compute(emp({ payType: '月給', base: '400000', birthYmd: '1950-01-01' })); // 76歳
+  ok(kojo(y76, '健康保険') === 0, '76歳は健保0(75歳→後期高齢)');
+  ok(kojo(y76, '厚生年金') === 0, '76歳は厚年も0');
+});
+
+// ── ⑧c 賞与も高齢ゲート: 71歳=賞与厚年0 / 76歳=賞与健保0 ──
+T('賞与の高齢ゲート: 71歳は賞与厚年0 / 76歳は賞与健保0', function () {
+  const st = A.state; st.bonus = { payYm: '2026-06', payDay: '', byEmp: {} };
+  function bsi(birthYmd) {
+    const e = emp({ payType: '月給', base: '400000', birthYmd });
+    st.employees = [e]; A.bonusEntry(e).amount = '600000'; // 賞与60万
+    return A.computeBonus(e).si;
+  }
+  const y68 = bsi('1958-01-01'); ok(y68.pension > 0 && y68.health > 0, '68歳は賞与厚年・健保あり');
+  const y71 = bsi('1955-01-01'); ok(y71.pension === 0 && y71.health > 0, '71歳は賞与厚年0/健保あり');
+  const y76 = bsi('1950-01-01'); ok(y76.health === 0 && y76.pension === 0, '76歳は賞与健保0/厚年0');
+  st.bonus = { payYm: '', payDay: '', byEmp: {} };
+});
+
 // ── ⑨ 入退社の日割 ──
 T('入退社: 月途中入社/退職で基本給が日割になる', function () {
   const full = A.compute(emp({ payType: '月給', base: '300000' }));
