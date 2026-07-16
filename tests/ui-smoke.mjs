@@ -122,6 +122,23 @@ T('随時改定モード: 3か月+従前+固定給変動を入力すると該当
   ok(errs.length === before, '随時改定操作で例外: ' + errs.slice(before).join(' | '));
 });
 
+T('対象月グローバル化: ヘッダーの対象月が入力/一覧で表示・設定で非表示・変更でstate同期', function () {
+  const q = s => doc.querySelector(s);
+  const am = q('#appbar-month'), at = q('#appbar-tab');
+  ok(am, 'ヘッダーに対象月ピッカー');
+  q('.bn[data-scr="scr-input"]').click();
+  ok(am.style.display !== 'none', '入力でヘッダー対象月が表示');
+  ok(at.style.display === 'none', '入力ではタブ名を隠す(排他)');
+  q('.bn[data-scr="scr-settings"]').click();
+  ok(am.style.display === 'none', '設定ではヘッダー対象月を隠す');
+  // ヘッダーの対象月を変えると state.month が変わり全.scr-monthが同期
+  q('.bn[data-scr="scr-input"]').click();
+  const inp = q('#appbar-month input.scr-month'); ok(inp, 'ヘッダー対象月input');
+  inp.value = '2026-08'; inp.dispatchEvent(new win.Event('change', { bubbles: true }));
+  ok(A.state.month === '2026-08', 'ヘッダー変更でstate.month同期(' + A.state.month + ')');
+  A.state.month = '2026-06'; // 後続テストのため戻す
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

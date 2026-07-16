@@ -389,7 +389,9 @@
     $$('.screen').forEach(function(s){ s.classList.toggle('active', s.id===id); });
     $$('.bn').forEach(function(b){ b.classList.toggle('on', b.dataset.scr===id); });
     var TABN={'scr-settings':'設定','scr-input':'入力','scr-list':'一覧 / 集計','scr-print':'印刷'}; var at=$('#appbar-tab'); if(at) at.textContent=TABN[id]||''; // ヘッダー右はタブ名
-    $$('.scr-month').forEach(function(m){ m.value=state.month; }); // 対象月はタイトル行(入力/一覧)に表示
+    // 対象月はヘッダー右にグローバル表示(入力/一覧)。設定=月概念なし・印刷=画面内に月/賞与切替があるので非表示。タブ名と排他。
+    var showMon=(id==='scr-input'||id==='scr-list'); var am=$('#appbar-month'); if(am) am.style.display=showMon?'flex':'none'; if(at) at.style.display=showMon?'none':'';
+    $$('.scr-month').forEach(function(m){ m.value=state.month; }); // 全.scr-month(ヘッダー/印刷)を対象月に同期
     if(id==='scr-settings'){ renderOnboard(); renderEmpMaster(); }
     if(id==='scr-input'){ $('#in-month').textContent=monthLabel(); renderInputArea(); }
     if(id==='scr-list') renderListActive();

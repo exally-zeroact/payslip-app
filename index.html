@@ -20,6 +20,7 @@
 <header class="appbar">
   <div class="logo">Kyually</div>
   <div class="appbar-tab" id="appbar-tab">設定</div>
+  <div class="appbar-month" id="appbar-month" style="display:none"><label>対象月</label><input type="month" class="finput finput-sm scr-month" aria-label="対象月"></div>
 </header>
 
 <main class="main">
@@ -79,7 +80,7 @@
 
   <!-- ② 入力 -->
   <section class="screen" id="scr-input">
-    <div class="scr-head"><span class="scr-sub scr-period" id="in-month"></span><div class="scr-month-wrap"><label>対象月</label><input type="month" class="finput finput-sm scr-month"></div></div>
+    <div class="scr-head"><span class="scr-sub scr-period" id="in-month"></span></div>
     <div class="imode-seg"><b class="imode on" data-imode="monthly">月次給与</b><b class="imode" data-imode="bonus">賞与</b></div>
     <p class="hint" id="in-hint">従業員をタップすると当月の変動値（勤怠・時数・変動手当）を入力できます。法定控除（健保/厚年/介護/雇用/所得税）は自動計算されます。</p>
     <input type="file" id="kintai-file" accept=".csv,text/csv" style="display:none">
@@ -89,7 +90,7 @@
 
   <!-- ③ 一覧/集計 -->
   <section class="screen" id="scr-list">
-    <div class="scr-head"><span class="scr-sub scr-period">月ごとの一覧・集計</span><div class="scr-month-wrap"><label>対象月</label><input type="month" class="finput finput-sm scr-month"></div></div>
+    <div class="scr-head"><span class="scr-sub scr-period">月ごとの一覧・集計</span></div>
     <div class="seg">
       <button class="seg-b on" data-view="list">一覧</button>
       <button class="seg-b" data-view="sum">集計</button>
