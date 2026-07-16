@@ -94,6 +94,34 @@ T('退職金の計算モーダル: 帳票→退職金を計算→入力→結果
   const cl = [...doc.querySelectorAll('.ui-modal-btn')].find(b => /閉じる/.test(b.textContent)); if (cl) cl.click();
 });
 
+T('随時改定モード: 3か月+従前+固定給変動を入力すると該当/非該当が表示・例外0', function () {
+  const q = s => doc.querySelector(s), qa = s => [...doc.querySelectorAll(s)];
+  q('.bn[data-scr="scr-settings"]').click();
+  const empSeg = q('#set-seg .seg-b[data-set="emp"]'); if (empSeg) empSeg.click();
+  // 1人目のカードと社保「詳しく」を開く(state直接→再描画)
+  const id0 = A.state.employees[0].id;
+  A.state.open = A.state.open || {};
+  A.state.open[id0] = true;            // カード
+  A.state.open['D' + id0] = true;      // 詳細設定
+  A.state.open['DS' + id0 + 'shaho'] = true; // 社会保険サブセクション
+  A.state.open['SHD' + id0] = true;    // 社保「詳しく」
+  empSeg.click();
+  const before = errs.length;
+  const zuiji = q('#emp-list .sh-mode[data-mode="zuiji"]'); ok(zuiji, '随時改定モードボタン');
+  zuiji.click();
+  // 3か月・日数・従前標準報酬・変動月を入力し固定給変動チップON
+  const set = (el, v) => { if (el) { el.value = v; el.dispatchEvent(new win.Event('input', { bubbles: true })); } };
+  qa('#emp-list .sh-pay').forEach((el, k) => set(el, [280000, 285000, 282000][k]));
+  qa('#emp-list .sh-days').forEach(el => set(el, 20));
+  set(q('#emp-list .sh-prevhyojun'), '200000');
+  set(q('#emp-list .sh-henko'), '2026-06');
+  const chip = q('#emp-list [data-shfixed]'); ok(chip, '固定給変動チップ'); chip.click();
+  const box = q('#emp-list .zk-box'); ok(box, '随時改定 判定ボックス');
+  ok(/該当します/.test(box.textContent), '該当表示（' + box.textContent.slice(0, 30) + '）');
+  ok(/2026-09/.test(box.textContent), '適用月=2026-09');
+  ok(errs.length === before, '随時改定操作で例外: ' + errs.slice(before).join(' | '));
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

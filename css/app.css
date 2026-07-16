@@ -91,6 +91,14 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .sh-hero .big{font-size:28px;font-weight:700;font-family:'DM Mono',monospace;color:#1a4a2e;line-height:1.1;margin:3px 0 6px;}
 .sh-hero .bd{font-size:11px;color:#3D6B53;line-height:1.6;}.sh-hero .bd b{color:#1a4a2e;font-family:'DM Mono',monospace;}
 .sh-sub{font-size:10.5px;color:#4A6B5A;line-height:1.6;}.sh-sub b{color:#1a4a2e;font-family:'DM Mono',monospace;}
+.zk-inp{margin:8px 0 4px;}
+.zk-box{margin:6px 0 2px;}
+.zk-hit{background:#F0FAF4;border:1.5px solid #C8ECD8;border-left:5px solid #3D9E72;border-radius:10px;padding:10px 12px;}
+.zk-miss{background:#F6F8F7;border:1px solid #dbe6e0;border-left:5px solid #B7C6BE;border-radius:10px;padding:10px 12px;}
+.zk-t{font-size:12px;font-weight:700;color:#1a4a2e;}.zk-miss .zk-t{color:#4A6B5A;}
+.zk-d{font-size:11px;color:#3D6B53;line-height:1.7;margin-top:4px;}.zk-d b{color:#1a4a2e;font-family:'DM Mono',monospace;}
+.zk-rs{margin:5px 0 2px;padding-left:18px;font-size:10.5px;color:#6B5A3D;line-height:1.6;}
+.zk-note{font-size:10px;color:#7A8B83;line-height:1.5;margin-top:5px;}.zk-note b{color:#3D6B53;font-family:'DM Mono',monospace;}
 .sh-warn{background:#fff8e1;border:1px solid #F4D8A8;border-radius:8px;padding:7px 9px;font-size:10.5px;color:#92500A;line-height:1.55;margin-bottom:9px;}.sh-warn b{color:#7A3F00;}
 /* 割増（時間/分） */
 .dur{display:flex;align-items:center;gap:4px;}

@@ -1,0 +1,42 @@
+/* zuiji.test.js — 随時改定(月額変更届)の該当判定 + 標準報酬等級 */
+'use strict';
+var PC = require('../lib/payroll-calc.js');
+var SH = require('../lib/shakaihoken-hyo.js');
+
+T('gradeOf: 報酬月額→標準報酬等級(厚年32等級)', function () {
+  var g = SH.gradeOf(200000); eq(g.hyojun, 200000); eq(g.tokyu, 14); // 195,000〜210,000=14等級
+  ok(SH.gradeOf(300000).tokyu > SH.gradeOf(200000).tokyu, '高い報酬は上位等級');
+});
+
+T('随時改定: 固定給変動+3か月17日以上+2等級差 → 該当', function () {
+  var r = PC.zuijiKaitei({ months: [{ pay: 280000, days: 20 }, { pay: 285000, days: 21 }, { pay: 282000, days: 19 }], prevHyojun: 200000, fixedChanged: true, henkoYm: '2026-06' });
+  eq(r.eligible, true);
+  ok(r.gradeDiff >= 2, '2等級以上差');
+  eq(r.applyYm, '2026-09'); // 変動月6月の4か月目=9月
+  ok(r.newHyojun > 0, '新標準報酬');
+});
+
+T('随時改定: 2等級差に満たない → 非該当(理由あり)', function () {
+  var r = PC.zuijiKaitei({ months: [{ pay: 205000, days: 20 }, { pay: 206000, days: 20 }, { pay: 204000, days: 20 }], prevHyojun: 200000, fixedChanged: true });
+  eq(r.eligible, false);
+  ok(r.reasons.some(function (x) { return /2等級/.test(x); }), '理由=2等級不足');
+});
+
+T('随時改定: 1か月でも17日未満 → 非該当', function () {
+  var r = PC.zuijiKaitei({ months: [{ pay: 280000, days: 20 }, { pay: 285000, days: 16 }, { pay: 282000, days: 20 }], prevHyojun: 200000, fixedChanged: true });
+  eq(r.eligible, false);
+  eq(r.allDays, false);
+  ok(r.reasons.some(function (x) { return /17日/.test(x); }), '理由=日数不足');
+});
+
+T('随時改定: 固定的賃金の変動なし → 非該当', function () {
+  var r = PC.zuijiKaitei({ months: [{ pay: 280000, days: 20 }, { pay: 285000, days: 21 }, { pay: 282000, days: 19 }], prevHyojun: 200000, fixedChanged: false });
+  eq(r.eligible, false);
+  ok(r.reasons.some(function (x) { return /固定的賃金/.test(x); }), '理由=固定給変動なし');
+});
+
+T('随時改定: 従前標準報酬 未入力 → 非該当', function () {
+  var r = PC.zuijiKaitei({ months: [{ pay: 280000, days: 20 }, { pay: 285000, days: 21 }, { pay: 282000, days: 19 }], prevHyojun: 0, fixedChanged: true });
+  eq(r.eligible, false);
+  ok(r.reasons.some(function (x) { return /従前/.test(x); }), '理由=従前未入力');
+});

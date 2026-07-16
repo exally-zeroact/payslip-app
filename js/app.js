@@ -693,6 +693,22 @@
       +'</div>';
   }
   var SH_MODES=[['auto','基本給から自動','見込み不要'],['teiji','毎年の見直し','4〜6月'],['shutoku','入社したばかり','資格取得'],['zuiji','給料が変わった','随時改定'],['manual','金額が分かる','直接入力']];
+  // 随時改定(月額変更届)の該当判定を表示(社労士: 2等級差・全月17日以上・固定的賃金変動・4か月目適用)。届出は人が行う前提の"目安"。
+  function zuijiJudgeHTML(e){
+    var s=e.shaho||{}; var PC=window.PayrollCalc;
+    if(!(PC&&PC.zuijiKaitei)) return '';
+    var z=PC.zuijiKaitei({ months:(s.months||[]).map(function(m){return {pay:num(m&&m.pay),days:num(m&&m.days)};}), prevHyojun:num(s.prevHyojun), fixedChanged:!!s.fixedChanged, henkoYm:s.henkoYm });
+    if(z.eligible){
+      return '<div class="zk-hit"><div class="zk-t">✓ 随時改定に該当します（月額変更届の対象）</div>'
+        +'<div class="zk-d">従前 '+yen(num(s.prevHyojun))+'（'+z.prevGrade+'等級）→ 改定後 <b>'+yen(z.newHyojun)+'</b>（'+z.newGrade+'等級）／'+z.gradeDiff+'等級差'
+        +(z.applyYm?'<br>適用：<b>'+z.applyYm+'</b>から（変動月の4か月目）':'')+'</div>'
+        +'<div class="zk-note">※ 届出（月額変更届）は事業主が年金事務所へ。このアプリは要件の目安です。</div></div>';
+    }
+    return '<div class="zk-miss"><div class="zk-t">今のところ随時改定には該当しません</div>'
+      +(z.reasons&&z.reasons.length?'<ul class="zk-rs">'+z.reasons.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>':'')
+      +(z.avg>0?'<div class="zk-note">3か月平均 '+yen(z.avg)+'（'+z.newGrade+'等級）。上の要件を満たすと届出対象になります。</div>':'')+'</div>';
+  }
+  function refreshZuiji(i){ var e=state.employees[i]; var card=$('#emp-list .mco[data-i="'+i+'"]'); if(!card)return; var box=card.querySelector('.zk-box'); if(box) box.innerHTML=zuijiJudgeHTML(e); }
   function shahoSection(e){
     var s=e.shaho||{mode:'auto',months:[]}; var mode=s.mode||'auto';
     var r=compute(e), sb=shahoBasisOf(e);
@@ -717,6 +733,12 @@
       body+='<div class="f3">'+labels.map(function(lab,k){var mm=ms[k]||{};var ex=(num(mm.days)>0&&num(mm.days)<th);return '<div class="mcol'+(ex?' ex':'')+'"><div class="mlb">'+lab+'</div><input class="finput num sh-pay" data-k="'+k+'" value="'+attr(mm.pay)+'" placeholder="総支給"><div class="drow"><span>支払基礎日数</span><input class="dinp sh-days" data-k="'+k+'" value="'+attr(mm.days)+'"></div></div>';}).join('')+'</div>';
       if(sb.excluded&&sb.excluded.length) body+='<div class="exinfo">✓ '+sb.excluded.map(function(x){return labels[x];}).join('・')+'は支払基礎日数が'+th+'日未満のため<b>ルール上この月を計算から外しました</b>（あなたのミスではありません）。残りの月の平均で算定します。</div>';
       if(mode==='teiji') body+='<div style="text-align:right;margin-top:2px"><span class="sh-refetch" data-refetch="1" style="font-size:12px;color:#3D9E72;text-decoration:underline;cursor:pointer">過去の4〜6月から自動入力</span></div>';
+      if(mode==='zuiji'){
+        body+='<div class="zk-inp"><div class="frow"><div class="flabel">変動があった月<span class="hint2">昇給・降給した月</span></div><input type="month" class="finput sh-henko" value="'+attr(s.henkoYm)+'"></div>'
+          +'<div class="frow"><div class="flabel">従前の標準報酬月額<span class="hint2">円・変動前</span></div><input class="finput num sh-prevhyojun" value="'+attr(s.prevHyojun)+'" placeholder="200000"></div>'
+          +'<div class="chip-row" style="margin:2px 0 6px"><span class="chip'+(s.fixedChanged?' on':'')+'" data-shfixed="1">'+(s.fixedChanged?'✓ ':'')+'固定的賃金（基本給・手当など）が変わった</span></div></div>';
+        body+='<div class="zk-box">'+zuijiJudgeHTML(e)+'</div>';
+      }
     } else if(mode==='shutoku'){
       body+='<div class="sh-tip">入社時は実績が無いので<b>入社月の見込み月額</b>（基本給＋手当の見込み・通勤含む）で決定します。</div><div class="frow"><div class="flabel">見込み月額<span class="hint2">円</span></div><input class="finput num sh-mikomi" value="'+attr(s.mikomi)+'" placeholder="280000"></div>';
     } else {
@@ -1965,6 +1987,7 @@
       if(ev.target.dataset.refetch){ autoFillTeijiMonths(emp, renderEmpMaster); return; }
       if(ev.target.dataset.apply){ var ak=ev.target.dataset.apply; if(!emp.apply)emp.apply={}; emp.apply[ak]=(emp.apply[ak]===false)?true:false; renderEmpMaster(); return; }
       if(ev.target.dataset.short){ emp.shortTime=!emp.shortTime; renderEmpMaster(); return; }
+      if(ev.target.dataset.shfixed){ if(!emp.shaho)emp.shaho={months:[]}; emp.shaho.fixedChanged=!emp.shaho.fixedChanged; renderEmpMaster(); return; }
       if(ev.target.dataset.rtik){ emp.residentTaxIkkatsu=!emp.residentTaxIkkatsu; renderEmpMaster(); return; }
       if(ev.target.dataset.taxc){ emp.taxClass=ev.target.dataset.taxc; renderEmpMaster(); return; }
       if(ev.target.classList.contains('wb-chip')){ var wlab=ev.target.dataset.wb; emp.wbInclude=emp.wbInclude||[]; emp.wbExclude=emp.wbExclude||[];
@@ -2012,6 +2035,8 @@
       if(t.classList.contains('sh-pay')||t.classList.contains('sh-days')){ var k=+t.dataset.k; emp.shaho.months[k]=emp.shaho.months[k]||{}; emp.shaho.months[k][t.classList.contains('sh-pay')?'pay':'days']=t.value; refreshShaho(i); return; }
       if(t.classList.contains('sh-mikomi')){ emp.shaho.mikomi=t.value; refreshShaho(i); return; }
       if(t.classList.contains('sh-manual')){ emp.shaho.manual=t.value; refreshShaho(i); return; }
+      if(t.classList.contains('sh-prevhyojun')){ emp.shaho.prevHyojun=t.value; refreshZuiji(i); return; }
+      if(t.classList.contains('sh-henko')){ emp.shaho.henkoYm=t.value; refreshZuiji(i); return; }
       var f=t.dataset.f; if(f&&!t.matches('select')) emp[f]=t.value; var nm=card.querySelector('.mco-nm'); if(f==='name'&&nm)nm.textContent=t.value||'（無名）';
       // 基本給/時給/歩合/通勤等の変更で「社会保険(自動)」ヒーローを即再計算(タブ切替まで古い額が出るのを防ぐ)
       if(f==='base'||f==='hourly'||f==='commissionAmt'||f==='hourlyGuarantee'||f==='commute'||f==='commuteKm') refreshShaho(i); });
