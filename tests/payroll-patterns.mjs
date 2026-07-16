@@ -147,6 +147,49 @@ T('入退社: 月途中入社/退職で基本給が日割になる', function ()
   ok(baseMid < baseFull, '入社月は日割で基本給減');
 });
 
+// ── ⑨b 年末調整: 給与所得控除/基礎控除(令和8)/累進/復興税/各種控除/住宅ローン税額控除 ──
+T('年末調整: 給与所得控除・基礎控除R8・算出税・復興税・過不足が正しい', function () {
+  const NM = win.Nenmatsu; ok(NM && NM.computeNencho, 'Nenmatsu露出');
+  const r = NM.computeNencho({ kyuyoShunyu: 5000000, shakaiHoken: 750000 });
+  near(r.kyuyoShotoku, 3560000, 1, '給与所得(控除144万)');      // 500万×20%+44万=144万控除
+  near(r.kojoList.kiso, 990000, 1, '基礎控除R8=99万');
+  near(r.kazeiKyuyoShotoku, 1820000, 1, '課税所得');
+  near(r.sanshutuZei, 91000, 1, '算出税(5%)');
+  near(r.nenchouNenzei, 92900, 1, '年調年税額(×1.021・百円切捨)');
+  const r3 = NM.computeNencho({ kyuyoShunyu: 3000000, shakaiHoken: 450000 });
+  near(r3.kyuyoShotoku, 2020000, 1, '300万→給与所得控除98万');
+});
+T('年末調整: 各種控除が効く(生保/地震/障害者/配偶者/扶養/住宅ローン税額控除)', function () {
+  const NM = win.Nenmatsu;
+  ok(NM.computeNencho({ kyuyoShunyu: 5000000, seimei: { generalNew: 120000 } }).kojoList.seimei === 40000, '生保 一般新12万→4万上限');
+  ok(NM.computeNencho({ kyuyoShunyu: 5000000, seimei: { generalNew: 120000, kaigo: 120000, pensionNew: 120000 } }).kojoList.seimei === 120000, '生保 総上限12万');
+  const base = NM.computeNencho({ kyuyoShunyu: 5000000, shakaiHoken: 750000 });
+  const withFuyo = NM.computeNencho({ kyuyoShunyu: 5000000, shakaiHoken: 750000, fuyoKojo: 760000 });
+  ok(withFuyo.kazeiKyuyoShotoku < base.kazeiKyuyoShotoku, '扶養控除で課税所得減');
+  const withLoan = NM.computeNencho({ kyuyoShunyu: 5000000, shakaiHoken: 750000, jutakuLoan: 200000 });
+  ok(withLoan.nenchouNenzei < base.nenchouNenzei && withLoan.kazeiKyuyoShotoku === base.kazeiKyuyoShotoku, '住宅ローンは税額控除(課税所得は不変・年税額のみ減)');
+});
+
+// ── ⑨c 住民税モード / 退職月資格喪失 / 社保翌月徴収 ──
+T('住民税: 月額直接 と 年額12分割(端数初月寄せ)', function () {
+  const m = A.compute(emp({ payType: '月給', base: '300000', residentTaxMode: 'monthly', residentTax: '12500' }));
+  near(kojo(m, '住民税'), 12500, 0, '月額直接');
+  const y = A.compute(emp({ payType: '月給', base: '300000', residentTaxMode: 'annual', residentTaxAnnual: '180000' }));
+  near(kojo(y, '住民税'), 15000, 0, '年額18万÷12');
+});
+T('退職月: 月中退職=社保0(前月まで) / 月末退職=当月社保あり', function () {
+  const mid = A.compute(emp({ payType: '月給', base: '300000', taishokuYmd: '2026-06-15' }));
+  ok(kojo(mid, '健康保険') === 0 && kojo(mid, '厚生年金') === 0, '6/15月中退職は当月社保0');
+  const end = A.compute(emp({ payType: '月給', base: '300000', taishokuYmd: '2026-06-30' }));
+  ok(kojo(end, '健康保険') > 0, '6/30月末退職は当月社保あり');
+});
+T('社保 翌月徴収(shahoTiming=next): 入社月は当月0', function () {
+  A.state.company.shahoTiming = 'next';
+  const r = A.compute(emp({ payType: '月給', base: '300000', joinYmd: '2026-06-10' }));
+  A.state.company.shahoTiming = 'current';
+  ok(kojo(r, '健康保険') === 0 && kojo(r, '厚生年金') === 0, '翌月徴収の入社月は社保0');
+});
+
 // ── ⑩ 網羅: 全形態×扶養0-3×県5×年齢4=480 → NaN/差引不一致/手取りマイナス ゼロ ──
 T('網羅480ケース: NaN・差引不一致・手取りマイナス ゼロ', function () {
   const PT = [['月給', 'base', '280000'], ['時給', 'hourly', '1500'], ['日給', 'base', '13000'], ['歩合', 'commissionAmt', '300000'], ['役員', 'base', '600000'], ['カスタム', '_pr', '']];
