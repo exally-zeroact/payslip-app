@@ -228,6 +228,19 @@ await (async () => {
   });
 })();
 
+T('表入力ビュー: 「今月を確定」ボタンが出る・"undefined"を表示しない(confirmBtn定義順バグ回帰)', function () {
+  const q = s => doc.querySelector(s);
+  // 2名いる前提(冒頭でemployees2名設定済)。入力→表ビュー
+  q('.bn[data-scr="scr-input"]').click();
+  const tv = q('[data-ivw="table"]'); ok(tv, '表ビュー切替(2名以上)');
+  tv.click();
+  const list = q('#input-list');
+  ok(q('#input-list [data-confirm-month]'), '表ビューに「今月を確定」ボタンがある');
+  ok(!/undefined/.test(list.innerHTML), '表ビューに "undefined" 文字列が出ていない');
+  // カードビューに戻す
+  const cv = q('[data-ivw="card"]'); if (cv) cv.click();
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

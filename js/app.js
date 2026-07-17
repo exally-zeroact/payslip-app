@@ -849,7 +849,7 @@
         html+='<div class="mco'+(op?' open':'')+(e.retired?' mco-retired':'')+'" data-i="'+i+'">'
           +'<div class="mco-hd" data-toggle="'+i+'"><span class="mco-nm">'+esc(e.name||'（無名）')+'</span>'
             +'<span class="hd-chip'+(e.workStatus&&e.workStatus!=='normal'?' on':'')+'" data-goleave="'+i+'">'+(e.workStatus&&e.workStatus!=='normal'?esc(WS_LABEL(e.workStatus)):'休暇')+'</span>'
-            +'<span class="hd-chip" data-goretire="'+i+'">退職</span>'
+            +(e.retired?'<span class="hd-chip" style="color:#8a7a4e;border-color:#e6dcb0;cursor:default">退職済</span>':'')
             +'<span class="mco-sub">'+esc(e.payType)+(e.role?' / '+esc(e.role):'')+'</span>'
             +(visibleEmpIdx().length>1?'<span class="mco-ord"><button class="ord-b" data-moveup="'+i+'" title="上へ" aria-label="上へ移動">▲</button><button class="ord-b" data-movedn="'+i+'" title="下へ" aria-label="下へ移動">▼</button></span>':'')
             +'<span class="mco-cv">▾</span></div>'
@@ -1161,6 +1161,10 @@
     var viewToggle=activeCount>1 ? '<div class="in-view-seg imode-seg" style="grid-template-columns:1fr 1fr;max-width:320px">'
       +'<b class="ivw'+(view==='card'?' on':'')+'" data-ivw="card">カードで1人ずつ</b>'
       +'<b class="ivw'+(view==='table'?' on':'')+'" data-ivw="table">表でまとめて</b></div>' : '';
+    // 「今月を確定」ボタン(表/カード両ビューで共通)。★以前は表ビューで未定義=「undefined」表示+確定不可だった★
+    var confirmBtn='<div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px"><button class="btn-primary" data-confirm-month style="flex:0 0 auto;padding:11px 18px;font-size:14px">今月を確定（台帳・年調に反映）</button>'
+      +(cnt.need>0?'<span style="font-size:11px;color:#92500A;font-weight:700">未確認 '+cnt.need+'名</span>':'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 確認済</span>')
+      +'<span style="font-size:10px;color:#5C7E6C"><b>保存は自動</b>です。「確定」は全員を確認済みにし、<b>賃金台帳・年末調整の集計対象</b>として今月を記録します（あとで直せます）。</span></div>';
     if(view==='table' && activeCount>1){ host.innerHTML=statutoryStaleWarn()+calHTML+progHTML+viewToggle+renderInputTableHTML(reviewOnly)+confirmBtn; return; }
     var cards=state.employees.map(function(e,i){
       if(!isActiveInMonth(e,state.month)) return '';
@@ -1197,9 +1201,6 @@
       return;
     }
     var emptyMsg=(reviewOnly && !cards) ? '<p class="hint" style="text-align:center;padding:18px 0">要確認の人はいません（全員確認済み）。</p>' : '';
-    var confirmBtn='<div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px"><button class="btn-primary" data-confirm-month style="flex:0 0 auto;padding:11px 18px;font-size:14px">今月を確定（台帳・年調に反映）</button>'
-      +(cnt.need>0?'<span style="font-size:11px;color:#92500A;font-weight:700">未確認 '+cnt.need+'名</span>':'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 確認済</span>')
-      +'<span style="font-size:10px;color:#5C7E6C"><b>保存は自動</b>です。「確定」は全員を確認済みにし、<b>賃金台帳・年末調整の集計対象</b>として今月を記録します（あとで直せます）。</span></div>';
     host.innerHTML=statutoryStaleWarn()+calHTML+progHTML+viewToggle+cards+emptyMsg+confirmBtn;
   }
   // 表でまとめて入力(全従業員1画面・弥生の弱点/Exallyモデル)。列は既存と同じdata属性を再利用=同じハンドラで書ける。
