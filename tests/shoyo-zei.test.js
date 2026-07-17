@@ -42,16 +42,23 @@ T('賞与源泉: 賞与の社保控除後に率を掛ける', function () {
   var r = SZ.calcBonusTax({ bonus: 600000, bonusSI: 90000, prevSalary: 350000, prevSI: 60000, fuyou: 0, payYm: '2026-12' });
   eq(r.tax, Math.floor(510000 * 0.06126));
 });
-T('特例: 前月給与なし → special(自動算出せず・月額表案件)', function () {
-  var r = SZ.calcBonusTax({ bonus: 500000, prevSalary: 0, payYm: '2026-12' });
-  eq(r.special, true); eq(r.tax, 0);
+var Densan = require('../lib/shotokuzei-densan.js');
+T('特例: 前月給与なし → 月額表で自動計算(手計算に投げない)', function () {
+  // 大きめの賞与で非ゼロを確認: 賞与300万・扶養0・甲。式= 月額表(300万÷6)×6
+  var r = SZ.calcBonusTax({ bonus: 3000000, prevSalary: 0, fuyou: 0, taxClass: 'ko', payYm: '2026-12' });
+  eq(r.special, true); eq(r.specialComputed, true);
+  var expect = Densan.calcByClass(Math.floor(3000000 / 6), 0, 'ko', { year: 2026 }) * 6;
+  eq(r.tax, expect); ok(r.tax > 0, '前月なし特例が税0で投げられていない(' + r.tax + ')');
 });
-T('特例: 賞与(社保後)が前月課税の10倍超 → special', function () {
-  // 前月課税29万 → 10倍=290万。賞与300万>290万 → special
-  var r = SZ.calcBonusTax({ bonus: 3000000, bonusSI: 0, prevSalary: 350000, prevSI: 60000, fuyou: 0, payYm: '2026-12' });
-  eq(r.special, true);
-  // ちょうど10倍(290万)は特例でない
-  ok(SZ.calcBonusTax({ bonus: 2900000, bonusSI: 0, prevSalary: 350000, prevSI: 60000, fuyou: 0, payYm: '2026-12' }).special === false);
+T('特例: 賞与が前月課税の10倍超 → 月額表で自動計算((A-B)×6)', function () {
+  // 前月課税25万 → 10倍=250万。賞与300万>250万 → 特例
+  var r = SZ.calcBonusTax({ bonus: 3000000, bonusSI: 0, prevSalary: 250000, prevSI: 0, fuyou: 1, taxClass: 'ko', payYm: '2026-12' });
+  eq(r.special, true); eq(r.specialComputed, true);
+  var A = Densan.calcByClass(250000 + Math.floor(3000000 / 6), 1, 'ko', { year: 2026 });
+  var B = Densan.calcByClass(250000, 1, 'ko', { year: 2026 });
+  eq(r.tax, (A - B) * 6); ok(r.tax > 0, '10倍超特例が計算される(' + r.tax + ')');
+  // ちょうど10倍(250万)は特例でない(算出率表)
+  ok(SZ.calcBonusTax({ bonus: 2500000, bonusSI: 0, prevSalary: 250000, prevSI: 0, fuyou: 1, payYm: '2026-12' }).special === false);
 });
 T('乙欄も自動計算: 賞与50万・前月課税29万 → 乙20.420% → floor(500000×20.42%)=102,100', function () {
   var r = SZ.calcBonusTax({ bonus: 500000, bonusSI: 0, prevSalary: 350000, prevSI: 60000, taxClass: 'otsu', payYm: '2026-12' });
