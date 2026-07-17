@@ -737,15 +737,22 @@
     var s=e.shaho||{}; var PC=window.PayrollCalc;
     if(!(PC&&PC.zuijiKaitei)) return '';
     var z=PC.zuijiKaitei({ months:(s.months||[]).map(function(m){return {pay:num(m&&m.pay),days:num(m&&m.days)};}), prevHyojun:num(s.prevHyojun), fixedChanged:!!s.fixedChanged, henkoYm:s.henkoYm });
+    // 厚年・健保それぞれの答えを1行ずつ出す(随時改定は保険ごとに届け出る)
+    function insLine(lbl, ins){
+      if(!(ins.prevGrade>0||ins.newGrade>0)) return '';
+      var tag=ins.eligible?'<b style="color:#2E7D54">該当</b>':'<span style="color:#7A8B83">対象外</span>';
+      return '<div class="zk-ins">'+lbl+'：従前 '+ins.prevGrade+'等級（'+yen(ins.prevHyojun)+'）→ 改定後 '+ins.newGrade+'等級（'+yen(ins.newHyojun)+'）／'+ins.diff+'等級差　'+tag+'</div>';
+    }
     if(z.eligible){
-      return '<div class="zk-hit"><div class="zk-t">✓ 随時改定に該当します（月額変更届の対象）</div>'
-        +'<div class="zk-d">従前 '+yen(num(s.prevHyojun))+'（'+z.prevGrade+'等級）→ 改定後 <b>'+yen(z.newHyojun)+'</b>（'+z.newGrade+'等級）／'+z.gradeDiff+'等級差'
-        +(z.applyYm?'<br>適用：<b>'+z.applyYm+'</b>から（変動月の4か月目）':'')+'</div>'
+      return '<div class="zk-hit"><div class="zk-t">✓ 随時改定に該当します（'+esc(z.which||'')+'）</div>'
+        +insLine('厚生年金', z.pension)+insLine('健康保険', z.health)
+        +(z.applyYm?'<div class="zk-d">適用：<b>'+z.applyYm+'</b>から（変動月の4か月目）'+((z.pension.eligible!==z.health.eligible)?'　※該当した保険だけ届け出ます':'')+'</div>':'')
         +'<div class="zk-note">※ 届出（月額変更届）は事業主が年金事務所へ。このアプリは要件の目安です。</div></div>';
     }
     return '<div class="zk-miss"><div class="zk-t">今のところ随時改定には該当しません</div>'
+      +insLine('厚生年金', z.pension)+insLine('健康保険', z.health)
       +(z.reasons&&z.reasons.length?'<ul class="zk-rs">'+z.reasons.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>':'')
-      +(z.avg>0?'<div class="zk-note">3か月平均 '+yen(z.avg)+'（'+z.newGrade+'等級）。上の要件を満たすと届出対象になります。</div>':'')+'</div>';
+      +(z.avg>0?'<div class="zk-note">3か月平均 '+yen(z.avg)+'。2等級以上の差＋固定給変動＋全月17日以上で届出対象になります。</div>':'')+'</div>';
   }
   function refreshZuiji(i){ var e=state.employees[i]; var card=$('#emp-list .mco[data-i="'+i+'"]'); if(!card)return; var box=card.querySelector('.zk-box'); if(box) box.innerHTML=zuijiJudgeHTML(e); }
   function shahoSection(e){
@@ -1317,7 +1324,8 @@
       if(hyojun>0&&c.si.koseiBase<hyojun) caps+='<span class="cap-badge">厚年 1回150万上限</span>';
       var taxLine, warn='';
       if(c.noPrev){ taxLine='<div class="calc-line"><span>源泉所得税</span><span class="v">前月給与の入力待ち</span></div>'; }
-      else if(c.tax.special){ taxLine='<div class="calc-line"><span>源泉所得税</span><span class="v">月額表で要計算</span></div>'; warn='<div class="cr-warn" style="margin:6px 0">⚠ この賞与は<b>特例</b>です（前月に給与がない、または賞与が前月給与（社保後）の<b>10倍超</b>）。通常の算出率表が使えず<b>月額表</b>で計算するため、源泉所得税は手計算してください。<span class="help-i" data-help="bonusPrev">💡</span></div>'; }
+      else if(c.tax.special && c.tax.specialComputed){ taxLine='<div class="calc-line"><span>源泉所得税（特例・月額表）</span><span class="v">'+yen(c.taxAmt)+'</span></div>'; warn='<div class="hint" style="margin:6px 0;color:#3D6B53">この賞与は<b>特例</b>（前月に給与がない、または賞与が前月給与（社保後）の<b>10倍超</b>）のため、算出率表でなく<b>月額表で自動計算</b>しました（'+(c.tax.months||6)+'か月で按分）。<span class="help-i" data-help="bonusPrev">💡</span></div>'; }
+      else if(c.tax.special){ taxLine='<div class="calc-line"><span>源泉所得税</span><span class="v">月額表で要計算</span></div>'; warn='<div class="cr-warn" style="margin:6px 0">⚠ この賞与は<b>特例</b>です（前月に給与がない、または賞与が前月給与（社保後）の<b>10倍超</b>）。税額表が読み込めなかったため、源泉所得税は月額表で確認してください。<span class="help-i" data-help="bonusPrev">💡</span></div>'; }
       else { taxLine='<div class="calc-line"><span>源泉所得税（率 '+c.tax.rate+'%'+(c.tax.otsu?'・乙欄':'')+'）</span><span class="v">'+yen(c.taxAmt)+'</span></div>'; }
       // 追加支給/任意控除の編集UI(月次と同じ自由度)。data-bs*/bk*=賞与の追加項目
       var sItems=(en.addShikyu||[]).map(function(it,idx){ return '<div class="bx-row">'
