@@ -294,3 +294,56 @@ update exally_entitlements e set email = u.email from auth.users u where u.id = 
 
 -- ★司さんを管理者に登録(自分のログインメールに置き換えて実行)★
 -- insert into exally_admins (account_id) select id from auth.users where email = 'ここに司さんのログインメール';
+
+-- ════════════════════════════════════════════════════════════════════════
+-- 年末調整 従業員セルフ申告(Web明細から本人がスマホで入力) ★step2・2026-07-18★
+--   ★DDL/RPCの本体と説明は supabase/nencho-decl.sql に集約(貼り付け用)。ここは同一内容を再掲。★
+--   Web明細(pay_meisai_pub)で認証済みの従業員が年末調整の申告(配偶者/扶養/保険料等)を
+--   スマホから保存→会社(account_id=auth.uid)が読み、管理アプリの年調へ取り込む(applyToNencho)。
+--   認証は明細と同方式(device_token or パスワード)。account_id/employee_idはpubから引く=詐称不可。
+-- ════════════════════════════════════════════════════════════════════════
+create table if not exists pay_nencho_decl (
+  token        uuid not null references pay_meisai_pub(token) on delete cascade,
+  account_id   uuid not null references auth.users(id) on delete cascade,
+  employee_id  text not null,
+  year         int  not null,
+  decl         jsonb not null default '{}'::jsonb,
+  submitted_at timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  primary key (token, year)
+);
+create index if not exists idx_pay_nencho_decl_acct on pay_nencho_decl(account_id, year);
+alter table pay_nencho_decl enable row level security;
+drop policy if exists own_pay_nencho_decl on pay_nencho_decl;
+create policy own_pay_nencho_decl on pay_nencho_decl for all
+  using (account_id = auth.uid()) with check (account_id = auth.uid());
+create or replace function save_nencho_decl(p_token uuid, p_device text, p_pw text, p_year int, p_decl jsonb)
+returns jsonb language plpgsql security definer set search_path=public, extensions as $$
+declare v_pub pay_meisai_pub; v_ok boolean;
+begin
+  select * into v_pub from pay_meisai_pub where token=p_token;
+  if v_pub.token is null then return jsonb_build_object('ok',false,'unauth',true); end if;
+  if v_pub.locked_until is not null and v_pub.locked_until > now() then return jsonb_build_object('ok',false,'locked',true,'retry_at',v_pub.locked_until); end if;
+  v_ok := (p_device is not null and p_device = any(v_pub.device_tokens))
+       or (p_pw is not null and v_pub.pw_hash is not null and v_pub.pw_hash = crypt(p_pw, v_pub.pw_hash));
+  if not v_ok then return jsonb_build_object('ok',false,'unauth',true); end if;
+  if p_year is null or p_year < 2000 or p_year > 2100 then return jsonb_build_object('ok',false,'bad_year',true); end if;
+  insert into pay_nencho_decl(token, account_id, employee_id, year, decl, submitted_at, updated_at)
+    values (p_token, v_pub.account_id, v_pub.employee_id, p_year, coalesce(p_decl,'{}'::jsonb), now(), now())
+    on conflict (token, year) do update set decl=excluded.decl, updated_at=now();
+  return jsonb_build_object('ok',true);
+end $$;
+create or replace function get_nencho_decl(p_token uuid, p_device text, p_pw text, p_year int)
+returns jsonb language plpgsql security definer set search_path=public, extensions as $$
+declare v_pub pay_meisai_pub; v_ok boolean; v_row pay_nencho_decl;
+begin
+  select * into v_pub from pay_meisai_pub where token=p_token;
+  if v_pub.token is null then return jsonb_build_object('unauth',true); end if;
+  v_ok := (p_device is not null and p_device = any(v_pub.device_tokens))
+       or (p_pw is not null and v_pub.pw_hash is not null and v_pub.pw_hash = crypt(p_pw, v_pub.pw_hash));
+  if not v_ok then return jsonb_build_object('unauth',true); end if;
+  select * into v_row from pay_nencho_decl where token=p_token and year=p_year;
+  if v_row.token is null then return jsonb_build_object('found',false); end if;
+  return jsonb_build_object('found',true,'decl',v_row.decl,'submittedAt',v_row.submitted_at,'updatedAt',v_row.updated_at);
+end $$;
+grant execute on function save_nencho_decl(uuid,text,text,int,jsonb), get_nencho_decl(uuid,text,text,int) to anon;

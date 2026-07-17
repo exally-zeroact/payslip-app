@@ -327,6 +327,51 @@
     return Promise.resolve(true);
   };
 
+  // ── 年末調整 従業員セルフ申告(Web明細から本人が入力→会社が取り込む) ──
+  //  本番=Supabase RPC(save_nencho_decl/get_nencho_decl・認証は明細と同じdevice/pw)。localStorage層は下のMNCH。
+  //  declは lib/nencho-declaration.js の normalize済オブジェクト(サーバは中身を検証せず保管)。
+  var MNCH_KEY='payslip_nencho_decl_v1';
+  function mNch(){ try{ return JSON.parse(localStorage.getItem(MNCH_KEY)||'[]'); }catch(e){ return []; } }
+  function mNchW(a){ try{ localStorage.setItem(MNCH_KEY, JSON.stringify(a)); }catch(e){} }
+  // 従業員: 申告を保存(認証必須)。返り={ok} or {unauth}
+  Store.saveNenchoDecl = function(token, cred, year, decl){
+    if(hasSupa){ cred=cred||{};
+      return sb.rpc('save_nencho_decl', { p_token:token, p_device:cred.deviceToken||null, p_pw:cred.password||null, p_year:year, p_decl:decl||{} }).then(function(r){
+        var d=r.data||{}; return { ok:!!d.ok, unauth:!!d.unauth, badYear:!!d.bad_year, locked:!!d.locked };
+      });
+    }
+    var f=findPub(token); if(!f.p) return Promise.resolve({ ok:false, unauth:true });
+    if(!authPub(f.p, cred)) return Promise.resolve({ ok:false, unauth:true });
+    var now=new Date().toISOString(), all=mNch();
+    var i=all.findIndex(function(x){ return x.token===token && x.year===year; });
+    var row={ token:token, employeeId:f.p.employeeId, year:year, decl:decl||{}, submittedAt:(i>=0?all[i].submittedAt:now), updatedAt:now };
+    if(i>=0) all[i]=row; else all.push(row); mNchW(all);
+    return Promise.resolve({ ok:true });
+  };
+  // 従業員: 自分の申告を取得(前回の続き/確認)。返り={found,decl,submittedAt,updatedAt} or {unauth}
+  Store.getNenchoDecl = function(token, cred, year){
+    if(hasSupa){ cred=cred||{};
+      return sb.rpc('get_nencho_decl', { p_token:token, p_device:cred.deviceToken||null, p_pw:cred.password||null, p_year:year }).then(function(r){
+        var d=r.data||{}; if(d.unauth) return { unauth:true }; if(!d.found) return { found:false };
+        return { found:true, decl:d.decl||{}, submittedAt:d.submittedAt, updatedAt:d.updatedAt };
+      });
+    }
+    var f=findPub(token); if(!f.p) return Promise.resolve({ unauth:true });
+    if(!authPub(f.p, cred)) return Promise.resolve({ unauth:true });
+    var row=mNch().filter(function(x){ return x.token===token && x.year===year; })[0];
+    if(!row) return Promise.resolve({ found:false });
+    return Promise.resolve({ found:true, decl:row.decl||{}, submittedAt:row.submittedAt, updatedAt:row.updatedAt });
+  };
+  // 会社: 提出済みの申告一覧(その年)。RLSで自分の発行分のみ。返り=[{employeeId,decl,submittedAt,updatedAt}]
+  Store.listNenchoDecl = function(year){
+    if(hasSupa){
+      return sb.from('pay_nencho_decl').select('employee_id,decl,submitted_at,updated_at').eq('year', year).then(function(r){
+        return (r.data||[]).map(function(x){ return { employeeId:x.employee_id, decl:x.decl||{}, submittedAt:x.submitted_at, updatedAt:x.updated_at }; });
+      });
+    }
+    return Promise.resolve(mNch().filter(function(x){ return x.year===year; }).map(function(x){ return { employeeId:x.employeeId, decl:x.decl||{}, submittedAt:x.submittedAt, updatedAt:x.updatedAt }; }));
+  };
+
   // 中央の法定データ(statutory テーブル)を取得。全アプリ共通・anon読取可。localやDB無しは[]=libのハードコードで動く(フォールバック)。
   Store.getStatutory = function(){
     if(hasSupa){ return sb.from('statutory').select('kind,year,data').then(function(r){ return r.data||[]; }).catch(function(){ return []; }); }

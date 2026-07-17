@@ -1630,6 +1630,18 @@
   }
   // 申告フォーム(nen-detail)だけ開いた状態を保ったまま再描画（when依存行の出し入れ用）
   function nenRefreshDetail(eid){ var d=$('#nen-detail-'+eid); if(!d)return; var agg=nenAggregate(state._nenRecs, eid); d.innerHTML=nenDetailInner(eid, nenStore(eid), agg); }
+  // 従業員がWeb明細から出した年末調整の申告バナー(会社が「取り込む」→n.*へ反映)
+  function nenDeclBannerHTML(eid){
+    var d=(state._nenDecls||{})[eid]; if(!d||!d.decl) return '';
+    var nd=NDcl(), sum=(nd&&nd.summarize)?nd.summarize(d.decl):[];
+    var when=''; try{ var t=d.updatedAt||d.submittedAt; if(t) when=new Date(t).toLocaleDateString('ja-JP'); }catch(_){}
+    return '<div class="nen-decl-banner" style="margin:8px 0 0;background:#EAF7F0;border:1.5px solid #C8ECD8;border-radius:10px;padding:10px 12px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
+      +'<b style="font-size:12.5px;color:#2E7D54">📝 本人がWebで年末調整の申告を提出'+(when?'（'+esc(when)+'）':'')+'</b>'
+      +'<button class="btn-ghost" data-nendecl-import="'+attr(eid)+'" style="padding:6px 12px;font-size:12px;white-space:nowrap">申告内容を取り込む</button></div>'
+      +(sum.length?'<div class="hint" style="margin-top:6px;color:#3D6B53;line-height:1.7">'+sum.map(esc).join('<br>')+'</div>':'<div class="hint" style="margin-top:4px">申告項目は空欄（該当なし）でした。</div>')
+      +'</div>';
+  }
   function nenEmpHTML(e, recs){
     var agg=nenAggregate(recs, e.id), n=nenStore(e.id);
     var warn = agg.months===0 ? '<div class="cr-warn" style="margin:6px 0 0">⚠ 当年の保存済み明細がありません。「今月を確定」で月次を保存するか、下の「年調の申告入力」で収入・源泉を手入力してください。</div>' : (agg.months<12?'<div class="hint" style="margin:4px 0 0;color:#92500A">保存済み '+agg.months+'/12か月分から集計中（不足月は手入力で補完可）</div>':'');
@@ -1637,6 +1649,7 @@
       +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>'+esc(e.name||'(無名)')+'</b>'
       +'<button class="btn-ghost" data-ntoggle="'+attr(e.id)+'" style="padding:5px 10px;font-size:12px">年調の申告入力 ▾</button></div>'
       +warn
+      +nenDeclBannerHTML(e.id)
       +nenDetailHTML(e.id, n, agg)
       +'<div id="nen-res-'+attr(e.id)+'" style="margin-top:8px">'+nenResHTML(nenCompute(agg,n), n)+'</div>'
       +'</div>';
@@ -1660,8 +1673,11 @@
     var host=$('#view-nen'); if(!host)return; var year=nenYear();
     if(!(window.Store&&Store.getPayslipsByYm&&Nen_())){ host.innerHTML='<div class="empty-cta"><div class="ec-emoji">📅</div><div class="ec-t">年末調整のデータがまだありません</div><div class="ec-s">各月の入力を「今月を確定」で記録すると、1〜12月分がここに自動集計されます。まずは入力タブで当月を確定してください。</div><button class="btn-primary ec-btn" data-scr="scr-input">入力タブへ</button></div>'; return; }
     host.innerHTML='<div class="card"><div class="card-h">年末調整 '+year+'年</div><p class="hint">読込中…</p></div>';
-    Store.getPayslipsByYm(year+'-01', year+'-12').then(function(recs){ host.innerHTML=nenViewHTML(confirmedRecs(recs), year); nenTotal(); })
-      .catch(function(){ host.innerHTML='<div class="card"><p class="hint">読込に失敗しました。</p></div>'; });
+    var declP = (Store.listNenchoDecl) ? Store.listNenchoDecl(year).catch(function(){ return []; }) : Promise.resolve([]);
+    Promise.all([Store.getPayslipsByYm(year+'-01', year+'-12'), declP]).then(function(res){
+      var recs=res[0], decls=res[1]||[]; state._nenDecls={}; decls.forEach(function(d){ if(d&&d.employeeId) state._nenDecls[d.employeeId]=d; }); // 従業員のWeb申告(employeeId→{decl,submittedAt,updatedAt})
+      host.innerHTML=nenViewHTML(confirmedRecs(recs), year); nenTotal();
+    }).catch(function(){ host.innerHTML='<div class="card"><p class="hint">読込に失敗しました。</p></div>'; });
   }
   // 年末調整一覧(源泉徴収簿)のExcel出力。年調ビューが描画済み(state._nenEmps/_nenRecs)前提。
   function nenDownloadXlsx(){
@@ -2174,6 +2190,12 @@
     var vnen=$('#view-nen'); if(vnen) vnen.addEventListener('input',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; if(f.tagName==='SELECT'||f.type==='checkbox')return; /* checkbox/selectはchangeに任せ二重発火を防ぐ */ nenSetField(f.dataset.eid, f.dataset.nf, f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); });
     if(vnen) vnen.addEventListener('change',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; if(f.tagName==='SELECT'||f.type==='checkbox'){ nenSetField(f.dataset.eid, f.dataset.nf, f.type==='checkbox'?f.checked:f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); } });
     if(vnen) vnen.addEventListener('click',function(e){ var t=e.target.closest('[data-ntoggle]'); if(t){ var b=$('#nen-detail-'+t.dataset.ntoggle); if(b){ var op=b.style.display==='none'; b.style.display=op?'':'none'; t.textContent=op?'閉じる ▲':'年調の申告入力 ▾'; } return; }
+      var imp=e.target.closest('[data-nendecl-import]'); if(imp){ var ieid=imp.dataset.nendeclImport, dd=(state._nenDecls||{})[ieid], nd2=NDcl();
+        if(dd&&dd.decl&&nd2){ nd2.applyToNencho(nenStore(ieid), dd.decl); // 従業員の申告をn.*へ反映(従業員の申告を正とする)
+          var det=$('#nen-detail-'+ieid); if(det&&det.style.display==='none'){ det.style.display=''; var tg=vnen.querySelector('[data-ntoggle="'+ieid+'"]'); if(tg)tg.textContent='閉じる ▲'; } // 反映を見せるため開く
+          nenRefreshDetail(ieid); nenRefreshEmp(ieid); if(window.persistSaveDebounced)persistSaveDebounced();
+          imp.textContent='取り込み済み ✓'; imp.style.background='#EAF7F0'; imp.style.color='#2E7D54'; } // 反映済みを明示(再クリックで再取り込み可)
+        return; }
       var yn=e.target.closest('[data-nfbool]'); if(yn){ var ynk=yn.dataset.nfbool, yne=yn.dataset.eid, ynv=yn.dataset.v==='1'; nenSetField(yne, ynk, ynv);
         var nd=NDcl(); var isParent=!!(nd&&nd.FIELDS.some(function(f){ return f.when===ynk; })); // この項目に依存する行があるか
         if(isParent){ nenRefreshDetail(yne); } // 依存行(配偶者の所得等)を出し入れするため申告フォームを再描画
@@ -2308,7 +2330,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

@@ -269,6 +269,16 @@ T('年調 平易ウィザード入力→ n.* に反映され控除に効く(実a
   ok(A.nenStore('WZ1').seiGeneralNew === '80000', 'nenStore に反映');
 });
 
+T('年調 従業員Web申告バナー: 提出があると要約+取り込みボタンが出る', function () {
+  const decl = win.NenchoDecl.normalize({ haiEnabled: true, haiShotoku: 300000, fuyoIppan: 2, seiGeneralNew: 80000 });
+  A.state._nenDecls = { WZ1: { decl, submittedAt: '2026-12-01T00:00:00Z', updatedAt: '2026-12-01T00:00:00Z' } };
+  const html = A.nenDeclBannerHTML('WZ1');
+  ok(html && /data-nendecl-import="WZ1"/.test(html), '取り込むボタンがある');
+  ok(/Webで年末調整の申告を提出/.test(html), '提出の見出し');
+  ok(/配偶者/.test(html) && /扶養/.test(html), '申告内容の要約(生活語)が出る');
+  ok(A.nenDeclBannerHTML('NOPE') === '', '提出が無い従業員はバナー無し');
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

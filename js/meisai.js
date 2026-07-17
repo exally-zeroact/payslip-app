@@ -5,7 +5,7 @@
 (function(){
   'use strict';
   var $=function(id){ return document.getElementById(id); };
-  var SCREENS=['sc-bad','sc-setup','sc-login','sc-consent','sc-list','sc-view'];
+  var SCREENS=['sc-bad','sc-setup','sc-login','sc-consent','sc-list','sc-view','sc-nencho'];
   function show(id){ SCREENS.forEach(function(s){ var el=$(s); if(el)el.classList.toggle('hidden', s!==id); }); }
   function yen(n){ n=Math.round(Number(n)||0); return '¥'+n.toLocaleString('en-US'); }
   function ymLabel(ym, kind){ var y=(ym||'').slice(0,4), m=parseInt((ym||'').slice(5,7),10)||0; return '令和'+(y-2018)+'年'+m+'月'+(kind==='bonus'?'（賞与）':'分'); }
@@ -110,4 +110,53 @@
   $('v-back').addEventListener('click', function(){ renderList(); show('sc-list'); });
   $('v-pdf').addEventListener('click', function(){ var f=$('frame'); try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){ window.print(); } });
   window.addEventListener('resize', function(){ if($('sc-view').classList.contains('hidden'))return; fitFrame(); });
+
+  // ⑥ 年末調整 従業員セルフ申告(平易な質問→保存。会社が取り込む)
+  var ND=window.NenchoDecl, nenYear=new Date().getFullYear(), declState={};
+  (function(){ var y=$('nencho-year'); if(y) y.textContent=nenYear+'年'; })();
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function fmtN(v){ v=Number(String(v==null?'':v).replace(/[, ]/g,'')); return isNaN(v)||v===0?'':v.toLocaleString('en-US'); }
+  function ynPill(key,on){ return '<span class="nw-yn" data-ynk="'+esc(key)+'"><b class="ynb'+(on?' on':'')+'" data-ynv="1">はい</b><b class="ynb'+(!on?' on':'')+'" data-ynv="0">いいえ</b></span>'; }
+  function nenWizHTML(){
+    if(!ND) return '<p class="hint">申告フォームを読み込めませんでした。</p>';
+    return ND.GROUPS.map(function(g){
+      var rows=ND.FIELDS.filter(function(f){ return f.group===g.id && (!f.when || !!declState[f.when]); }).map(function(f){
+        var help=f.help?'<div class="nw-help">'+esc(f.help)+'</div>':'', input;
+        if(f.type==='bool') input=ynPill(f.key, !!declState[f.key]);
+        else if(f.type==='select') input='<select class="finput" data-nk="'+esc(f.key)+'">'+(f.options||[]).map(function(o){ return '<option value="'+esc(o[0])+'"'+((declState[f.key]||'')===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select>';
+        else { var unit=(f.type==='count')?'人':'円'; input='<input class="finput num" data-nk="'+esc(f.key)+'" inputmode="numeric" value="'+esc(fmtN(declState[f.key]))+'" placeholder="0"><span class="nw-unit">'+unit+'</span>'; }
+        return '<div class="nw-row"><div class="nw-q">'+esc(f.q)+help+'</div><div class="nw-in">'+input+'</div></div>';
+      }).join('');
+      return '<div class="nw-group"><div class="nw-gt">'+esc(g.title)+'</div>'+rows+'</div>';
+    }).join('');
+  }
+  function renderNenWiz(){ var host=$('nencho-wiz'); if(host) host.innerHTML=nenWizHTML(); }
+  function openNencho(){
+    var errEl=$('nencho-err'); if(errEl)errEl.textContent=''; $('nencho-saved').classList.add('hidden');
+    Store.getNenchoDecl(token, cred, nenYear).then(function(r){
+      declState = (r && r.found && r.decl) ? JSON.parse(JSON.stringify(r.decl)) : (ND?ND.blank():{});
+      if(r && r.found){ var sv=$('nencho-saved'); sv.textContent='前回の申告を読み込みました。修正して再提出できます。'; sv.classList.remove('hidden'); }
+      renderNenWiz(); show('sc-nencho'); window.scrollTo(0,0);
+    });
+  }
+  var toN=$('to-nencho'); if(toN) toN.addEventListener('click', openNencho);
+  var nBack=$('nencho-back'); if(nBack) nBack.addEventListener('click', function(){ renderList(); show('sc-list'); });
+  var wiz=$('nencho-wiz');
+  if(wiz){
+    wiz.addEventListener('click', function(e){ var b=e.target.closest('.ynb'); if(!b)return; var pill=b.closest('[data-ynk]'); if(!pill)return;
+      declState[pill.dataset.ynk]=(b.dataset.ynv==='1'); renderNenWiz(); }); // when依存行(配偶者の所得等)の出し入れ
+    wiz.addEventListener('input', function(e){ var f=e.target.closest('[data-nk]'); if(!f||f.tagName==='SELECT')return; declState[f.dataset.nk]=f.value; });
+    wiz.addEventListener('change', function(e){ var f=e.target.closest('[data-nk]'); if(!f||f.tagName!=='SELECT')return; declState[f.dataset.nk]=f.value; });
+  }
+  var nSave=$('nencho-save');
+  if(nSave) nSave.addEventListener('click', function(){
+    var errEl=$('nencho-err'); if(errEl)errEl.textContent='';
+    var decl = ND ? ND.normalize(declState) : declState;
+    Store.saveNenchoDecl(token, cred, nenYear, decl).then(function(r){
+      if(!r || !r.ok){ if(errEl)errEl.textContent=(r&&r.unauth)?'ログインが必要です。もう一度開き直してください。':'保存できませんでした。通信環境をご確認ください。'; return; }
+      declState=JSON.parse(JSON.stringify(decl)); renderNenWiz();
+      var sv=$('nencho-saved'); sv.textContent='申告を保存しました。会社が確認して年末調整に反映します。修正があればこの画面から再提出できます。'; sv.classList.remove('hidden');
+      window.scrollTo(0,0);
+    });
+  });
 })();
