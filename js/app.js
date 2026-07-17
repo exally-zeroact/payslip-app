@@ -782,7 +782,7 @@
       if(mode==='zuiji'){
         body+='<div class="zk-inp"><div class="frow"><div class="flabel">変動があった月<span class="hint2">昇給・降給した月</span></div><input type="month" class="finput sh-henko" value="'+attr(s.henkoYm)+'"></div>'
           +'<div class="frow"><div class="flabel">従前の標準報酬月額<span class="hint2">円・変動前</span><span class="help-i" data-help="toukyu">💡</span></div><input class="finput num sh-prevhyojun" value="'+attr(s.prevHyojun)+'" placeholder="200000"></div>'
-          +'<div class="chip-row" style="margin:2px 0 6px"><span class="chip'+(s.fixedChanged?' on':'')+'" data-shfixed="1">'+(s.fixedChanged?'✓ ':'')+'固定的賃金（基本給・手当など）が変わった</span></div></div>';
+          +'<div class="nw-row" style="margin:2px 0 6px"><div class="nw-q">固定的賃金（基本給・手当など）が変わりましたか？<div class="nw-help">昇給・降給・手当の新設/廃止など。残業だけの増減は含みません。</div></div><div class="nw-in">'+ynPill('shfixed','1',!!s.fixedChanged)+'</div></div></div>';
         body+='<div class="zk-box">'+zuijiJudgeHTML(e)+'</div>';
       }
     } else if(mode==='shutoku'){
@@ -1051,16 +1051,17 @@
       +'<div class="frow"><div class="flabel">退職金の額<span class="hint2">円</span></div><input class="finput num" id="ts-gross" inputmode="numeric" placeholder="例 20000000" value=""></div>'
       +'<div class="frow2"><div class="frow"><div class="flabel">入社日</div><input class="finput" id="ts-join" type="date" value="'+attr(jymd)+'"></div>'
       +'<div class="frow"><div class="flabel">退職日</div><input class="finput" id="ts-ret" type="date" value="'+attr(tymd)+'"></div></div>'
-      +'<label class="cr-chk" style="display:flex;align-items:center;gap:6px;font-size:12px;margin:4px 0"><input type="checkbox" id="ts-report" checked>「退職所得の受給に関する申告書」を提出済み（未提出は一律20.42%）</label>'
-      +'<label class="cr-chk" style="display:flex;align-items:center;gap:6px;font-size:12px;margin:4px 0"><input type="checkbox" id="ts-officer">役員等で勤続5年以下（1/2課税なし）</label>'
-      +'<label class="cr-chk" style="display:flex;align-items:center;gap:6px;font-size:12px;margin:4px 0"><input type="checkbox" id="ts-short">勤続5年以下の一般従業員（短期退職手当等・300万超は1/2なし）</label>'
+      +'<div class="nw-row"><div class="nw-q">「退職所得の受給に関する申告書」を提出していますか？<div class="nw-help">未提出だと一律20.42%で計算します。</div></div><div class="nw-in">'+ynPill('tsyn','report',true)+'</div></div>'
+      +'<div class="nw-row"><div class="nw-q">役員等で勤続5年以下ですか？<div class="nw-help">はいの場合、1/2課税はありません。</div></div><div class="nw-in">'+ynPill('tsyn','officer',false)+'</div></div>'
+      +'<div class="nw-row"><div class="nw-q">勤続5年以下の一般従業員ですか？（短期退職手当等）<div class="nw-help">はいの場合、300万円超の部分は1/2になりません。</div></div><div class="nw-in">'+ynPill('tsyn','short',false)+'</div></div>'
       +'<div id="ts-result" style="margin-top:10px"></div>';
     uiModal({ title:'退職金の税金（退職所得の源泉徴収）', html:html, buttons:[{label:'閉じる',val:true,primary:true}],
       onRender:function(host){
+        function ynState(key){ var p=host.querySelector('[data-tsyn="'+key+'"][data-v="1"]'); return !!(p && /\bon\b/.test(p.className)); } // はい=data-v1のpillがon
         function upd(){
           var gross=num(host.querySelector('#ts-gross').value);
           var years=kinzokuYears(host.querySelector('#ts-join').value, host.querySelector('#ts-ret').value);
-          var opts={ noReport:!host.querySelector('#ts-report').checked, officer:host.querySelector('#ts-officer').checked, shortTerm:host.querySelector('#ts-short').checked };
+          var opts={ noReport:!ynState('report'), officer:ynState('officer'), shortTerm:ynState('short') };
           var r=TS.compute(Object.assign({gross:gross,years:years},opts));
           var el=host.querySelector('#ts-result');
           if(!gross||!years){ el.innerHTML='<div class="hint" style="color:#92500A">退職金の額と入社日・退職日を入れてください。</div>'; return; }
@@ -1074,6 +1075,9 @@
             +'</div><div class="hint" style="margin-top:6px">'+(opts.noReport?'※申告書未提出＝退職金×20.42%（住民税は別途分離）。':'※'+(opts.officer||opts.short?'1/2課税の制限を適用。':'(退職金−控除)×1/2に速算表。'))+'社会保険料は退職金にかかりません。</div></div>';
         }
         Array.prototype.forEach.call(host.querySelectorAll('input'), function(i){ i.addEventListener('input',upd); i.addEventListener('change',upd); });
+        // はい/いいえピルのクリック: 同じkeyの2つのpillのon切替→再計算
+        host.addEventListener('click',function(ev){ var b=ev.target.closest('[data-tsyn]'); if(!b)return; var key=b.dataset.tsyn, v=b.dataset.v==='1';
+          Array.prototype.forEach.call(host.querySelectorAll('[data-tsyn="'+key+'"]'), function(p){ p.classList.toggle('on',(p.dataset.v==='1')===v); }); upd(); });
         upd();
       }
     });
@@ -1588,30 +1592,44 @@
   function nenRefreshEmp(eid){ var host=$('#nen-res-'+eid); if(!host)return; var agg=nenAggregate(state._nenRecs, eid); var n=nenStore(eid); host.innerHTML=nenResHTML(nenCompute(agg,n), n); nenTotal(); }
   function nenTotal(){ var el=$('#nen-total'); if(!el)return; var t=0, emps=state._nenEmps||[]; emps.forEach(function(e){ var c=nenCompute(nenAggregate(state._nenRecs,e.id), nenStore(e.id)); if(c)t+=c.res.kabusoku; }); el.innerHTML = t<0?'<b style="color:#2E7D54">還付合計 '+yen(-t)+'</b>':(t>0?'<b style="color:#C0392B">追加徴収合計 '+yen(t)+'</b>':'過不足なし'); }
   function nf(eid, field, val, ph, wide){ return '<input class="finput num" data-eid="'+attr(eid)+'" data-nf="'+field+'" inputmode="numeric" value="'+attr(val==null?'':fmtN(val))+'" placeholder="'+(ph||'0')+'" style="'+(wide?'':'max-width:130px;')+'font-size:13px;padding:7px 8px">'; }
-  function nenDetailHTML(eid, n, agg){
-    function chk(field,label){ return '<label style="font-size:12px;display:inline-flex;align-items:center;gap:4px;margin-right:12px"><input type="checkbox" data-eid="'+attr(eid)+'" data-nf="'+field+'"'+(n[field]?' checked':'')+'>'+label+'</label>'; }
-    var shougaiOpts=[['','障害者なし'],['ippan','一般障害者(27万)'],['tokubetsu','特別障害者(40万)'],['doukyo','同居特別障害者(75万)']].map(function(o){return '<option value="'+o[0]+'"'+((n.shougai||'')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('');
-    return '<div class="nen-detail" id="nen-detail-'+attr(eid)+'" style="display:none;border-top:1px dashed #d4eae0;margin-top:8px;padding-top:8px">'
-      +'<div style="font-size:11px;color:#5C7E6C;margin-bottom:6px">自動集計を上書きする場合のみ入力（空欄=履歴から自動）</div>'
+  // 共通「はい／いいえ」2択ピル。質問形式の真偽入力はこれで統一(単一チェックの紛らわしさを無くす)。
+  //  dataAttr=クリックハンドラが読む属性名(nfbool/shfixed/tsyn等)・key=data値・on=現在真偽・eid=任意の対象ID
+  function ynPill(dataAttr, key, on, eid){
+    var ea=eid!=null?' data-eid="'+attr(eid)+'"':'';
+    return '<span class="nw-yn">'
+      +'<b class="ynb'+(on?' on':'')+'" data-'+dataAttr+'="'+attr(key)+'"'+ea+' data-v="1">はい</b>'
+      +'<b class="ynb'+(on?'':' on')+'" data-'+dataAttr+'="'+attr(key)+'"'+ea+' data-v="0">いいえ</b></span>';
+  }
+  function NDcl(){ return (typeof NenchoDecl!=='undefined')?NenchoDecl:(window&&window.NenchoDecl); }
+  // 年調の申告入力を「生活語の質問」で。data-nf/data-eid は既存ハンドラがそのまま n.* に書く=配線不要。
+  //  ★従業員Web申告(★A)でも同じ NenchoDecl.FIELDS を使う=UI共有(平易・分かりやすさを崩さない方針)。
+  function nenchoWizardHTML(eid, n){
+    var nd=NDcl(); if(!nd) return ''; n=n||{};
+    return nd.GROUPS.map(function(g){
+      var rows=nd.FIELDS.filter(function(f){ return f.group===g.id && (!f.when || !!n[f.when]); }).map(function(f){
+        var help=f.help?'<div class="nw-help">'+esc(f.help)+'</div>':'', input;
+        if(f.type==='bool') input=ynPill('nfbool', f.key, !!n[f.key], eid);
+        else if(f.type==='select') input='<select class="finput m-f" data-eid="'+attr(eid)+'" data-nf="'+f.key+'" style="max-width:220px;font-size:13px">'+(f.options||[]).map(function(o){ return '<option value="'+o[0]+'"'+((n[f.key]||'')===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select>';
+        else { var unit=(f.type==='count')?'人':'円'; input='<input class="finput num" data-eid="'+attr(eid)+'" data-nf="'+f.key+'" inputmode="numeric" value="'+attr(n[f.key]==null||n[f.key]===''?'':fmtN(n[f.key]))+'" placeholder="0" style="max-width:120px;font-size:13px;padding:7px 8px"><span class="nw-unit">'+unit+'</span>'; }
+        return '<div class="nw-row"><div class="nw-q">'+esc(f.q)+help+'</div><div class="nw-in">'+input+'</div></div>';
+      }).join('');
+      return '<div class="nw-group"><div class="nw-gt">'+esc(g.title)+'</div>'+rows+'</div>';
+    }).join('');
+  }
+  function nenDetailInner(eid, n, agg){
+    return '<div style="font-size:11px;color:#5C7E6C;margin-bottom:6px">自動集計を上書きする場合のみ入力（空欄=履歴から自動）</div>'
       +'<div class="nrow"><span class="nlbl">給与収入(年)</span>'+nf(eid,'shunyuOverride',n.shunyuOverride,fmtN(agg.shunyu))+'<span class="nlbl">源泉徴収済(年)</span>'+nf(eid,'genzenOverride',n.genzenOverride,fmtN(agg.genzen))+'</div>'
       +'<div class="nrow"><span class="nlbl">社保(天引・上書)</span>'+nf(eid,'shahoOverride',n.shahoOverride,fmtN(agg.shaho))+'<span class="nlbl">社保(申告追加)</span>'+nf(eid,'shinkokuShaho',n.shinkokuShaho)+'</div>'
-      +'<div class="nsec">生命保険料（支払保険料）</div>'
-      +'<div class="nrow"><span class="nlbl">一般(新)</span>'+nf(eid,'seiGeneralNew',n.seiGeneralNew)+'<span class="nlbl">一般(旧)</span>'+nf(eid,'seiGeneralOld',n.seiGeneralOld)+'</div>'
-      +'<div class="nrow"><span class="nlbl">介護医療(新)</span>'+nf(eid,'seiKaigo',n.seiKaigo)+'</div>'
-      +'<div class="nrow"><span class="nlbl">個人年金(新)</span>'+nf(eid,'seiPensionNew',n.seiPensionNew)+'<span class="nlbl">個人年金(旧)</span>'+nf(eid,'seiPensionOld',n.seiPensionOld)+'</div>'
-      +'<div class="nsec">地震保険料</div>'
-      +'<div class="nrow"><span class="nlbl">地震保険料</span>'+nf(eid,'jishinP',n.jishinP)+'<span class="nlbl">旧長期損害</span>'+nf(eid,'jishinKyu',n.jishinKyu)+'</div>'
-      +'<div class="nsec">配偶者・扶養</div>'
-      +'<div class="nrow">'+chk('haiEnabled','配偶者あり')+chk('haiRojin','老人配偶者(70歳)')+'<span class="nlbl">配偶者の合計所得</span>'+nf(eid,'haiShotoku',n.haiShotoku)+'</div>'
-      +'<div class="nrow"><span class="nlbl">一般扶養(人)</span>'+nf(eid,'fuyoIppan',n.fuyoIppan)+'<span class="nlbl">特定19-22(人)</span>'+nf(eid,'fuyoTokutei',n.fuyoTokutei)+'</div>'
-      +'<div class="nrow"><span class="nlbl">老人扶養(人)</span>'+nf(eid,'fuyoRoujin',n.fuyoRoujin)+'<span class="nlbl">同居老親(人)</span>'+nf(eid,'fuyoDoukyo',n.fuyoDoukyo)+'</div>'
-      +'<div class="nrow"><span class="nlbl">特定親族の所得<span class="hint2">62超123万で控除</span></span>'+nf(eid,'tokuteiShinzokuShotoku',n.tokuteiShinzokuShotoku)+'</div>'
-      +'<div class="nsec">その他控除</div>'
-      +'<div class="nrow"><span class="nlbl">小規模企業共済等</span>'+nf(eid,'shokibo',n.shokibo)+'<span class="nlbl">住宅ローン控除</span>'+nf(eid,'jutakuLoan',n.jutakuLoan)+'</div>'
-      +'<div class="nrow"><select class="finput m-f" data-eid="'+attr(eid)+'" data-nf="shougai" style="max-width:220px;font-size:13px">'+shougaiOpts+'</select></div>'
-      +'<div class="nrow">'+chk('kafu','寡婦(27万)')+chk('hitorioya','ひとり親(35万)')+chk('kinrou','勤労学生(27万)')+'</div>'
-      +'</div>';
+      +'<div class="nsec" style="margin-top:10px">申告（生活語で・控除証明書の数字を写すだけ）</div>'
+      +nenchoWizardHTML(eid, n)
+      // 特定親族の所得(62超123万)は稀・専門的なので詳細のまま残す
+      +'<div class="nw-group"><div class="nw-gt">その他（詳しい人向け）</div><div class="nw-row"><div class="nw-q">特定親族の所得<span class="nw-help">19〜22歳で所得62万超123万以下のとき</span></div><div class="nw-in">'+nf(eid,'tokuteiShinzokuShotoku',n.tokuteiShinzokuShotoku)+'<span class="nw-unit">円</span></div></div></div>';
   }
+  function nenDetailHTML(eid, n, agg){
+    return '<div class="nen-detail" id="nen-detail-'+attr(eid)+'" style="display:none;border-top:1px dashed #d4eae0;margin-top:8px;padding-top:8px">'+nenDetailInner(eid, n, agg)+'</div>';
+  }
+  // 申告フォーム(nen-detail)だけ開いた状態を保ったまま再描画（when依存行の出し入れ用）
+  function nenRefreshDetail(eid){ var d=$('#nen-detail-'+eid); if(!d)return; var agg=nenAggregate(state._nenRecs, eid); d.innerHTML=nenDetailInner(eid, nenStore(eid), agg); }
   function nenEmpHTML(e, recs){
     var agg=nenAggregate(recs, e.id), n=nenStore(e.id);
     var warn = agg.months===0 ? '<div class="cr-warn" style="margin:6px 0 0">⚠ 当年の保存済み明細がありません。「今月を確定」で月次を保存するか、下の「年調の申告入力」で収入・源泉を手入力してください。</div>' : (agg.months<12?'<div class="hint" style="margin:4px 0 0;color:#92500A">保存済み '+agg.months+'/12か月分から集計中（不足月は手入力で補完可）</div>':'');
@@ -2048,7 +2066,7 @@
       if(ev.target.dataset.refetch){ autoFillTeijiMonths(emp, renderEmpMaster); return; }
       if(ev.target.dataset.apply){ var ak=ev.target.dataset.apply; if(!emp.apply)emp.apply={}; emp.apply[ak]=(emp.apply[ak]===false)?true:false; renderEmpMaster(); return; }
       if(ev.target.dataset.short){ emp.shortTime=!emp.shortTime; renderEmpMaster(); return; }
-      if(ev.target.dataset.shfixed){ if(!emp.shaho)emp.shaho={months:[]}; emp.shaho.fixedChanged=!emp.shaho.fixedChanged; renderEmpMaster(); return; }
+      var shfx=ev.target.closest('[data-shfixed]'); if(shfx){ if(!emp.shaho)emp.shaho={months:[]}; emp.shaho.fixedChanged=(shfx.dataset.v==='1'); renderEmpMaster(); return; } // 固定給変動 はい/いいえ
       if(ev.target.dataset.rtik){ emp.residentTaxIkkatsu=!emp.residentTaxIkkatsu; renderEmpMaster(); return; }
       if(ev.target.dataset.taxc){ emp.taxClass=ev.target.dataset.taxc; renderEmpMaster(); return; }
       if(ev.target.dataset.honnin){ var hk=ev.target.dataset.honnin; // 本人の人的加算(甲欄+1)。寡婦↔ひとり親は排他
@@ -2156,6 +2174,11 @@
     var vnen=$('#view-nen'); if(vnen) vnen.addEventListener('input',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; if(f.tagName==='SELECT'||f.type==='checkbox')return; /* checkbox/selectはchangeに任せ二重発火を防ぐ */ nenSetField(f.dataset.eid, f.dataset.nf, f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); });
     if(vnen) vnen.addEventListener('change',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; if(f.tagName==='SELECT'||f.type==='checkbox'){ nenSetField(f.dataset.eid, f.dataset.nf, f.type==='checkbox'?f.checked:f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); } });
     if(vnen) vnen.addEventListener('click',function(e){ var t=e.target.closest('[data-ntoggle]'); if(t){ var b=$('#nen-detail-'+t.dataset.ntoggle); if(b){ var op=b.style.display==='none'; b.style.display=op?'':'none'; t.textContent=op?'閉じる ▲':'年調の申告入力 ▾'; } return; }
+      var yn=e.target.closest('[data-nfbool]'); if(yn){ var ynk=yn.dataset.nfbool, yne=yn.dataset.eid, ynv=yn.dataset.v==='1'; nenSetField(yne, ynk, ynv);
+        var nd=NDcl(); var isParent=!!(nd&&nd.FIELDS.some(function(f){ return f.when===ynk; })); // この項目に依存する行があるか
+        if(isParent){ nenRefreshDetail(yne); } // 依存行(配偶者の所得等)を出し入れするため申告フォームを再描画
+        else { Array.prototype.forEach.call(vnen.querySelectorAll('[data-nfbool="'+ynk+'"][data-eid="'+yne+'"]'), function(p){ p.classList.toggle('on', (p.dataset.v==='1')===ynv); }); } // pillのon即更新
+        nenRefreshEmp(yne); if(window.persistSaveDebounced)persistSaveDebounced(); return; } // はい/いいえトグル
       var x=e.target.closest('[data-nxlsx]'); if(x){ nenDownloadXlsx(); return; }
       var g=e.target.closest('[data-ngensen]'); if(g){ nenPrintGensen(); return; } });
     // 帳票のサブ切替(賃金台帳/社保一覧/部署別)＋Excel
@@ -2285,7 +2308,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

@@ -388,6 +388,20 @@ input[type="date"].finput:not(.finput-sm),input[type="month"].finput:not(.finput
 .nen-detail .nrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:5px 0;}
 .nen-detail .nlbl{font-size:11.5px;color:#3D6B53;min-width:96px;}
 .nen-detail .nlbl .hint2{display:block;font-size:9.5px;color:#527A66;font-weight:400;}
+/* 年調 平易ウィザード(生活語の質問→入力)。従業員Web申告でも同じ見た目を使う。 */
+.nw-group{margin:8px 0 4px;}
+.nw-gt{font-size:12px;font-weight:700;color:#2E7D54;margin:8px 0 4px;border-bottom:1px solid #eef3f0;padding-bottom:2px;}
+.nw-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:6px 0;border-bottom:1px dashed #f0f5f2;}
+.nw-q{font-size:12px;color:#23261f;line-height:1.5;flex:1;min-width:0;}
+.nw-help{display:block;font-size:10px;color:#527A66;line-height:1.5;margin-top:2px;}
+.nw-in{flex:0 0 auto;display:flex;align-items:center;gap:4px;white-space:nowrap;}
+.nw-unit{font-size:11px;color:#5C7E6C;}
+.nw-chk{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#3D6B53;font-weight:700;cursor:pointer;}
+.nw-chk input{width:20px;height:20px;}
+.nw-yn{display:inline-flex;border:1.5px solid #d4eae0;border-radius:9px;overflow:hidden;}
+.nw-yn .ynb{padding:6px 14px;font-size:12px;font-weight:700;color:#5C7E6C;background:#fff;cursor:pointer;user-select:none;min-width:44px;text-align:center;}
+.nw-yn .ynb+.ynb{border-left:1.5px solid #d4eae0;}
+.nw-yn .ynb.on{background:#3D9E72;color:#fff;}
 
 /* ───────── モバイル基礎 UX監査(2026-07-13) : iOSズーム防止 / 可視フォーカス / 44pxタップ ───────── */
 /* ① iOS Safariは16px未満のinputフォーカスで画面を自動ズーム→戻らない。全テキスト入力を16pxに(スマホ主眼の最重要) */
