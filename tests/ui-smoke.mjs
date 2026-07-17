@@ -184,6 +184,31 @@ T('キーボードa11y: div/bトグルがfocus可能(tabindex/role)＋Enterで�
   const back = q('.imode[data-imode="monthly"]'); if (back) back.click();
 });
 
+T('台帳/年調の確定ゲート: 下書き保存はconfirmed=false・確定でtrue・confirmedRecsが下書きを除外', function () {
+  const q = s => doc.querySelector(s);
+  const saved = [];
+  win.Store = { savePayslip: (ym, eid, data) => { saved.push({ ym, eid, data }); }, getPayslipsByYm: () => Promise.resolve([]) };
+  A.state.month = '2026-06'; A.state.confirmed = {};
+  const emp = A.state.employees[0];
+  // 未確定のまま自動保存(下書き) → confirmed=false
+  saved.length = 0; A.saveMonthlyPayslips();
+  const draft = saved.find(s => s.eid === emp.id);
+  ok(draft && draft.data.confirmed === false, '下書き保存が confirmed=false (' + (draft && draft.data.confirmed) + ')');
+  // 確定してforce保存 → confirmed=true
+  A.setConfirm(emp.id, true); saved.length = 0; A.saveMonthlyPayslips(true);
+  const conf = saved.find(s => s.eid === emp.id);
+  ok(conf && conf.data.confirmed === true, '確定保存が confirmed=true');
+  // confirmedRecs: 下書き(false)は除外・確定(true)と旧データ(無し)は集計対象
+  const recs = [
+    { ym: '2026-01', employee_id: 'x', data: { confirmed: true, net: 1 } },
+    { ym: '2026-02', employee_id: 'x', data: { confirmed: false, net: 2 } },
+    { ym: '2026-03', employee_id: 'x', data: { net: 3 } } // 旧データ(フラグ無し)
+  ];
+  const kept = A.confirmedRecs(recs);
+  ok(kept.length === 2, 'confirmedRecsが下書きだけ除外(残' + kept.length + ')');
+  ok(!kept.some(r => r.data.confirmed === false), '下書きが残っている');
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

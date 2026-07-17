@@ -1363,6 +1363,7 @@
       try{ var c=computeBonus(e); var si=c.si||{};
         var shikyu=[{label:'賞与',value:c.bonus,hikazei:false}]; (c.addShikyu||[]).forEach(function(it){ shikyu.push({label:it.label||'追加支給',value:it.value,hikazei:!!it.hikazei}); }); // 課税/非課税を保持=年調の課税集計が正確に
         Store.savePayslip(ym, e.id, { name:e.name, shikyuTotal:c.totalGross, kazei:c.base, net:c.net,
+          confirmed:true, // 賞与は「賞与を確定」でのみ保存=常に確定済み
           shikyu:shikyu, tax:num(c.taxAmt),
           siTotal:si.total||0, si:{ health:num(si.health), kaigo:num(si.kaigo), pension:num(si.pension), employ:num(si.employ) },
           dept:(e.dept||'') }, 'bonus');
@@ -1434,6 +1435,8 @@
 
   /* ---------- 帳票（賃金台帳・社保一覧・部署別集計） ---------- */
   function CD(){ return window.ChinginDaicho; }
+  // 賃金台帳/年末調整は「確定済み」の明細だけ集計(未確定の下書き月を混入させない)。旧データ(confirmed無し)は後方互換で集計対象。
+  function confirmedRecs(recs){ return (recs||[]).filter(function(r){ return r && r.data && r.data.confirmed!==false; }); }
   function fmtMinLbl(min){ min=num(min); if(!min)return ''; return Math.floor(min/60)+':'+('0'+(min%60)).slice(-2); }
   function activeMonthEmps(){ return state.employees.filter(function(e){return isActiveInMonth(e,state.month);}); }
   // 社保一覧(月次・現計算)
@@ -1482,7 +1485,7 @@
   }
   function renderChinginDaicho(sub){ var host=$('#view-cho'); var year=parseInt(String(state.month||'').slice(0,4),10)||2026;
     if(!(window.Store&&Store.getPayslipsByYm)){ host.innerHTML=sub+'<div class="card"><p class="hint">履歴保存が未対応です（保存を有効化してください）。</p></div>'; return; }
-    Store.getPayslipsByYm(year+'-01', year+'-12').then(function(recs){ recs=(recs||[]).filter(function(r){return !r.data||r.data.kind!=='bonus';}); host.innerHTML=sub+chinginDaichoHTML(CD().buildLedger(recs, year, state.employees), year); }) // 賃金台帳(月次)は賞与除外
+    Store.getPayslipsByYm(year+'-01', year+'-12').then(function(recs){ recs=confirmedRecs(recs).filter(function(r){return r.data.kind!=='bonus';}); host.innerHTML=sub+chinginDaichoHTML(CD().buildLedger(recs, year, state.employees), year); }) // 賃金台帳(月次)は賞与除外
       .catch(function(){ host.innerHTML=sub+'<div class="card"><p class="hint">読込に失敗しました。</p></div>'; }); }
   function choSub(v){ return '<div class="seg" style="margin-bottom:10px">'
     +'<button class="seg-b'+(v==='shakai'?' on':'')+'" data-cho="shakai">社保一覧</button>'
@@ -1497,7 +1500,7 @@
     if(kind==='shakai'){ PayslipXlsx.downloadSheets([{name:'社保一覧', aoa:PayslipXlsx.shakaiListAOA(shakaiRows(),{company:co,monthLabel:mlabel})}], {filename:'社保一覧_'+state.month+'.xlsx'}); return; }
     if(kind==='dept'){ var g=CD().deptGroups(deptRows()); PayslipXlsx.downloadSheets([{name:'部署別集計', aoa:PayslipXlsx.deptSummaryAOA(g,{company:co,monthLabel:mlabel})}], {filename:'部署別集計_'+state.month+'.xlsx'}); return; }
     if(kind==='daicho'){ var year=parseInt(String(state.month||'').slice(0,4),10)||2026;
-      Store.getPayslipsByYm(year+'-01',year+'-12').then(function(recs){ recs=(recs||[]).filter(function(r){return !r.data||r.data.kind!=='bonus';}); var L=CD().buildLedger(recs,year,state.employees); // 賃金台帳(月次)は賞与除外
+      Store.getPayslipsByYm(year+'-01',year+'-12').then(function(recs){ recs=confirmedRecs(recs).filter(function(r){return r.data.kind!=='bonus';}); var L=CD().buildLedger(recs,year,state.employees); // 賃金台帳(月次)は賞与除外
         var sheets=PayslipXlsx.chinginDaichoSheets(L, year, CD(), {company:co}); if(!sheets.length){ uiAlert('確定済みの月がありません。'); return; } PayslipXlsx.downloadSheets(sheets,{filename:'賃金台帳_'+year+'.xlsx'}); }); return; } }
 
   /* ---------- 年末調整(view-nen) ---------- */
@@ -1613,7 +1616,7 @@
     var host=$('#view-nen'); if(!host)return; var year=nenYear();
     if(!(window.Store&&Store.getPayslipsByYm&&Nen_())){ host.innerHTML='<div class="empty-cta"><div class="ec-emoji">📅</div><div class="ec-t">年末調整のデータがまだありません</div><div class="ec-s">各月の入力を「今月を確定」で記録すると、1〜12月分がここに自動集計されます。まずは入力タブで当月を確定してください。</div><button class="btn-primary ec-btn" data-scr="scr-input">入力タブへ</button></div>'; return; }
     host.innerHTML='<div class="card"><div class="card-h">年末調整 '+year+'年</div><p class="hint">読込中…</p></div>';
-    Store.getPayslipsByYm(year+'-01', year+'-12').then(function(recs){ host.innerHTML=nenViewHTML(recs||[], year); nenTotal(); })
+    Store.getPayslipsByYm(year+'-01', year+'-12').then(function(recs){ host.innerHTML=nenViewHTML(confirmedRecs(recs), year); nenTotal(); })
       .catch(function(){ host.innerHTML='<div class="card"><p class="hint">読込に失敗しました。</p></div>'; });
   }
   // 年末調整一覧(源泉徴収簿)のExcel出力。年調ビューが描画済み(state._nenEmps/_nenRecs)前提。
@@ -2235,6 +2238,7 @@
         otMin:num(wc.otH)*60+num(wc.otM), nightMin:num(wc.nightH)*60+num(wc.nightM), holidayMin:num(wc.holidayH)*60+num(wc.holidayM) };
       var si=r.si||{};
       Store.savePayslip(ym, e.id, { name:e.name, shikyuTotal:r.shikyuTotal, paymentDays:days, kojoTotal:r.kojoTotal, net:r.net, kazei:r.kazei, siTotal:si.total||0,
+        confirmed:!!(conf&&conf[e.id]), // ★確定フラグ=賃金台帳/年調は確定済みだけ集計(未確定の下書き月を混入させない)。旧データ(無し)は後方互換で集計対象
         shikyu:r.shikyu, kojo:r.kojo, hyojun:r.hyojun, dept:(e.dept||''), tax:num(r.incomeTax), jumin:num(r.residentTax),
         si:{ health:num(si.health), kaigo:num(si.kaigo), pension:num(si.pension), employ:num(si.employ) }, work:work });
     }catch(_e){} });
@@ -2255,7 +2259,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';
