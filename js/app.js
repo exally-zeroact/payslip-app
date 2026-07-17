@@ -2303,7 +2303,13 @@
       // ★クラウド保存の成否を待ってから表示(失敗を「保存済」と嘘表示しない)
       Promise.resolve().then(function(){ return Store.cloudSaveState(snap); }).then(function(r){
         // no-user=未ログイン=クラウド対象外(ローカル保存が正)→警告しない。ログイン中の実失敗のみ警告。
-        if(r&&r.ok===false&&r.reason!=='no-user'){ setS('⚠ クラウド未保存（'+(r.reason||'通信エラー')+'）'); }
+        if(r&&r.ok===false&&r.reason==='conflict'){ // ★楽観ロック: 別端末が後から更新→上書きせず警告(データ消失防止)
+          setS('⚠ 別の端末で更新されました（クラウド未保存）');
+          if(!state._conflictPrompted){ state._conflictPrompted=true;
+            uiConfirm('この会社の設定・従業員データが、別の端末で更新されています。\n\n最新を読み込みますか？\n・はい＝最新を読込（この端末の未保存の編集は失われます）\n・いいえ＝このまま（ローカルには残ります・クラウド保存は保留）').then(function(ok){ if(ok) location.reload(); });
+          }
+        }
+        else if(r&&r.ok===false&&r.reason!=='no-user'){ setS('⚠ クラウド未保存（'+(r.reason||'通信エラー')+'）'); }
         else if(lsOk){ state._savedAt=hhmm; setS('自動保存済 '+hhmm); }
       }).catch(function(){ if(lsOk) setS('⚠ ローカルのみ保存（クラウド通信エラー）'); });
     } else if(lsOk){ state._savedAt=hhmm; setS('自動保存済 '+hhmm); }

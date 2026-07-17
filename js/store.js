@@ -64,12 +64,25 @@
     // ★このセッションでクラウドと同期できたか(読めた or 書けた)。差分削除はこれがtrueの時だけ許可
     //  =クラウド読込に失敗した古い/空の端末が、本番の従業員を物理削除するのを防ぐ(データ消失対策)。
     var cloudSynced = false;
+    // ★楽観ロック用: 最後に把握した pay_companies(設定=全置換で最も危険)の updated_at。
+    //  読込時・自分の保存成功時に更新。保存前にクラウドの現在値と違えば「別端末が後から更新」=conflictで上書きしない。
+    var lastCompanyUpdatedAt = null;
     Store.cloudSaveState = function(state){
       return curUid().then(function(uid){ if(!uid) return { ok:false, reason:'no-user' }; var now=new Date().toISOString();
         // ★employees以外の全スナップショット項目を保存(確定印/年末調整/賞与/カスタム給テンプレ/onboard等も載せる=端末替えで消えない)
         var settings={}; for(var k in state){ if(Object.prototype.hasOwnProperty.call(state,k) && k!=='employees') settings[k]=state[k]; }
         var emps=(state.employees||[]).map(function(e,i){ return { id:e.id, account_id:uid, sort:i, data:e, updated_at:now }; });
         var ids=emps.map(function(e){ return e.id; });
+        // ★競合検知: 一度でも同期していれば(lastCompanyUpdatedAt!=null)、保存直前にクラウドの現在updated_atを確認。
+        //  自分が最後に把握した値と違う=別端末が後から書いた→上書きせず conflict を返す(app.js側で再読込を促す)。
+        return sb.from('pay_companies').select('updated_at').eq('account_id',uid).maybeSingle().then(function(cur){
+          var cloudUA = cur && cur.data && cur.data.updated_at;
+          if(lastCompanyUpdatedAt!=null && cloudUA && cloudUA!==lastCompanyUpdatedAt){
+            return { ok:false, reason:'conflict', cloudUpdatedAt:cloudUA };
+          }
+          return doSave();
+        }).catch(function(){ return doSave(); }); // 確認クエリ失敗時は従来どおり保存(可用性優先)
+        function doSave(){
         var ops=[
           sb.from('pay_companies').upsert({ account_id:uid, data:settings, updated_at:now }),
           emps.length? sb.from('pay_employees').upsert(emps) : Promise.resolve({ error:null })
@@ -80,19 +93,21 @@
         }
         return Promise.all(ops).then(function(res){
           var bad=res.filter(function(x){ return x && x.error; })[0];
-          if(!bad) cloudSynced=true; // 書き込み成功=手元の集合が本番の正=以後の差分削除OK
+          if(!bad){ cloudSynced=true; lastCompanyUpdatedAt=now; } // 書込成功=手元が本番の正・以後の差分削除OK・自分の書いたupdated_atを基準に更新
           return { ok:!bad, reason: bad?((bad.error&&bad.error.message)||'error'):null };
         }).catch(function(e){ return { ok:false, reason:(e&&e.message)||'exception' }; });
+        }
       });
     };
     Store.cloudLoadState = function(){
       return curUid().then(function(uid){ if(!uid) return null;
         return Promise.all([
-          sb.from('pay_companies').select('data').eq('account_id',uid).maybeSingle(),
+          sb.from('pay_companies').select('data,updated_at').eq('account_id',uid).maybeSingle(),
           sb.from('pay_employees').select('data,sort').eq('account_id',uid).order('sort',{ascending:true})
         ]).then(function(res){
           var co=res[0].data && res[0].data.data; var emps=(res[1].data||[]).map(function(r){ return r.data; });
           cloudSynced=true; // クラウドと通信できた=同期済み(空でも=新規アカウントとして差分削除を許可)
+          lastCompanyUpdatedAt=(res[0].data && res[0].data.updated_at)||null; // ★競合検知の基準=読込時のクラウドupdated_at
           if(!co && !emps.length) return null; var s=co||{}; s.employees=emps; return s;
         });
       });

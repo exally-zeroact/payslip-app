@@ -18,7 +18,8 @@ function makeMock(opts) {
   const calls = { companyUpsert: [], empUpsert: [], deletes: [] };
   let serverEmpIds = (opts.serverEmpIds || []).slice();
   function query(kind) {
-    const data = kind === 'companyData' ? (opts.companyData ? { data: opts.companyData } : null)
+    const _cua = typeof opts.companyUpdatedAt === 'function' ? opts.companyUpdatedAt() : opts.companyUpdatedAt;
+    const data = kind === 'companyData' ? ((opts.companyData || _cua) ? { data: opts.companyData, updated_at: _cua } : null)
       : kind === 'empIds' ? serverEmpIds.map(id => ({ id }))
         : (opts.serverEmps || []);
     const res = { data, error: null };
@@ -89,6 +90,30 @@ runs.push(T('P1-4: 書込失敗時は ok:false を返す', async function () {
   const Store = loadStore(mock);
   const r = await Store.cloudSaveState(SNAP);
   ok(r.ok === false, '失敗を ok:false で返す(reason=' + r.reason + ')');
+}));
+
+// 楽観ロック: 読込後にクラウドのupdated_atが別端末で変わっていたら上書きせず conflict を返す
+runs.push(T('楽観ロック: 別端末が後から更新→保存は conflict で上書きしない', async function () {
+  let cua = '2026-07-17T00:00:00.000Z'; // 現在のクラウドupdated_at(可変)
+  const mock = makeMock({ companyData: { company: { name: 'A' } }, companyUpdatedAt: () => cua });
+  const Store = loadStore(mock);
+  await Store.cloudLoadState(); // 読込=lastCompanyUpdatedAt を U0 に
+  // 同じ値のまま保存 → 競合なし=保存される
+  const r1 = await Store.cloudSaveState(SNAP);
+  ok(r1.ok === true, '競合なしなら保存OK(reason=' + r1.reason + ')');
+  const upsertsBefore = mock.__calls.companyUpsert.length;
+  // 別端末がクラウドを更新(updated_atが進む) → 次の保存は conflict
+  cua = '2026-07-17T09:00:00.000Z';
+  const r2 = await Store.cloudSaveState(SNAP);
+  ok(r2.ok === false && r2.reason === 'conflict', '別端末更新後は conflict(reason=' + r2.reason + ')');
+  ok(mock.__calls.companyUpsert.length === upsertsBefore, 'conflict時は pay_companies を上書きしない');
+}));
+// 初回(未load/クラウド空)は競合判定せず保存できる(新規アカウント)
+runs.push(T('楽観ロック: 初回(load前)は競合扱いにせず保存できる', async function () {
+  const mock = makeMock({}); // クラウド空
+  const Store = loadStore(mock);
+  const r = await Store.cloudSaveState(SNAP);
+  ok(r.ok === true, '初回保存OK(reason=' + r.reason + ')');
 }));
 
 await Promise.all(runs);
