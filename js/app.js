@@ -122,7 +122,15 @@
     koyoGyoshu:{ t:'💡 雇用保険の業種', b:'業種で雇用保険の料率が変わります。\n\n● 一般の事業／建設・農林水産・清酒製造（高め）。\n● 雇用保険は<b>通勤手当も含む賃金総額</b>に料率を掛けます。\n● <b>料率は対象月の年度で自動</b>（令和8は引下げ：一般0.50%・建設/農林0.60%）。' },
     paymentDays:{ t:'💡 支払基礎日数の数え方', b:'社会保険の<b>定時決定（毎年4〜6月）</b>で「支払基礎日数17日以上の月」を平均して標準報酬を決めます。その日数の数え方です。\n\n● 年金機構の一般扱い＝<b>月給は暦日数／日給・時給は出勤日数</b>。\n● 会社の運用に合わせて変更できます（暦日数／所定労働日数／出勤日数）。' },
     kekkin:{ t:'💡 欠勤控除の計算', b:'月給は<b>日給月給制（欠勤分を控除）が標準</b>です（民法624条 ノーワーク・ノーペイ）。\n\n● 10日欠勤すれば10日分減ります。1日あたり＝<b>月給÷分母×欠勤日数</b>。\n● 分母＝月平均所定労働日数（既定）／当月の暦日数／当月の所定労働日数 から選べます。\n● 役員等で減額しない場合のみ「<b>完全月給制</b>」に。\n● 時給・日給は元々 日数・時間で按分されます。' },
-    daikyu:{ t:'💡 代休・振替休日の使い分け', b:'<b>振替休日</b>＝事前に休日と労働日を入れ替え。その出勤は<b>通常労働（割増なし）</b>。割増の「法定休日」に入れず、ふつうの労働時間に入れてください（週40時間を超えた分だけ時間外1.25倍）。\n\n<b>代休</b>＝先に休日労働→後で別の日に休む。休日労働は<b>割増あり</b>（法定休日1.35倍／所定休日は時間外1.25倍）。休む日は入力の「代休取得」へ。\n\n代休で休む日を無給にするか（日給制向け）有給にするか（月給は相殺）は会社規程によります。「代休で休んだ日を出勤から差し引く」をオンにすると出勤から控除します。' }
+    daikyu:{ t:'💡 代休・振替休日の使い分け', b:'<b>振替休日</b>＝事前に休日と労働日を入れ替え。その出勤は<b>通常労働（割増なし）</b>。割増の「法定休日」に入れず、ふつうの労働時間に入れてください（週40時間を超えた分だけ時間外1.25倍）。\n\n<b>代休</b>＝先に休日労働→後で別の日に休む。休日労働は<b>割増あり</b>（法定休日1.35倍／所定休日は時間外1.25倍）。休む日は入力の「代休取得」へ。\n\n代休で休む日を無給にするか（日給制向け）有給にするか（月給は相殺）は会社規程によります。「代休で休んだ日を出勤から差し引く」をオンにすると出勤から控除します。' },
+    juminzei:{ t:'💡 住民税（市区町村の税金）', b:'住民税は前年の所得に応じて<b>市区町村が金額を決める</b>税金です。自分で計算する必要はありません。\n\n● 毎年5〜6月ごろ、市区町村から会社へ<b>「特別徴収税額の決定通知書」</b>が届きます。その<b>月額をそのまま入力</b>します（6月〜翌5月の12か月分・端数は6月に寄せます）。\n● <b>特別徴収</b>＝会社が給与から天引きして納める（原則こちら）。\n● <b>普通徴収</b>＝本人が自分で納める。\n\n※入社直後や設立直後で通知書がまだ無いときは<b>0円のままでOK</b>（通知が来たら入れます）。「年額から自動」を選ぶと年額を12分割した概算を出しますが、正は通知書の額です。' },
+    chingindaicho:{ t:'💡 賃金台帳とは？', b:'賃金台帳は、従業員ごとに毎月の<b>労働時間・支給・控除</b>を記録する帳簿で、<b>労働基準法108条</b>で作成・保存が義務づけられています（賃金台帳・出勤簿・労働者名簿で「法定三帳簿」）。\n\n● 各月を入力タブで<b>「今月を確定」</b>すると、その月がこの台帳に自動で入ります。\n● Excelで出力して保存・提出できます。\n\n※未確定（下書き）の月は台帳に載りません。確定した月だけが記録されます。' },
+    santeikiso:{ t:'💡 算定基礎届とは？', b:'算定基礎届は、毎年<b>7月10日まで</b>に日本年金機構へ出す届で、<b>4〜6月の給与</b>から社会保険の「標準報酬月額」（保険料計算のものさし）を決め直すものです（その年9月〜翌8月に適用）。\n\nこの一覧は、その届出や<b>納付額の確認の“素”</b>として使えます（正式な届出書そのものの作成はしません）。' },
+    genzenbo:{ t:'💡 源泉徴収簿とは？', b:'源泉徴収簿は、従業員ごとに1年間の<b>給与・賞与・源泉徴収した所得税</b>をまとめた帳簿で、<b>年末調整の計算の土台</b>になります。\n\nこのアプリでは、<b>確定した月次・賞与</b>から自動で集計してExcel出力できます（各人の年収・源泉税・社会保険料が並びます）。' },
+    hyojunbonus:{ t:'💡 標準賞与額とは？', b:'標準賞与額は、<b>賞与の社会保険料を計算するための金額</b>です。賞与額（税引き前）から<b>1,000円未満を切り捨て</b>た額を使います。\n\n保険料がかかる上限：\n● 健康保険＝<b>年度累計573万円</b>まで\n● 厚生年金＝<b>1回あたり150万円</b>まで\n\n※所得税のほうは別の「算出率の表」で、前月給与と扶養人数から率が決まります。' },
+    toukyu:{ t:'💡 等級（標準報酬の等級）', b:'等級は、社会保険の<b>「標準報酬月額」が保険料額表の何段目か</b>を表す番号です。報酬が上がると等級も上がります（健康保険は50等級・厚生年金は32等級）。\n\n<b>随時改定（月額変更届）</b>では、固定給が変わってから3か月の平均が、<b>従前と2等級以上ちがう</b>と届出が必要かを判断します。差が1等級以内なら対象外です。' },
+    shimebi:{ t:'💡 締め日・支給日', b:'給与の対象期間と支払日を決めます（会社の給与規程どおりに）。\n\n● <b>締め日</b>＝計算の対象期間の区切り（例：<b>末日締め</b>＝その月の1日〜末日ぶんを計算）。\n● <b>支給日</b>＝その給与を実際に払う日（例：<b>翌月25日</b>＝当月ぶんを翌月25日に支払う）。\n\n「当月／翌月」＋「◯日」で、対象月からいつ払うかを指定します。※この設定は明細の表示と社保の当月／翌月徴収の目安に使い、税額そのものは変わりません。' },
+    daily:{ t:'💡 日払い・週払い（日別入力）', b:'支給サイクルが<b>日払い・週払い</b>のとき、日ごとに<b>日付・労働時間・支給額</b>を入れます。\n\n● 所得税は税区分ごとに<b>日額表</b>で日ごとに計算します（甲＝扶養反映／乙／丙＝日雇い）。\n● <b>丙欄（日雇い）</b>は継続2か月以内が対象。2か月を超えたら甲／乙へ。\n\n明細には日別の内訳が出ます。' }
   };
   function openHelp(k){ var h=HELP[k]; if(!h)return; var t=document.getElementById('help-t'),b=document.getElementById('help-b'); t.textContent=h.t; b.innerHTML=h.b; document.getElementById('help-ov').classList.add('on'); }
   // 支給/控除(法定外) のチップ候補
@@ -680,7 +688,7 @@
         +[['ko','甲（通常）'],['otsu','乙（副業）'],['hei','丙（日雇い）']].map(function(o){ var on=(e.taxClass||'ko')===o[0]; return '<span class="chip'+(on?' on':'')+'" data-taxc="'+o[0]+'">'+(on?'✓ ':'')+o[1]+'</span>'; }).join('')
         +'<span class="help-i" data-help="taxclass" style="margin-left:4px">💡</span></div>'
       +(e.taxClass==='hei'?'<div class="sh-warn" style="margin:-4px 0 10px">丙欄＝<b>日雇い</b>（日々雇い・継続2か月以内）向け。所得税＝<b>日額表 丙欄（令和8年分）×出勤日数</b>で計算します（日給・扶養や甲乙の算式は使いません）。2か月を超えたら甲/乙へ。'+(e.payType!=='日給'?'<br><b>⚠ 丙は給与形態＝日給が前提です。現在「'+esc(e.payType)+'」なので丙は適用せず甲欄で計算しています。</b>':'')+'</div>':'')
-      +'<div class="frow2"><div class="frow"><div class="flabel">住民税<span class="hint2">徴収方法</span></div><select class="finput m-f" data-f="residentTaxMode"><option value="monthly"'+(e.residentTaxMode==='annual'?'':' selected')+'>月額を直接（通知書）</option><option value="annual"'+(e.residentTaxMode==='annual'?' selected':'')+'>年額から自動（12分割）</option></select></div>'
+      +'<div class="frow2"><div class="frow"><div class="flabel">住民税<span class="hint2">徴収方法</span><span class="help-i" data-help="juminzei">💡</span></div><select class="finput m-f" data-f="residentTaxMode"><option value="monthly"'+(e.residentTaxMode==='annual'?'':' selected')+'>月額を直接（通知書）</option><option value="annual"'+(e.residentTaxMode==='annual'?' selected':'')+'>年額から自動（12分割）</option></select></div>'
         +(e.residentTaxMode==='annual'
           ? '<div class="frow"><div class="flabel">年税額<span class="hint2">円/年・通知書</span></div><input class="finput num m-f" data-f="residentTaxAnnual" inputmode="numeric" value="'+attr(fmtN(e.residentTaxAnnual))+'"></div>'
           : '<div class="frow"><div class="flabel">月額<span class="hint2">円/月</span></div><input class="finput num m-f" data-f="residentTax" inputmode="numeric" value="'+attr(fmtN(e.residentTax))+'"></div>')
@@ -766,7 +774,7 @@
       if(mode==='teiji') body+='<div style="text-align:right;margin-top:2px"><span class="sh-refetch" data-refetch="1" style="font-size:12px;color:#3D9E72;text-decoration:underline;cursor:pointer">過去の4〜6月から自動入力</span></div>';
       if(mode==='zuiji'){
         body+='<div class="zk-inp"><div class="frow"><div class="flabel">変動があった月<span class="hint2">昇給・降給した月</span></div><input type="month" class="finput sh-henko" value="'+attr(s.henkoYm)+'"></div>'
-          +'<div class="frow"><div class="flabel">従前の標準報酬月額<span class="hint2">円・変動前</span></div><input class="finput num sh-prevhyojun" value="'+attr(s.prevHyojun)+'" placeholder="200000"></div>'
+          +'<div class="frow"><div class="flabel">従前の標準報酬月額<span class="hint2">円・変動前</span><span class="help-i" data-help="toukyu">💡</span></div><input class="finput num sh-prevhyojun" value="'+attr(s.prevHyojun)+'" placeholder="200000"></div>'
           +'<div class="chip-row" style="margin:2px 0 6px"><span class="chip'+(s.fixedChanged?' on':'')+'" data-shfixed="1">'+(s.fixedChanged?'✓ ':'')+'固定的賃金（基本給・手当など）が変わった</span></div></div>';
         body+='<div class="zk-box">'+zuijiJudgeHTML(e)+'</div>';
       }
@@ -1335,7 +1343,7 @@
         +'<div style="font-size:11px;color:#4b6b58;margin:5px 0">本年度の既往賞与（標準賞与額）累計 <input class="finput num" data-by="'+e.id+'" inputmode="numeric" value="'+attr(en.ytd)+'" placeholder="0" style="width:110px"> 円 <span style="color:#6E907E">（2回目以降のみ・健保 年573万上限用）</span></div>'
         +editor
         +(caps?'<div style="margin:4px 0">'+caps+'</div>':'')+warn
-        +'<div class="calc-box"><div class="ch">賞与の自動計算（標準賞与額 '+yen(hyojun)+'）</div>'
+        +'<div class="calc-box"><div class="ch">賞与の自動計算（標準賞与額 '+yen(hyojun)+'）<span class="help-i" data-help="hyojunbonus">💡</span></div>'
           +'<div class="calc-line"><span>賞与額</span><span class="v">'+yen(c.bonus)+'</span></div>'
           +addSLines
           +(c.si.health>0?'<div class="calc-line"><span>健康保険</span><span class="v">'+yen(c.si.health)+'</span></div>':'')
@@ -1444,7 +1452,7 @@
   function shakaiListHTML(){ var rows=shakaiRows(); var mlabel=monthLabel().replace(/ /g,'');
     var t=rows.reduce(function(a,x){return {health:a.health+x.health,kaigo:a.kaigo+x.kaigo,pension:a.pension+x.pension,employ:a.employ+x.employ,sum:a.sum+x.sum};},{health:0,kaigo:0,pension:0,employ:0,sum:0});
     var body=rows.map(function(x){ return '<tr><td>'+esc(x.name)+'</td><td class="num">'+yen(x.hyojun)+'</td><td class="num">'+yen(x.health)+'</td><td class="num">'+yen(x.kaigo)+'</td><td class="num">'+yen(x.pension)+'</td><td class="num">'+yen(x.employ)+'</td><td class="num">'+yen(x.sum)+'</td></tr>'; }).join('');
-    return '<div class="card"><div class="card-h">社会保険一覧（本人負担・'+mlabel+'）<button class="btn-ghost" data-choxlsx="shakai" style="margin-left:auto;padding:5px 12px;font-size:12px">Excel</button></div>'
+    return '<div class="card"><div class="card-h">社会保険一覧（本人負担・'+mlabel+'）<span class="help-i" data-help="santeikiso">💡</span><button class="btn-ghost" data-choxlsx="shakai" style="margin-left:auto;padding:5px 12px;font-size:12px">Excel</button></div>'
       +'<div style="overflow-x:auto"><table class="sumtab" style="min-width:520px"><thead><tr><th>従業員</th><th>標準報酬</th><th>健保</th><th>介護</th><th>厚年</th><th>雇用</th><th>本人計</th></tr></thead>'
       +'<tbody>'+body+'<tr class="total"><td>合計</td><td class="num">—</td><td class="num">'+yen(t.health)+'</td><td class="num">'+yen(t.kaigo)+'</td><td class="num">'+yen(t.pension)+'</td><td class="num">'+yen(t.employ)+'</td><td class="num">'+yen(t.sum)+'</td></tr></tbody></table></div>'
       +'<p class="hint" style="margin-top:6px">当月の計算値。会社負担は健保・厚年・介護がほぼ同額（折半）、雇用は会社率で別途。算定基礎届・納付確認の素にどうぞ。</p></div>'; }
@@ -1460,7 +1468,7 @@
       +'<p class="hint" style="margin-top:6px">部署は従業員マスタの「部署」で設定。未設定は「未分類」。</p></div>'; }
   // 賃金台帳(年間・従業員別・確定済み月から)
   function chinginDaichoHTML(L, year){
-    var CDm=CD(); var note='<p class="hint" style="margin:0 0 10px">「今月を確定」で保存した月だけ反映（労基法108条の賃金台帳）。横スクロール可。<button class="btn-ghost" data-choxlsx="daicho" style="margin-left:8px;padding:4px 10px;font-size:11px">Excel</button></p>';
+    var CDm=CD(); var note='<p class="hint" style="margin:0 0 10px">「今月を確定」で保存した月だけ反映（労基法108条の賃金台帳）。<span class="help-i" data-help="chingindaicho">💡</span>横スクロール可。<button class="btn-ghost" data-choxlsx="daicho" style="margin-left:8px;padding:4px 10px;font-size:11px">Excel</button></p>';
     if(!L.length) return note+'<div class="card"><p class="hint">従業員がいません。</p></div>';
     var months=[]; for(var mm=1;mm<=12;mm++)months.push(mm);
     var cards=L.map(function(row){ var t=CDm.ledgerTotals(row), lab=CDm.ledgerLabels(row);
@@ -1607,7 +1615,7 @@
       +'<p class="hint">当年1〜12月の<b>保存済みの給与・賞与明細から自動集計</b>し、保険料・扶養などの<b>申告分を入力</b>すると過不足（還付／追加徴収）を計算します。月次は「今月を確定」、賞与は「賞与を確定」で保存すると収入・源泉・社保が自動で埋まります（賞与も含めて集計）。令和8年度改正（基礎控除・給与所得控除・特定親族特別控除）に対応。<br><b style="color:#92500A">※このアプリで扱っていない他の給与所得（前職分など）がある場合のみ「年調の申告入力 ▾」で 給与収入(年)／源泉徴収済(年)／社保 を上書き入力してください。</b></p>'
       +'<div class="pay-row" style="margin-top:6px"><span>全体の過不足</span><span id="nen-total" class="v">—</span></div>'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
-      +'<button class="btn-ghost" data-nxlsx="1" style="padding:8px 12px;font-size:12px">年末調整一覧（源泉徴収簿）をExcel出力</button>'
+      +'<button class="btn-ghost" data-nxlsx="1" style="padding:8px 12px;font-size:12px">年末調整一覧（源泉徴収簿）をExcel出力</button><span class="help-i" data-help="genzenbo">💡</span>'
       +'<button class="btn-ghost" data-ngensen="1" style="padding:8px 12px;font-size:12px">源泉徴収票を印刷 / PDF保存</button></div></div>';
     if(!emps.length) return head+'<div class="card"><p class="hint">対象の従業員がいません。</p></div>';
     return head+emps.map(function(e){ return nenEmpHTML(e, recs); }).join('');

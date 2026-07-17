@@ -16,3 +16,13 @@ T('ブランド: auth.js のログインロゴが Kyually(旧ZEROACT表記なし
 T('ブランド: appbar とログインで Kyually 表記が一致', function () {
   ok(/class="logo">Kyually</.test(read('index.html')), 'appbar が Kyually');
 });
+
+T('ヘルプ: すべての data-help="X" に HELP[X] 定義がある(死んだ💡が無い)', function () {
+  var app = read('js/app.js'), idx = read('index.html');
+  var keys = {};
+  (app.match(/([a-zA-Z]+):\{ ?t:'💡/g) || []).forEach(function (m) { keys[m.replace(/:\{.*/, '')] = 1; });
+  var refs = [];
+  (app + idx).replace(/data-help="([a-zA-Z]+)"/g, function (_, k) { refs.push(k); return _; });
+  var missing = refs.filter(function (k, i) { return refs.indexOf(k) === i && !keys[k]; });
+  ok(missing.length === 0, 'HELP未定義の💡: ' + missing.join(', '));
+});
