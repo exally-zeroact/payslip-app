@@ -209,6 +209,25 @@ T('台帳/年調の確定ゲート: 下書き保存はconfirmed=false・確定�
   ok(!kept.some(r => r.data.confirmed === false), '下書きが残っている');
 });
 
+await (async () => {
+  let pass2 = 0;
+  // 賞与ytd自動集計: 当年度(4-3月)の当月より前の賞与の標準賞与額を合計する
+  const saved = [
+    { ym: '2026-06', employee_id: 'E1', data: { kind: 'bonus', hyojun: 3000000 } }, // 同年度・前
+    { ym: '2026-09', employee_id: 'E1', data: { kind: 'bonus', hyojun: 2000000 } }, // 同年度・前
+    { ym: '2026-12', employee_id: 'E1', data: { kind: 'bonus', hyojun: 1000000 } }, // 当月=除外
+    { ym: '2026-03', employee_id: 'E1', data: { kind: 'bonus', hyojun: 9000000 } }, // 前年度(3月)=除外
+    { ym: '2026-07', employee_id: 'E1', data: { kind: 'monthly', kazei: 250000 } } // 月次=除外
+  ];
+  win.Store = { getPayslipsByYm: (from, to) => Promise.resolve(saved.filter(r => r.ym >= from && r.ym <= to)), savePayslip: () => {} };
+  A.state.bonus = { payYm: '2026-12', byEmp: {} }; A.state._bonusYtdYm = null; A.state.inputMode = 'monthly';
+  await A.loadBonusYtd();
+  await new Promise(r => setTimeout(r, 20));
+  T('賞与ytd自動集計: 当年度の当月より前の賞与(標準賞与額)だけ合計(前年度/月次/当月は除外)', function () {
+    ok(A.state._bonusYtd && A.state._bonusYtd.E1 === 5000000, '既往合計=3,000,000+2,000,000=5,000,000 (' + (A.state._bonusYtd && A.state._bonusYtd.E1) + ')');
+  });
+})();
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

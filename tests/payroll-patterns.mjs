@@ -281,5 +281,19 @@ T('法定控除オフ(役員=雇用なし/非加入=健保厚年なし): siも0�
   ok((si.total || 0) === 0, 'si.total=0でない(' + si.total + ')');
 });
 
+// ── 賞与の健保573万 年度累計(ytd)を自動集計値で上限適用・手入力は上書き ──
+T('賞与ytd自動: _bonusYtd(既往500万)で健保573万上限が効く・手入力で上書き', function () {
+  const e = emp({ name: 'ytd', payType: '月給', base: '300000', pref: 'tokyo' });
+  A.state.bonus = { payYm: '2026-12', byEmp: {} };
+  const en = A.bonusEntry(e); en.amount = '2000000'; // 標準賞与額200万
+  A.state._bonusYtd = {}; A.state._bonusYtd[e.id] = 5000000; // 既往500万を自動集計済とする
+  const c = A.computeBonus(e);
+  ok(c.ytdAuto === true && c.ytdVal === 5000000, 'ytd自動が反映');
+  ok(c.si.kenpoBase === 730000, '健保対象が573万上限で73万(' + c.si.kenpoBase + ')'); // min(200万, 573万-500万=73万)
+  en.ytd = '0'; const c2 = A.computeBonus(e); // 手入力0で上書き
+  ok(c2.ytdAuto === false && c2.si.kenpoBase === 2000000, '手入力0で上限未適用(' + c2.si.kenpoBase + ')');
+  en.ytd = ''; A.state._bonusYtd = {}; // 後片付け
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
