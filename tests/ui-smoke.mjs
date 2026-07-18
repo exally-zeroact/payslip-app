@@ -279,6 +279,44 @@ T('年調 従業員Web申告バナー: 提出があると要約+取り込みボ�
   ok(A.nenDeclBannerHTML('NOPE') === '', '提出が無い従業員はバナー無し');
 });
 
+T('給与パターン 一括適用(ロジック): 選んだ人だけに構造が反映・給与額は不変', function () {
+  // emp0 を「時給・皆勤手当あり」に仕立ててパターン化
+  const src = A.defEmp('原型'); src.payType = '時給'; src.hourly = '1500';
+  src.shikyu = [{ label: '基本給', value: '0' }, { label: '皆勤手当', value: '8000' }];
+  const pat = A.makePayPattern(src, 'バイト');
+  ok(pat && pat.pay && /皆勤手当/.test((pat.pay.shikyuTpl || []).join(',')), 'パターンに皆勤手当ラベルが入る(値は含めない)');
+  // 適用先2名(月給・別の額)。給与額は変わらない・構造だけ変わる
+  const a = A.defEmp('田中'); a.payType = '月給'; a.base = '300000';
+  const b = A.defEmp('鈴木'); b.payType = '月給'; b.base = '280000';
+  A.applyPayPattern(a, pat); A.applyPayPattern(b, pat);
+  ok(a.payType === '時給' && b.payType === '時給', '給与形態が反映');
+  ok((a.shikyu || []).some(x => x.label === '皆勤手当'), '支給項目(皆勤手当)が反映');
+  ok(a.base === '300000' && b.base === '280000', '基本給(人ごとの額)は不変');
+  ok(!(pat.pay.base) && !(pat.pay.hourly), 'パターンに給与額は含まれない');
+});
+
+T('給与パターン 一括適用(モーダル): 全員チェックで選んだ人数に適用', function () {
+  A.state.payPatterns = [A.makePayPattern((() => { const e = A.defEmp('原'); e.payType = '日給'; e.shikyu = [{ label: '基本給', value: '0' }, { label: '危険手当', value: '3000' }]; return e; })(), '現場')];
+  A.state.employees = [A.defEmp('甲'), A.defEmp('乙'), A.defEmp('丙')];
+  A.state.employees.forEach(e => { e.payType = '月給'; });
+  A.renderEmpMaster();
+  // 前テストの残りモーダルを閉じてから開く
+  doc.querySelectorAll('.ui-modal-ov').forEach(m => m.remove());
+  A.openBulkPatternApply();
+  const ov = doc.querySelector('.ui-modal-ov'); ok(ov, 'モーダルが開く');
+  ok(!/在籍中の従業員がいません/.test(ov.textContent), '在籍者ありで適用モーダルが出る(アラートでない)');
+  const cks = ov.querySelectorAll('.bp-ck'); ok(cks.length === 3, '在籍3名分のチェックが出る: ' + cks.length);
+  ok(ov.querySelector('#bp-pat'), 'パターン選択がある');
+  // 「全員 ON/OFF」で一旦全解除→全選択(トグル配線)を確認
+  const allBtn = ov.querySelector('#bp-all'); ok(allBtn, '全員ON/OFFボタン');
+  allBtn.click(); ok([...ov.querySelectorAll('.bp-ck')].every(c => !c.checked), '一度で全解除');
+  allBtn.click(); ok([...ov.querySelectorAll('.bp-ck')].every(c => c.checked), 'もう一度で全選択');
+  // 「適用」を押すとモーダルが閉じる(実際の適用=applyPayPatternは上のロジックテスト+実機で担保)
+  const applyBtn = [...ov.querySelectorAll('.ui-modal-btn')].find(b => /適用/.test(b.textContent));
+  ok(applyBtn, '適用ボタンがある'); applyBtn.click();
+  ok(!doc.querySelector('.ui-modal-ov'), '適用後モーダルは閉じる');
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

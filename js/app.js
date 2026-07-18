@@ -635,6 +635,32 @@
       +'<button class="btn-ghost pat-save" data-i="'+i+'" style="padding:9px 10px;white-space:nowrap;font-size:12px">この設定を保存</button></div></div>'
       +'<div class="hint" style="margin:2px 2px 8px">'+(pats.length?'選ぶと 給与形態・決め方・支給/控除項目 をこの人に反映（氏名・扶養・通勤などは変わりません）。':'「この設定を保存」で いまの給与形態・決め方・項目 を"パターン"化 → 他の人へ一括適用できます。')+'</div>';
   }
+  // 給与パターンを複数の従業員へ一括適用(1人ずつでなく、選んだ人に一度に反映)
+  function openBulkPatternApply(){
+    var pats=state.payPatterns||[]; if(!pats.length){ uiAlert('先に、どれかの人で「この設定を保存」して給与パターンを作ってください。'); return; }
+    var cands=state.employees.map(function(e,i){return {e:e,i:i};}).filter(function(x){ return !x.e.retired && !empOnLeave(x.e); }); // 在籍中のみ
+    if(!cands.length){ uiAlert('適用できる在籍中の従業員がいません。'); return; }
+    var sel={ patId:pats[0].id, ids:{} }; cands.forEach(function(x){ sel.ids[x.e.id]=true; }); // 既定は全員チェック
+    var html=''
+      +'<div class="frow"><div class="flabel">適用するパターン</div><select class="finput" id="bp-pat">'+pats.map(function(p){return '<option value="'+attr(p.id)+'">'+esc(p.name)+'</option>';}).join('')+'</select></div>'
+      +'<div class="sec-lb" style="margin-top:10px;display:flex;align-items:center;gap:8px">適用する人<button class="btn-ghost" id="bp-all" style="padding:4px 10px;font-size:11px">全員 ON/OFF</button></div>'
+      +'<div id="bp-emps" style="max-height:44vh;overflow:auto">'+cands.map(function(x){ return '<label class="bp-row" style="display:flex;align-items:center;gap:9px;padding:8px 4px;border-top:1px dashed #eaf3ee;font-size:13px;cursor:pointer"><input type="checkbox" class="bp-ck" data-eid="'+attr(x.e.id)+'" checked style="width:20px;height:20px;accent-color:#3D9E72"><span>'+esc(x.e.name||'（無名）')+'<span style="color:#8aa89a;font-size:11px;margin-left:4px">'+esc(x.e.payType||'')+'</span></span></label>'; }).join('')+'</div>'
+      +'<div class="ri-note" style="margin-top:10px">給与形態・決め方・支給/控除項目が置き換わります。<b>氏名・扶養・通勤・給与額（基本給/時給）は変わりません。</b></div>';
+    uiModal({ title:'給与パターンを一括適用', html:html, buttons:[{label:'キャンセル',val:false},{label:'適用',val:true,primary:true}],
+      onRender:function(host){
+        host.querySelector('#bp-pat').addEventListener('change',function(){ sel.patId=this.value; });
+        host.addEventListener('change',function(ev){ var ck=ev.target.closest('.bp-ck'); if(ck) sel.ids[ck.dataset.eid]=ck.checked; });
+        host.querySelector('#bp-all').addEventListener('click',function(){ var cks=host.querySelectorAll('.bp-ck'); var turnOn=[].some.call(cks,function(c){return !c.checked;}); [].forEach.call(cks,function(c){ c.checked=turnOn; sel.ids[c.dataset.eid]=turnOn; }); });
+      }
+    }).then(function(okv){
+      if(!okv) return;
+      var pat=(state.payPatterns||[]).find(function(x){return x.id===sel.patId;}); if(!pat) return;
+      var ids=Object.keys(sel.ids).filter(function(id){return sel.ids[id];});
+      if(!ids.length){ uiAlert('適用する人が選ばれていません。'); return; }
+      var n=0; state.employees.forEach(function(e){ if(ids.indexOf(e.id)>=0){ applyPayPattern(e,pat); n++; } });
+      renderEmpMaster(); if(window.persistSaveDebounced)persistSaveDebounced(); toast('「'+pat.name+'」を '+n+'名に適用しました');
+    });
+  }
   // 雑入力ウィザード(給料の決め方を言葉で→読み取る→数字例つき確認→設定)
   function parseRow(e,i){
     return '<div class="frow"><div class="flabel">雑に書いて作る<span class="hint2">任意</span></div>'
@@ -839,8 +865,8 @@
     state.employees.forEach(function(e,i){ if(!empMatchesFilter(e)) return; var g=e.dept||'未分類'; if(!groups[g]){groups[g]=[];order.push(g);} groups[g].push(i); });
     var html='<div class="emp-filter">'+FILTERS.map(function(f){ return '<b class="ef-b'+(filt===f[0]?' on':'')+'" data-empfilter="'+f[0]+'">'+f[1]+'<span class="ef-n">'+f[2]+'</span></b>'; }).join('')+'</div>';
     var pats=state.payPatterns||[];
-    if(pats.length) html+='<div class="pat-strip"><span class="pat-strip-l">給与パターン</span>'+pats.map(function(p){ return '<span class="pat-chip">'+esc(p.name)+'<b class="pat-del" data-patdel="'+attr(p.id)+'">×</b></span>'; }).join('')+'</div>';
-    html+='<div class="hint" style="margin:0 2px 8px">カードを左にスワイプ＝削除（または開いて下の「削除」）。休暇・退職もここで（カードを開いて設定）。'+(pats.length?'給与パターンは各カードの「給与パターン」で適用/保存。':'')+'</div>';
+    if(pats.length) html+='<div class="pat-strip"><span class="pat-strip-l">給与パターン</span>'+pats.map(function(p){ return '<span class="pat-chip">'+esc(p.name)+'<b class="pat-del" data-patdel="'+attr(p.id)+'">×</b></span>'; }).join('')+(cActive>=1?'<button class="btn-ghost pat-bulk" style="padding:5px 12px;font-size:12px;white-space:nowrap">選んで一括適用</button>':'')+'</div>';
+    html+='<div class="hint" style="margin:0 2px 8px">カードを左にスワイプ＝削除（または開いて下の「削除」）。休暇・退職もここで（カードを開いて設定）。'+(pats.length?'給与パターンは各カードの「給与パターン」で1人ずつ、または上の「選んで一括適用」で複数人へまとめて適用。':'')+'</div>';
     if(!order.length) html+='<p class="hint" style="margin:8px 2px">この絞り込みに該当する人はいません。</p>';
     order.forEach(function(g){
       if(anyDept) html+='<div class="grp-hd">'+esc(g)+'（'+groups[g].length+'名）</div>';
@@ -2073,6 +2099,7 @@
       if(ev.target.dataset.goleave!=null){ var gl=+ev.target.dataset.goleave; var ge=state.employees[gl]; state.open[ge.id]=true; state.open['D'+ge.id]=true; renderEmpMaster(); return; } // カードの詳細(就業状況)を開く=1経路に集約
       if(ev.target.dataset.goretire!=null){ var gr=+ev.target.dataset.goretire; if(activeEmps().length<=1){ uiAlert('稼働中は最低1名必要です'); return; } uiConfirm((state.employees[gr].name||'この従業員')+' を退職にします。給与計算・印刷の対象から外れます（データは残ります）。').then(function(ok){ if(!ok)return; state.employees[gr].retired=true; state.employees[gr].retiredYmd=state.month; renderEmpMaster(); }); return; }
       var pdl=ev.target.closest('[data-patdel]'); if(pdl){ var pdid=pdl.dataset.patdel; uiConfirm('この給与パターンを削除しますか？（適用済みの従業員の設定は変わりません）').then(function(ok){ if(!ok)return; state.payPatterns=(state.payPatterns||[]).filter(function(x){return x.id!==pdid;}); renderEmpMaster(); if(window.persistSaveDebounced)persistSaveDebounced(); }); return; } // パターン削除
+      if(ev.target.closest('.pat-bulk')){ openBulkPatternApply(); return; } // 給与パターンを複数人へ一括適用
       var card=ev.target.closest('.mco');
       var tg=ev.target.closest('[data-toggle]');
       if(tg){ var ti=+tg.dataset.toggle; var e=state.employees[ti]; state.open[e.id]=!state.open[e.id]; renderEmpMaster(); return; }
@@ -2330,7 +2357,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';
