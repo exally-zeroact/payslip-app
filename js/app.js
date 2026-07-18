@@ -143,6 +143,11 @@
   function usedItemNames(group){ var s={}; (state.employees||[]).forEach(function(e){ (e[group]||[]).forEach(function(x){ var l=((x&&x.label)||'').trim(); if(l && !/基本給|通勤手当/.test(l)) s[l]=1; }); }); return Object.keys(s); }
   function itemSuggestOptions(group){ var used=usedItemNames(group==='shikyu'?'shikyu':'extraKojo'), curated=(group==='shikyu'?SUGGEST_SHIKYU:SUGGEST_KOJO), seen={}, out=[]; used.concat(curated).forEach(function(n){ if(n && !seen[n]){ seen[n]=1; out.push(n); } }); return out; } // 実使用を先頭(MRU的)＋定番
   function itemSuggestHTML(){ return '<datalist id="dl-item-shikyu">'+itemSuggestOptions('shikyu').map(function(n){return '<option value="'+attr(n)+'"></option>';}).join('')+'</datalist><datalist id="dl-item-kojo">'+itemSuggestOptions('kojo').map(function(n){return '<option value="'+attr(n)+'"></option>';}).join('')+'</datalist>'; }
+  // 賞与の追加支給/控除の項目名サジェスト(賞与で使った名前＋賞与の定番)
+  var SUGGEST_BONUS_SHIKYU=['特別賞与','寸志','決算賞与','報奨金','インセンティブ','業績賞与'];
+  var SUGGEST_BONUS_KOJO=['親睦会費','貸付金返済','旅行積立','財形貯蓄','社宅費'];
+  function bonusItemSuggestOptions(group){ var used={}, byEmp=(state.bonus&&state.bonus.byEmp)||{}; Object.keys(byEmp).forEach(function(id){ var en=byEmp[id]||{}; ((group==='shikyu'?en.addShikyu:en.addKojo)||[]).forEach(function(it){ var l=((it&&it.label)||'').trim(); if(l) used[l]=1; }); }); var curated=(group==='shikyu'?SUGGEST_BONUS_SHIKYU:SUGGEST_BONUS_KOJO), seen={}, out=[]; Object.keys(used).concat(curated).forEach(function(n){ if(n&&!seen[n]){ seen[n]=1; out.push(n); } }); return out; }
+  function bonusItemSuggestHTML(){ return '<datalist id="dl-bonus-shikyu">'+bonusItemSuggestOptions('shikyu').map(function(n){return '<option value="'+attr(n)+'"></option>';}).join('')+'</datalist><datalist id="dl-bonus-kojo">'+bonusItemSuggestOptions('kojo').map(function(n){return '<option value="'+attr(n)+'"></option>';}).join('')+'</datalist>'; }
   var LEGAL_KOJO=[['health','健康保険'],['kaigo','介護保険'],['pension','厚生年金'],['employ','雇用保険'],['incomeTax','所得税'],['resident','住民税']];
   // 雇用保険 従業員負担(令和7年度・業種別)
   // 雇用保険 労働者負担(厚労省)。区分は全国共通の3種で網羅。料率は年度で自動選択(所得税と同様)
@@ -1401,18 +1406,18 @@
       else { taxLine='<div class="calc-line"><span>源泉所得税（率 '+c.tax.rate+'%'+(c.tax.otsu?'・乙欄':'')+'）</span><span class="v">'+yen(c.taxAmt)+'</span></div>'; }
       // 追加支給/任意控除の編集UI(月次と同じ自由度)。data-bs*/bk*=賞与の追加項目
       var sItems=(en.addShikyu||[]).map(function(it,idx){ return '<div class="bx-row">'
-        +'<input class="finput bx-lbl" data-bsl="'+e.id+':'+idx+'" value="'+attr(it.label)+'" placeholder="項目名">'
+        +'<input class="finput bx-lbl" data-bsl="'+e.id+':'+idx+'" list="dl-bonus-shikyu" value="'+attr(it.label)+'" placeholder="項目名">'
         +'<input class="finput num bx-val" data-bsv="'+e.id+':'+idx+'" inputmode="numeric" value="'+attr(fmtN(it.value))+'" placeholder="円">'
         +'<label class="bx-hik"><input type="checkbox" data-bsh="'+e.id+':'+idx+'"'+(it.hikazei?' checked':'')+'>非課税</label>'
         +'<button class="btn-ghost bx-del" data-bsx="'+e.id+':'+idx+'" aria-label="この支給項目を削除">×</button></div>'; }).join('');
       var kItems=(en.addKojo||[]).map(function(it,idx){ return '<div class="bx-row">'
-        +'<input class="finput bx-lbl" data-bkl="'+e.id+':'+idx+'" value="'+attr(it.label)+'" placeholder="項目名">'
+        +'<input class="finput bx-lbl" data-bkl="'+e.id+':'+idx+'" list="dl-bonus-kojo" value="'+attr(it.label)+'" placeholder="項目名">'
         +'<input class="finput num bx-val" data-bkv="'+e.id+':'+idx+'" inputmode="numeric" value="'+attr(fmtN(it.value))+'" placeholder="円">'
         +'<button class="btn-ghost bx-del" data-bkx="'+e.id+':'+idx+'" aria-label="この控除項目を削除">×</button></div>'; }).join('');
       var editor='<div class="sec-lb" style="font-size:11px;margin-top:10px">追加の支給項目<span class="hint2">賞与に上乗せ・任意</span></div>'+sItems
-        +'<div class="addcustom"><input class="finput ac-inp" data-bsaddl="'+e.id+'" placeholder="例：特別賞与・寸志"><button class="btn-ghost" data-bsadd="'+e.id+'" style="padding:9px 12px">＋支給</button></div>'
+        +'<div class="addcustom"><input class="finput ac-inp" data-bsaddl="'+e.id+'" list="dl-bonus-shikyu" placeholder="例：特別賞与・寸志"><button class="btn-ghost" data-bsadd="'+e.id+'" style="padding:9px 12px">＋支給</button></div>'
         +'<div class="sec-lb" style="font-size:11px">任意の控除項目<span class="hint2">法定は自動・これは任意分</span></div>'+kItems
-        +'<div class="addcustom"><input class="finput ac-inp" data-bkaddl="'+e.id+'" placeholder="例：親睦会費・貸付金返済"><button class="btn-ghost" data-bkadd="'+e.id+'" style="padding:9px 12px">＋控除</button></div>';
+        +'<div class="addcustom"><input class="finput ac-inp" data-bkaddl="'+e.id+'" list="dl-bonus-kojo" placeholder="例：親睦会費・貸付金返済"><button class="btn-ghost" data-bkadd="'+e.id+'" style="padding:9px 12px">＋控除</button></div>';
       var addSLines=(c.addShikyu||[]).map(function(it){ return '<div class="calc-line"><span>'+esc(it.label||'追加支給')+(it.hikazei?'（非課税）':'')+'</span><span class="v">'+yen(it.value)+'</span></div>'; }).join('');
       var addKLines=(c.addKojo||[]).map(function(it){ return '<div class="calc-line"><span>'+esc(it.label||'控除')+'</span><span class="v">'+yen(it.value)+'</span></div>'; }).join('');
       return '<div class="acc icard'+(num(en.amount)>0?' open':'')+'">'
@@ -1440,7 +1445,7 @@
       ? '<div class="card" style="padding:12px;margin-top:6px"><button class="btn-primary" data-confirm-bonus style="width:100%">この賞与を確定（年調・台帳に反映）</button>'
         +'<p class="hint" style="margin:8px 0 0">確定すると、この賞与（'+esc(ym)+'）を年末調整の自動集計と賃金台帳に反映します。あとで直せます。<b>定時決定（4〜6月の標準報酬）や前月比には賞与は含めません</b>（法令どおり）。</p></div>'
       : '';
-    host.innerHTML=head+(cards||'<p class="hint">対象の従業員がいません。</p>')+footer;
+    host.innerHTML=bonusItemSuggestHTML()+head+(cards||'<p class="hint">対象の従業員がいません。</p>')+footer;
   }
   // 賞与を pay_payslips に kind='bonus' で保存(年末調整の年集計・賃金台帳が拾う)。賞与額0は保存しない。
   //  ★定時決定/前月比は賞与を除外して集計する(取得側フィルタ)ので、この保存は法令上の月額報酬に混入しない。
@@ -2493,7 +2498,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

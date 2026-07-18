@@ -421,6 +421,18 @@ T('★H1回帰★ 扶養控除: 累積入力(総数＋そのうち)を排他区�
   ok(inc({ fuyoIppan: 3, fuyoTokutei: 1, fuyoRoujin: 1, fuyoDoukyo: 0 }) === 380000 + 630000 + 480000, '総数3(一般1+特定1+老人非同居1)=149万: ' + inc({ fuyoIppan: 3, fuyoTokutei: 1, fuyoRoujin: 1 }));
 });
 
+T('賞与 項目名サジェスト: 賞与で使った名前＋賞与定番がdatalist候補に出る', function () {
+  A.state.bonus = { payYm: '2026-06', payDay: '', byEmp: { E1: { addShikyu: [{ label: '決算賞与', value: '50000' }], addKojo: [{ label: '共済会費', value: '2000' }] } } };
+  const sup = A.bonusItemSuggestOptions('shikyu');
+  ok(sup.indexOf('決算賞与') === 0, '賞与で実使用の名前が先頭: ' + sup.slice(0, 3));
+  ok(sup.indexOf('特別賞与') > 0 && sup.indexOf('寸志') > 0, '賞与定番(特別賞与/寸志)も候補');
+  const koj = A.bonusItemSuggestOptions('kojo');
+  ok(koj.indexOf('共済会費') === 0 && koj.indexOf('親睦会費') > 0, '控除も実使用＋定番');
+  const html = A.bonusItemSuggestHTML();
+  ok(/<datalist id="dl-bonus-shikyu">/.test(html) && /<datalist id="dl-bonus-kojo">/.test(html), '賞与用datalist2種');
+  ok(/<option value="決算賞与">/.test(html), 'option化される');
+});
+
 T('源泉徴収票 Web交付: 単独HTML(自己完結)が氏名・見出し・CSSを含み iframe srcdoc で表示可能', function () {
   A.state._nenRecs = [];
   const e = A.defEmp('山田 太郎'); e.address = '東京都渋谷区1-2-3'; e.zip = '150-0001';
