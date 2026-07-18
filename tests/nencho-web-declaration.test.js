@@ -90,5 +90,37 @@ await T('会社側 applyToNencho: 申告が年調 n.* に1:1反映', async () =>
   eq(n.fuyoIppan, 3, 'n.fuyoIppan'); eq(n.seiGeneralNew, 40000, 'n.seiGeneralNew'); eq(n.haiEnabled, false, 'n.haiEnabled');
 });
 
+// ── 従業員セルフ登録: 振込先(save/get/list・同じtoken/credを流用) ──
+ok(Store.saveEmpProfile && Store.getEmpProfile && Store.listEmpProfile, 'store: 振込先API露出');
+
+await T('振込先: 未登録なら found:false', async () => {
+  const r = await Store.getEmpProfile(token, cred); eq(r.found, false, '未登録');
+});
+
+await T('振込先: 従業員が保存→本人が取得できる', async () => {
+  const data = { furiBankName: 'みずほ銀行', furiBankNo: '0001', furiBranchName: '本店', furiBranchNo: '001', furiYokin: '普通', furiAccount: '1234567', furiKana: 'ﾔﾏﾀﾞ ﾀﾛｳ' };
+  const s = await Store.saveEmpProfile(token, cred, data); ok(s && s.ok, '保存OK: ' + JSON.stringify(s));
+  const g = await Store.getEmpProfile(token, cred); ok(g.found, '登録済'); eq(g.data.furiBankNo, '0001', '銀行コード'); eq(g.data.furiAccount, '1234567', '口座番号');
+});
+
+await T('振込先: 認証が無い/誤りなら拒否(unauth)', async () => {
+  const s = await Store.saveEmpProfile(token, {}, { furiBankNo: '9999' }); ok(s && s.unauth && !s.ok, '空credは拒否');
+  const g = await Store.getEmpProfile(token, { password: 'zzz' }); ok(g && g.unauth, '誤PWは取得拒否');
+  const ok2 = await Store.getEmpProfile(token, cred); eq(ok2.data.furiBankNo, '0001', '不正操作で登録が壊れない');
+});
+
+await T('振込先: 会社が一覧取得(employeeId付き)', async () => {
+  const l = await Store.listEmpProfile(); const row = l.find(x => x.employeeId === 'E1');
+  ok(row, 'E1の振込先が一覧に出る'); eq(row.data.furiKana, 'ﾔﾏﾀﾞ ﾀﾛｳ', '名義カナ'); ok(row.submittedAt, '提出日時');
+});
+
+await T('振込先: 再登録は上書き(submittedAt維持)', async () => {
+  const before = await Store.getEmpProfile(token, cred);
+  const r = await Store.saveEmpProfile(token, cred, { furiBankName: '三菱UFJ銀行', furiBankNo: '0005', furiAccount: '7654321' }); ok(r.ok, '再保存OK');
+  const after = await Store.getEmpProfile(token, cred);
+  eq(after.data.furiBankNo, '0005', '銀行コード更新'); eq(after.data.furiAccount, '7654321', '口座番号更新');
+  eq(after.submittedAt, before.submittedAt, 'submittedAtは初回のまま');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

@@ -372,6 +372,50 @@
     return Promise.resolve(mNch().filter(function(x){ return x.year===year; }).map(function(x){ return { employeeId:x.employeeId, decl:x.decl||{}, submittedAt:x.submittedAt, updatedAt:x.updatedAt }; }));
   };
 
+  // ── 従業員セルフ登録: 振込先(本人がWeb明細から登録→会社が従業員マスタへ取り込む) ──
+  //  本番=Supabase RPC(save_emp_profile/get_emp_profile・認証は明細と同じ)。localStorage層は下のMPRF。
+  var MPRF_KEY='payslip_emp_profile_v1';
+  function mPrf(){ try{ return JSON.parse(localStorage.getItem(MPRF_KEY)||'[]'); }catch(e){ return []; } }
+  function mPrfW(a){ try{ localStorage.setItem(MPRF_KEY, JSON.stringify(a)); }catch(e){} }
+  // 従業員: 振込先を保存(認証必須)。返り={ok} or {unauth}
+  Store.saveEmpProfile = function(token, cred, data){
+    if(hasSupa){ cred=cred||{};
+      return sb.rpc('save_emp_profile', { p_token:token, p_device:cred.deviceToken||null, p_pw:cred.password||null, p_data:data||{} }).then(function(r){
+        var d=r.data||{}; return { ok:!!d.ok, unauth:!!d.unauth, locked:!!d.locked };
+      });
+    }
+    var f=findPub(token); if(!f.p) return Promise.resolve({ ok:false, unauth:true });
+    if(!authPub(f.p, cred)) return Promise.resolve({ ok:false, unauth:true });
+    var now=new Date().toISOString(), all=mPrf();
+    var i=all.findIndex(function(x){ return x.token===token; });
+    var row={ token:token, employeeId:f.p.employeeId, data:data||{}, submittedAt:(i>=0?all[i].submittedAt:now), updatedAt:now };
+    if(i>=0) all[i]=row; else all.push(row); mPrfW(all);
+    return Promise.resolve({ ok:true });
+  };
+  // 従業員: 自分の登録を取得。返り={found,data,submittedAt,updatedAt} or {unauth}
+  Store.getEmpProfile = function(token, cred){
+    if(hasSupa){ cred=cred||{};
+      return sb.rpc('get_emp_profile', { p_token:token, p_device:cred.deviceToken||null, p_pw:cred.password||null }).then(function(r){
+        var d=r.data||{}; if(d.unauth) return { unauth:true }; if(!d.found) return { found:false };
+        return { found:true, data:d.data||{}, submittedAt:d.submittedAt, updatedAt:d.updatedAt };
+      });
+    }
+    var f=findPub(token); if(!f.p) return Promise.resolve({ unauth:true });
+    if(!authPub(f.p, cred)) return Promise.resolve({ unauth:true });
+    var row=mPrf().filter(function(x){ return x.token===token; })[0];
+    if(!row) return Promise.resolve({ found:false });
+    return Promise.resolve({ found:true, data:row.data||{}, submittedAt:row.submittedAt, updatedAt:row.updatedAt });
+  };
+  // 会社: 提出済みの振込先一覧。RLSで自分の発行分のみ。返り=[{employeeId,data,submittedAt,updatedAt}]
+  Store.listEmpProfile = function(){
+    if(hasSupa){
+      return sb.from('pay_emp_profile').select('employee_id,data,submitted_at,updated_at').then(function(r){
+        return (r.data||[]).map(function(x){ return { employeeId:x.employee_id, data:x.data||{}, submittedAt:x.submitted_at, updatedAt:x.updated_at }; });
+      });
+    }
+    return Promise.resolve(mPrf().map(function(x){ return { employeeId:x.employeeId, data:x.data||{}, submittedAt:x.submittedAt, updatedAt:x.updatedAt }; }));
+  };
+
   // 中央の法定データ(statutory テーブル)を取得。全アプリ共通・anon読取可。localやDB無しは[]=libのハードコードで動く(フォールバック)。
   Store.getStatutory = function(){
     if(hasSupa){ return sb.from('statutory').select('kind,year,data').then(function(r){ return r.data||[]; }).catch(function(){ return []; }); }

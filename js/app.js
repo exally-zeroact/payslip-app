@@ -409,7 +409,7 @@
     // 対象月はヘッダー右にグローバル表示(入力/一覧)。設定=月概念なし・印刷=画面内に月/賞与切替があるので非表示。タブ名と排他。
     var showMon=(id==='scr-input'||id==='scr-list'); var am=$('#appbar-month'); if(am) am.style.display=showMon?'flex':'none'; if(at) at.style.display=showMon?'none':'';
     $$('.scr-month').forEach(function(m){ m.value=state.month; }); // 全.scr-month(ヘッダー/印刷)を対象月に同期
-    if(id==='scr-settings'){ renderOnboard(); renderEmpMaster(); }
+    if(id==='scr-settings'){ renderOnboard(); renderEmpMaster(); loadEmpProfiles(); }
     if(id==='scr-input'){ $('#in-month').textContent=monthLabel(); renderInputArea(); }
     if(id==='scr-list') renderListActive();
     if(id==='scr-print') renderPrint();
@@ -850,6 +850,20 @@
   function visibleEmpIdx(){ var arr=[]; var groups={},order=[]; state.employees.forEach(function(e,idx){ if(!empMatchesFilter(e))return; var g=e.dept||'未分類'; if(!groups[g]){groups[g]=[];order.push(g);} groups[g].push(idx); }); order.forEach(function(g){ groups[g].forEach(function(idx){ arr.push(idx); }); }); return arr; }
   // 従業員を表示順で1つ上(dir=-1)/下(dir=+1)へ。配列の並びを入替=入力/一覧/印刷/Excel 全部に反映・永続(sort:i)
   function moveEmp(i, dir){ var vis=visibleEmpIdx(); var p=vis.indexOf(i); var q=p+dir; if(p<0||q<0||q>=vis.length) return; var a=state.employees, j=vis[q]; var t=a[i]; a[i]=a[j]; a[j]=t; renderEmpMaster(); }
+  // 従業員がWeb明細から登録した振込先(会社が従業員マスタへ取り込む)
+  var PROFILE_KEYS=['furiBankName','furiBankNo','furiBranchName','furiBranchNo','furiYokin','furiAccount','furiKana'];
+  function applyEmpProfile(e, data){ if(!e||!data) return; PROFILE_KEYS.forEach(function(k){ if(data[k]!=null && data[k]!=='') e[k]=data[k]; }); if(!e.bank){ var disp=[data.furiBankName,data.furiYokin,data.furiAccount].filter(Boolean).join(' '); if(disp) e.bank=disp; } }
+  function loadEmpProfiles(){ if(!(window.Store&&Store.listEmpProfile)) return; Store.listEmpProfile().then(function(list){ state._empProfiles={}; (list||[]).forEach(function(p){ if(p&&p.employeeId) state._empProfiles[p.employeeId]=p; }); renderEmpMaster(); }).catch(function(){}); }
+  function pendingProfileEmps(){ var profs=state._empProfiles||{}, imp=state._profImported||{}; return state.employees.filter(function(e){ return !e.retired && profs[e.id] && !imp[e.id]; }); }
+  function empProfileStripHTML(){
+    var list=pendingProfileEmps(); if(!list.length) return '';
+    return '<div class="prof-strip" style="background:#EAF7F0;border:1.5px solid #C8ECD8;border-radius:10px;padding:8px 10px;margin:0 0 8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">'
+      +'<span style="font-size:12px;font-weight:700;color:#2E7D54;flex-basis:100%">🏦 本人がWebで振込先を登録しました（確認して取り込み）</span>'
+      +list.map(function(e){ return '<button class="btn-ghost prof-import" data-profimport="'+attr(e.id)+'" style="padding:6px 12px;font-size:12px">'+esc(e.name||'（無名）')+' を取り込む</button>'; }).join('')
+      +(list.length>1?'<button class="btn-ghost" data-profimportall="1" style="padding:6px 12px;font-size:12px;font-weight:700">全員まとめて取り込む</button>':'')
+      +'</div>';
+  }
+  function importEmpProfile(eid){ var p=(state._empProfiles||{})[eid], e=state.employees.filter(function(x){return x.id===eid;})[0]; if(!p||!e) return false; applyEmpProfile(e,p.data); if(!state._profImported)state._profImported={}; state._profImported[eid]=true; return true; }
   function renderEmpMaster(){
     fillCompany();
     var host=$('#emp-list'); if(!host) return;
@@ -864,6 +878,7 @@
     var groups={}; var order=[];
     state.employees.forEach(function(e,i){ if(!empMatchesFilter(e)) return; var g=e.dept||'未分類'; if(!groups[g]){groups[g]=[];order.push(g);} groups[g].push(i); });
     var html='<div class="emp-filter">'+FILTERS.map(function(f){ return '<b class="ef-b'+(filt===f[0]?' on':'')+'" data-empfilter="'+f[0]+'">'+f[1]+'<span class="ef-n">'+f[2]+'</span></b>'; }).join('')+'</div>';
+    html+=empProfileStripHTML();
     var pats=state.payPatterns||[];
     if(pats.length) html+='<div class="pat-strip"><span class="pat-strip-l">給与パターン</span>'+pats.map(function(p){ return '<span class="pat-chip">'+esc(p.name)+'<b class="pat-del" data-patdel="'+attr(p.id)+'">×</b></span>'; }).join('')+(cActive>=1?'<button class="btn-ghost pat-bulk" style="padding:5px 12px;font-size:12px;white-space:nowrap">選んで一括適用</button>':'')+'</div>';
     html+='<div class="hint" style="margin:0 2px 8px">カードを左にスワイプ＝削除（または開いて下の「削除」）。休暇・退職もここで（カードを開いて設定）。'+(pats.length?'給与パターンは各カードの「給与パターン」で1人ずつ、または上の「選んで一括適用」で複数人へまとめて適用。':'')+'</div>';
@@ -2063,7 +2078,7 @@
     // 設定 seg
     $('#set-seg').addEventListener('click',function(ev){ var b=ev.target.closest('.seg-b'); if(!b)return; $$('.seg-b',this).forEach(function(x){x.classList.toggle('on',x===b);}); var s=b.dataset.set;
       $('#set-company').style.display=s==='company'?'':'none'; $('#set-emp').style.display=s==='emp'?'':'none'; $('#set-design').style.display=s==='design'?'':'none';
-      if(s==='emp')renderEmpMaster(); if(s==='design')renderDesign(); });
+      if(s==='emp'){ renderEmpMaster(); loadEmpProfiles(); } if(s==='design')renderDesign(); });
     // 従業員マスタ：絞り込み(在籍中/休暇中/退職者/全員)
     $('#emp-list').addEventListener('click',function(ev){ var f=ev.target.closest('[data-empfilter]'); if(!f)return; state.empFilter=f.dataset.empfilter; renderEmpMaster(); });
     ['name','addr','close'].forEach(function(k){ var el=$('#c-'+k); if(el) el.addEventListener('input',function(){ state.company[k]=this.value; }); });
@@ -2100,6 +2115,8 @@
       if(ev.target.dataset.goretire!=null){ var gr=+ev.target.dataset.goretire; if(activeEmps().length<=1){ uiAlert('稼働中は最低1名必要です'); return; } uiConfirm((state.employees[gr].name||'この従業員')+' を退職にします。給与計算・印刷の対象から外れます（データは残ります）。').then(function(ok){ if(!ok)return; state.employees[gr].retired=true; state.employees[gr].retiredYmd=state.month; renderEmpMaster(); }); return; }
       var pdl=ev.target.closest('[data-patdel]'); if(pdl){ var pdid=pdl.dataset.patdel; uiConfirm('この給与パターンを削除しますか？（適用済みの従業員の設定は変わりません）').then(function(ok){ if(!ok)return; state.payPatterns=(state.payPatterns||[]).filter(function(x){return x.id!==pdid;}); renderEmpMaster(); if(window.persistSaveDebounced)persistSaveDebounced(); }); return; } // パターン削除
       if(ev.target.closest('.pat-bulk')){ openBulkPatternApply(); return; } // 給与パターンを複数人へ一括適用
+      var pim=ev.target.closest('[data-profimport]'); if(pim){ if(importEmpProfile(pim.dataset.profimport)){ renderEmpMaster(); if(window.persistSaveDebounced)persistSaveDebounced(); toast('振込先を取り込みました'); } return; } // 本人の振込先を取り込む
+      if(ev.target.closest('[data-profimportall]')){ var did=false; pendingProfileEmps().slice().forEach(function(e){ if(importEmpProfile(e.id)) did=true; }); if(did){ renderEmpMaster(); if(window.persistSaveDebounced)persistSaveDebounced(); toast('全員の振込先を取り込みました'); } return; } // 全員の振込先を取り込む
       var card=ev.target.closest('.mco');
       var tg=ev.target.closest('[data-toggle]');
       if(tg){ var ti=+tg.dataset.toggle; var e=state.employees[ti]; state.open[e.id]=!state.open[e.id]; renderEmpMaster(); return; }
@@ -2357,7 +2374,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

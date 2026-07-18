@@ -5,7 +5,7 @@
 (function(){
   'use strict';
   var $=function(id){ return document.getElementById(id); };
-  var SCREENS=['sc-bad','sc-setup','sc-login','sc-consent','sc-list','sc-view','sc-nencho'];
+  var SCREENS=['sc-bad','sc-setup','sc-login','sc-consent','sc-list','sc-view','sc-nencho','sc-furikomi'];
   function show(id){ SCREENS.forEach(function(s){ var el=$(s); if(el)el.classList.toggle('hidden', s!==id); }); }
   function yen(n){ n=Math.round(Number(n)||0); return '¥'+n.toLocaleString('en-US'); }
   function ymLabel(ym, kind){ var y=(ym||'').slice(0,4), m=parseInt((ym||'').slice(5,7),10)||0; return '令和'+(y-2018)+'年'+m+'月'+(kind==='bonus'?'（賞与）':'分'); }
@@ -156,6 +156,47 @@
       if(!r || !r.ok){ if(errEl)errEl.textContent=(r&&r.unauth)?'ログインが必要です。もう一度開き直してください。':'保存できませんでした。通信環境をご確認ください。'; return; }
       declState=JSON.parse(JSON.stringify(decl)); renderNenWiz();
       var sv=$('nencho-saved'); sv.textContent='申告を保存しました。会社が確認して年末調整に反映します。修正があればこの画面から再提出できます。'; sv.classList.remove('hidden');
+      window.scrollTo(0,0);
+    });
+  });
+
+  // ⑦ 従業員セルフ登録: 振込先(給与の受け取り口座)
+  var PROFILE_FIELDS=[
+    { k:'furiBankName', label:'銀行名', ph:'みずほ銀行', help:'例：みずほ銀行／三菱UFJ銀行／ゆうちょ銀行 など。' },
+    { k:'furiBankNo', label:'銀行コード（4桁）', ph:'0001', num:true, max:4, help:'通帳・キャッシュカード・銀行アプリで確認できます。分からなければ空欄でOK。' },
+    { k:'furiBranchName', label:'支店名', ph:'本店', help:'' },
+    { k:'furiBranchNo', label:'支店コード（3桁）', ph:'001', num:true, max:3, help:'' },
+    { k:'furiYokin', label:'預金の種類', sel:['普通','当座','貯蓄'] },
+    { k:'furiAccount', label:'口座番号（7桁）', ph:'1234567', num:true, max:7, help:'7桁より短い場合は前に0を付けて7桁にしてください。' },
+    { k:'furiKana', label:'口座名義（カナ）', ph:'ﾔﾏﾀﾞ ﾊﾅｺ', help:'通帳のとおり（半角カナ）。空欄なら会社が氏名から補います。' }
+  ];
+  var profState={};
+  function profFieldHTML(f){
+    var v=profState[f.k]==null?'':profState[f.k], inner;
+    if(f.sel) inner='<select class="finput" data-pk="'+esc(f.k)+'">'+f.sel.map(function(o){ return '<option'+(((v||f.sel[0])===o)?' selected':'')+'>'+esc(o)+'</option>'; }).join('')+'</select>';
+    else inner='<input class="finput'+(f.num?' num':'')+'" data-pk="'+esc(f.k)+'" value="'+esc(v)+'"'+(f.num?' inputmode="numeric"':'')+(f.max?' maxlength="'+f.max+'"':'')+' placeholder="'+esc(f.ph||'')+'">';
+    return '<div style="margin-bottom:12px"><label class="lbl">'+esc(f.label)+'</label>'+inner+(f.help?'<div class="hint" style="margin-top:3px">'+esc(f.help)+'</div>':'')+'</div>';
+  }
+  function renderProfForm(){ var host=$('furi-form'); if(host) host.innerHTML=PROFILE_FIELDS.map(profFieldHTML).join(''); }
+  function openFurikomi(){
+    var errEl=$('furi-err'); if(errEl)errEl.textContent=''; $('furi-saved').classList.add('hidden');
+    Store.getEmpProfile(token, cred).then(function(r){
+      profState = (r && r.found && r.data) ? JSON.parse(JSON.stringify(r.data)) : {};
+      if(r && r.found){ var sv=$('furi-saved'); sv.textContent='前回の登録を読み込みました。修正して再登録できます。'; sv.classList.remove('hidden'); }
+      renderProfForm(); show('sc-furikomi'); window.scrollTo(0,0);
+    });
+  }
+  var toF=$('to-furikomi'); if(toF) toF.addEventListener('click', openFurikomi);
+  var fBack=$('furi-back'); if(fBack) fBack.addEventListener('click', function(){ renderList(); show('sc-list'); });
+  var fSave=$('furi-save');
+  if(fSave) fSave.addEventListener('click', function(){
+    var errEl=$('furi-err'); if(errEl)errEl.textContent='';
+    var host=$('furi-form'), data={};
+    PROFILE_FIELDS.forEach(function(f){ var el=host.querySelector('[data-pk="'+f.k+'"]'); var v=el?(''+el.value).trim():''; if(f.num) v=v.replace(/[^0-9]/g,''); data[f.k]=v; }); // コード/口座番号は数字のみ
+    Store.saveEmpProfile(token, cred, data).then(function(r){
+      if(!r || !r.ok){ if(errEl)errEl.textContent=(r&&r.unauth)?'ログインが必要です。もう一度開き直してください。':'保存できませんでした。通信環境をご確認ください。'; return; }
+      profState=JSON.parse(JSON.stringify(data)); renderProfForm();
+      var sv=$('furi-saved'); sv.textContent='振込先を登録しました。会社が確認して反映します。修正があればこの画面から再登録できます。'; sv.classList.remove('hidden');
       window.scrollTo(0,0);
     });
   });

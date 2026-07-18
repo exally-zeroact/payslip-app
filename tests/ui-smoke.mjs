@@ -317,6 +317,29 @@ T('給与パターン 一括適用(モーダル): 全員チェックで選んだ
   ok(!doc.querySelector('.ui-modal-ov'), '適用後モーダルは閉じる');
 });
 
+T('振込先 Web登録: 会社バナー＋取り込みで従業員マスタの振込先(furi*)に反映', function () {
+  A.state.employees = [A.defEmp('田中'), A.defEmp('佐藤')];
+  const t = A.state.employees[0];
+  const data = { furiBankName: 'みずほ銀行', furiBankNo: '0001', furiBranchName: '本店', furiBranchNo: '001', furiYokin: '普通', furiAccount: '1234567', furiKana: 'ﾀﾅｶ ﾀﾛｳ' };
+  A.state._empProfiles = { [t.id]: { employeeId: t.id, data, updatedAt: '2026-11-01T00:00:00Z' } };
+  A.state._profImported = {};
+  // バナーHTML
+  const strip = A.empProfileStripHTML();
+  ok(strip && new RegExp('data-profimport="' + t.id + '"').test(strip), '取り込むボタンがある');
+  ok(/振込先を登録/.test(strip), '見出しが出る');
+  // 取り込み前は空
+  ok(!t.furiBankNo, '取り込み前は未設定');
+  // 取り込み実行
+  ok(A.importEmpProfile(t.id) === true, '取り込み成功');
+  ok(t.furiBankNo === '0001' && t.furiAccount === '1234567' && t.furiKana === 'ﾀﾅｶ ﾀﾛｳ', 'furi* に反映');
+  ok(/みずほ銀行/.test(t.bank || ''), '表示用bankも補完');
+  // 取り込み済みはバナーから消える
+  ok(A.empProfileStripHTML() === '', '取り込み後はバナーが消える');
+  // applyEmpProfile: 空値は既存を消さない
+  const e2 = A.defEmp('x'); e2.furiBankNo = '9999'; A.applyEmpProfile(e2, { furiBankNo: '', furiAccount: '111' });
+  ok(e2.furiBankNo === '9999' && e2.furiAccount === '111', '空値は上書きしない・値ありは反映');
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

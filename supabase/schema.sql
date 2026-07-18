@@ -347,3 +347,52 @@ begin
   return jsonb_build_object('found',true,'decl',v_row.decl,'submittedAt',v_row.submitted_at,'updatedAt',v_row.updated_at);
 end $$;
 grant execute on function save_nencho_decl(uuid,text,text,int,jsonb), get_nencho_decl(uuid,text,text,int) to anon;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- 従業員セルフ登録: 振込先を本人がWeb明細から登録 ★step3・2026-07-18★
+--   ★DDL/RPCの本体と説明は supabase/emp-profile.sql に集約(貼り付け用)。ここは同一内容を再掲。★
+--   Web明細で認証済みの従業員が振込先(銀行/支店/科目/口座/名義カナ)を登録→会社が従業員マスタへ取り込む。
+--   認証は明細と同方式・account_id/employee_idはpubから引く=詐称不可。
+-- ════════════════════════════════════════════════════════════════════════
+create table if not exists pay_emp_profile (
+  token        uuid primary key references pay_meisai_pub(token) on delete cascade,
+  account_id   uuid not null references auth.users(id) on delete cascade,
+  employee_id  text not null,
+  data         jsonb not null default '{}'::jsonb,
+  submitted_at timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create index if not exists idx_pay_emp_profile_acct on pay_emp_profile(account_id);
+alter table pay_emp_profile enable row level security;
+drop policy if exists own_pay_emp_profile on pay_emp_profile;
+create policy own_pay_emp_profile on pay_emp_profile for all
+  using (account_id = auth.uid()) with check (account_id = auth.uid());
+create or replace function save_emp_profile(p_token uuid, p_device text, p_pw text, p_data jsonb)
+returns jsonb language plpgsql security definer set search_path=public, extensions as $$
+declare v_pub pay_meisai_pub; v_ok boolean;
+begin
+  select * into v_pub from pay_meisai_pub where token=p_token;
+  if v_pub.token is null then return jsonb_build_object('ok',false,'unauth',true); end if;
+  if v_pub.locked_until is not null and v_pub.locked_until > now() then return jsonb_build_object('ok',false,'locked',true,'retry_at',v_pub.locked_until); end if;
+  v_ok := (p_device is not null and p_device = any(v_pub.device_tokens))
+       or (p_pw is not null and v_pub.pw_hash is not null and v_pub.pw_hash = crypt(p_pw, v_pub.pw_hash));
+  if not v_ok then return jsonb_build_object('ok',false,'unauth',true); end if;
+  insert into pay_emp_profile(token, account_id, employee_id, data, submitted_at, updated_at)
+    values (p_token, v_pub.account_id, v_pub.employee_id, coalesce(p_data,'{}'::jsonb), now(), now())
+    on conflict (token) do update set data=excluded.data, updated_at=now();
+  return jsonb_build_object('ok',true);
+end $$;
+create or replace function get_emp_profile(p_token uuid, p_device text, p_pw text)
+returns jsonb language plpgsql security definer set search_path=public, extensions as $$
+declare v_pub pay_meisai_pub; v_ok boolean; v_row pay_emp_profile;
+begin
+  select * into v_pub from pay_meisai_pub where token=p_token;
+  if v_pub.token is null then return jsonb_build_object('unauth',true); end if;
+  v_ok := (p_device is not null and p_device = any(v_pub.device_tokens))
+       or (p_pw is not null and v_pub.pw_hash is not null and v_pub.pw_hash = crypt(p_pw, v_pub.pw_hash));
+  if not v_ok then return jsonb_build_object('unauth',true); end if;
+  select * into v_row from pay_emp_profile where token=p_token;
+  if v_row.token is null then return jsonb_build_object('found',false); end if;
+  return jsonb_build_object('found',true,'data',v_row.data,'submittedAt',v_row.submitted_at,'updatedAt',v_row.updated_at);
+end $$;
+grant execute on function save_emp_profile(uuid,text,text,jsonb), get_emp_profile(uuid,text,text) to anon;
