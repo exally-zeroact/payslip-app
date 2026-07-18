@@ -8,7 +8,7 @@
   var SCREENS=['sc-bad','sc-setup','sc-login','sc-consent','sc-list','sc-view','sc-nencho','sc-furikomi'];
   function show(id){ SCREENS.forEach(function(s){ var el=$(s); if(el)el.classList.toggle('hidden', s!==id); }); }
   function yen(n){ n=Math.round(Number(n)||0); return '¥'+n.toLocaleString('en-US'); }
-  function ymLabel(ym, kind){ var y=(ym||'').slice(0,4), m=parseInt((ym||'').slice(5,7),10)||0; return '令和'+(y-2018)+'年'+m+'月'+(kind==='bonus'?'（賞与）':'分'); }
+  function ymLabel(ym, kind){ var y=(ym||'').slice(0,4), m=parseInt((ym||'').slice(5,7),10)||0; if(kind==='gensen') return '令和'+(y-2018)+'年 源泉徴収票'; return '令和'+(y-2018)+'年'+m+'月'+(kind==='bonus'?'（賞与）':'分'); }
 
   var token=(function(){ try{ return new URLSearchParams(location.search).get('t'); }catch(e){ return null; } })();
   var DEVKEY='meisai_dev_'+token;                 // この端末に記憶したdeviceToken
@@ -77,8 +77,11 @@
     if(!docs.length){ host.innerHTML='<p class="hint">公開されている明細はまだありません。</p>'; return; }
     docs.forEach(function(d, i){
       var p=(d.data&&d.data.person)||{};
+      var isGensen=(d.kind==='gensen');
+      var sub=isGensen?'源泉徴収票':(d.kind==='bonus'?'賞与明細':'給与明細');
+      var val=isGensen?'<span style="font-size:11px;color:#7aa08c">開いて確認</span>':yen(p.net);
       var row=document.createElement('div'); row.className='drow';
-      row.innerHTML='<div><div class="dl">'+ymLabel(d.ym,d.kind)+(d.openedAt?'':'<span class="badge-new">未読</span>')+'</div><div class="ds">'+(d.kind==='bonus'?'賞与明細':'給与明細')+'</div></div><div class="dv">'+yen(p.net)+'</div>';
+      row.innerHTML='<div><div class="dl">'+ymLabel(d.ym,d.kind)+(d.openedAt?'':'<span class="badge-new">未読</span>')+'</div><div class="ds">'+sub+'</div></div><div class="dv">'+val+'</div>';
       row.addEventListener('click', function(){ openDoc(i); });
       host.appendChild(row);
     });
@@ -87,12 +90,17 @@
   // ⑤ 明細ビュー
   function openDoc(i){
     var d=docs[i]; if(!d) return; var data=d.data||{};
-    var people=[data.person||{}], doc=data.doc||{month:ymLabel(d.ym,d.kind), kind:d.kind};
     try{
-      var out=window.Render.build(people, doc, data.prefer, data.theme);
-      var f=$('frame');
-      f.srcdoc=out.html;
-      var pw=out.orientation==='landscape'?1123:794, ph=out.orientation==='landscape'?794:1123;
+      var f=$('frame'), pw, ph;
+      if(d.kind==='gensen'){ // 源泉徴収票=会社が作った単独HTMLをそのまま表示(render.js非経由)
+        f.srcdoc=data.gensenHtml||'<p style="padding:16px">源泉徴収票を表示できませんでした。</p>';
+        pw=794; ph=1123; // A4縦
+      } else {
+        var people=[data.person||{}], doc=data.doc||{month:ymLabel(d.ym,d.kind), kind:d.kind};
+        var out=window.Render.build(people, doc, data.prefer, data.theme);
+        f.srcdoc=out.html;
+        pw=out.orientation==='landscape'?1123:794; ph=out.orientation==='landscape'?794:1123;
+      }
       f.style.width=pw+'px'; f.style.height=ph+'px'; f.style.transformOrigin='top left';
       f.dataset.pw=pw; f.dataset.ph=ph;
       show('sc-view'); // 先に表示してからフィット(隠れてると幅0で負scaleになる)

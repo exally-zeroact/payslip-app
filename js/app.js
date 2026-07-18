@@ -1733,7 +1733,8 @@
       +'<div class="pay-row" style="margin-top:6px"><span>全体の過不足</span><span id="nen-total" class="v">—</span></div>'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
       +'<button class="btn-ghost" data-nxlsx="1" style="padding:8px 12px;font-size:12px">年末調整一覧（源泉徴収簿）をExcel出力</button><span class="help-i" data-help="genzenbo">💡</span>'
-      +'<button class="btn-ghost" data-ngensen="1" style="padding:8px 12px;font-size:12px">源泉徴収票を印刷 / PDF保存</button></div></div>';
+      +'<button class="btn-ghost" data-ngensen="1" style="padding:8px 12px;font-size:12px">源泉徴収票を印刷 / PDF保存</button>'
+      +'<button class="btn-ghost" data-ngensenweb="1" style="padding:8px 12px;font-size:12px">源泉徴収票を従業員へWeb交付</button></div></div>';
     if(!emps.length) return head+'<div class="card"><p class="hint">対象の従業員がいません。</p></div>';
     return head+emps.map(function(e){ return nenEmpHTML(e, recs); }).join('');
   }
@@ -1788,11 +1789,9 @@
       +'<tr><td class="gl">支払者</td><td colspan="3">'+esc((state.company||{}).name||'')+'　'+esc((state.company||{}).addr||'')+'</td></tr>'
       +'</table></div>';
   }
-  function nenPrintGensen(){
-    var year=nenYear(); var emps=state._nenEmps||[];
-    if(!emps.length){ uiAlert('対象の従業員がいません。'); return; }
-    var body=emps.map(function(e){ return nenGensenHTML(e, year); }).join('');
-    var css='body{font-family:"Noto Sans JP",sans-serif;color:#1a1a1a;margin:0;padding:12px;}'
+  // 源泉徴収票の共通CSS(印刷・Web交付で共用)
+  function gensenCss(){
+    return 'body{font-family:"Noto Sans JP",sans-serif;color:#1a1a1a;margin:0;padding:12px;}'
       +'.gensen{border:2px solid #333;border-radius:4px;padding:12px 14px;margin:0 0 16px;page-break-after:always;}'
       +'.gt{font-size:16px;font-weight:700;text-align:center;margin-bottom:10px;letter-spacing:.08em;}'
       +'.gtbl{width:100%;border-collapse:collapse;font-size:12px;}'
@@ -1800,12 +1799,33 @@
       +'.gtbl .gl{background:#f2f2f2;font-size:10.5px;color:#333;white-space:nowrap;width:150px;}'
       +'.gtbl .gv{font-family:"DM Mono",monospace;text-align:right;font-weight:700;}'
       +'@media print{.gensen{margin:0;border-color:#000;}}';
+  }
+  // 1名分の源泉徴収票を単独HTML化(Web明細ビューアのiframeにそのまま表示できる自己完結HTML)
+  function nenGensenDoc(e, year){
+    return '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+      +'<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">'
+      +'<style>'+gensenCss()+'</style></head><body>'+nenGensenHTML(e, year)+'</body></html>';
+  }
+  function nenPrintGensen(){
+    var year=nenYear(); var emps=state._nenEmps||[];
+    if(!emps.length){ uiAlert('対象の従業員がいません。'); return; }
+    var body=emps.map(function(e){ return nenGensenHTML(e, year); }).join('');
     var html='<!doctype html><html><head><meta charset="utf-8"><title>源泉徴収票 '+year+'</title>'
       +'<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">'
-      +'<style>'+css+'</style></head><body>'+body
+      +'<style>'+gensenCss()+'</style></head><body>'+body
       +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},400);}</scr'+'ipt></body></html>';
     var w=window.open('', '_blank'); if(!w){ uiAlert('ポップアップがブロックされました。ブラウザの設定で許可してください。'); return; }
     w.document.open(); w.document.write(html); w.document.close();
+  }
+  // 源泉徴収票を従業員へWeb交付(明細と同じpay_meisai_docsにkind=gensenで公開・電子交付同意ゲートは明細と共通)
+  function nenPublishGensen(){
+    var year=nenYear(); var emps=state._nenEmps||[];
+    if(!emps.length){ uiAlert('対象の従業員がいません。'); return; }
+    if(!(window.Store&&Store.publishMeisai)) return;
+    uiConfirm(emps.length+'名の源泉徴収票を、従業員のWeb明細で交付します（電磁的方法・所得税法226条等）。\n・従業員はログイン＋電子交付の同意後に閲覧・PDF保存/印刷できます\n・本人交付用のためマイナンバーは記載されません\n・書面（紙）を希望する従業員には、別途書面で交付してください\nよろしいですか？').then(function(ok){ if(!ok) return;
+      var items=emps.map(function(e){ return { employeeId:e.id, name:e.name, ym:year+'-12', kind:'gensen', data:{ gensenHtml:nenGensenDoc(e, year), person:{ name:e.name }, year:year } }; });
+      Store.publishMeisai(items).then(function(){ toast(emps.length+'名の源泉徴収票をWeb交付しました'); });
+    });
   }
 
   /* ---------- 印刷 / PDF ---------- */
@@ -2282,7 +2302,8 @@
         else { Array.prototype.forEach.call(vnen.querySelectorAll('[data-nfbool="'+ynk+'"][data-eid="'+yne+'"]'), function(p){ p.classList.toggle('on', (p.dataset.v==='1')===ynv); }); } // pillのon即更新
         nenRefreshEmp(yne); if(window.persistSaveDebounced)persistSaveDebounced(); return; } // はい/いいえトグル
       var x=e.target.closest('[data-nxlsx]'); if(x){ nenDownloadXlsx(); return; }
-      var g=e.target.closest('[data-ngensen]'); if(g){ nenPrintGensen(); return; } });
+      var g=e.target.closest('[data-ngensen]'); if(g){ nenPrintGensen(); return; }
+      var gw=e.target.closest('[data-ngensenweb]'); if(gw){ nenPublishGensen(); return; } });
     // 帳票のサブ切替(賃金台帳/社保一覧/部署別)＋Excel
     var vcho=$('#view-cho'); if(vcho) vcho.addEventListener('click',function(e){
       var st=e.target.closest('[data-cho]'); if(st){ state.choView=st.dataset.cho; renderChoView(); return; }
@@ -2447,7 +2468,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

@@ -421,6 +421,18 @@ T('★H1回帰★ 扶養控除: 累積入力(総数＋そのうち)を排他区�
   ok(inc({ fuyoIppan: 3, fuyoTokutei: 1, fuyoRoujin: 1, fuyoDoukyo: 0 }) === 380000 + 630000 + 480000, '総数3(一般1+特定1+老人非同居1)=149万: ' + inc({ fuyoIppan: 3, fuyoTokutei: 1, fuyoRoujin: 1 }));
 });
 
+T('源泉徴収票 Web交付: 単独HTML(自己完結)が氏名・見出し・CSSを含み iframe srcdoc で表示可能', function () {
+  A.state._nenRecs = [];
+  const e = A.defEmp('山田 太郎'); e.address = '東京都渋谷区1-2-3'; e.zip = '150-0001';
+  const html = A.nenGensenDoc(e, 2026);
+  ok(/^<!doctype html>/i.test(html), '完結したHTMLドキュメント');
+  ok(/令和8年分　給与所得の源泉徴収票/.test(html), '公式見出し');
+  ok(/山田 太郎/.test(html) && /東京都渋谷区1-2-3/.test(html), '氏名・住所が入る(住所Web登録の反映)');
+  ok(/<style>[\s\S]*\.gtbl[\s\S]*<\/style>/.test(html), '票のCSSを内包(iframeで崩れず表示)');
+  ok(/源泉徴収税額/.test(html) && /所得控除の額の合計額/.test(html), '主要な金額欄がある');
+  ok(!/マイナンバー|個人番号/.test(html), '★本人交付用=マイナンバー(個人番号)を記載しない(平成28年〜)★');
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });
