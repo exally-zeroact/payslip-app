@@ -79,6 +79,32 @@ T('税区分: 乙欄>甲欄 / 丙欄(日給)は算出される', function () {
   const hei = A.compute(emp({ payType: '日給', base: '10000', taxClass: 'hei', kintai: [{ label: '出勤日数', value: '15' }] }));
   ok(Number.isFinite(hei.incomeTax) && hei.incomeTax >= 0, '丙欄健全');
 });
+// ── ④b ★丙欄 日額 実数★: 日給10,000×15日 → 所得税=heiTax(10,000)8円/日×15日=120(公式日額表・令和8) ──
+T('丙欄 日額(実数): 日給1万×15日→所得税120(公式8円/日×15)', function () {
+  const hei = A.compute(emp({ payType: '日給', base: '10000', taxClass: 'hei', kintai: [{ label: '出勤日数', value: '15' }] }));
+  near(hei.incomeTax, 8 * 15, 0, '丙欄=日額表8円/日×15日=120: ' + hei.incomeTax);
+  const hei2 = A.compute(emp({ payType: '日給', base: '15000', taxClass: 'hei', kintai: [{ label: '出勤日数', value: '10' }] }));
+  near(hei2.incomeTax, 193 * 10, 0, '丙欄=日額表193円/日×10日=1,930: ' + hei2.incomeTax);
+});
+// ── ④c ★歩合/カスタムmax 基本給 実数★: 「AかBの高い方」を正しく採る(H1同型の合成) ──
+T('歩合の保障給(労基27条): 歩合と時給×総労働の"高い方"が基本給になる', function () {
+  const baseOf = r => Number(((r.shikyu || []).find(x => /基本給/.test(x.label)) || {}).value || 0);
+  // 保障=1200×170h=204,000。歩合15万 < 保障→基本給204,000(保障給)
+  const low = A.compute(emp({ payType: '歩合', commissionAmt: '150000', hourlyGuarantee: '1200', workedH: '170' }));
+  near(baseOf(low), 204000, 0, '歩合15万<保障204,000→基本給=保障204,000: ' + baseOf(low));
+  // 歩合30万 > 保障204,000→基本給300,000(歩合)
+  const high = A.compute(emp({ payType: '歩合', commissionAmt: '300000', hourlyGuarantee: '1200', workedH: '170' }));
+  near(baseOf(high), 300000, 0, '歩合30万>保障→基本給=歩合300,000: ' + baseOf(high));
+});
+T('カスタム給 max(高い方): 売上×率 と 時給×総労働 の高い方が基本給', function () {
+  const baseOf = r => Number(((r.shikyu || []).find(x => /基本給/.test(x.label)) || {}).value || 0);
+  // 固定0 + max(売上40万×40%=160,000, 時給1200×170h=204,000)=204,000
+  const r = A.compute(emp({ payType: 'カスタム', payRule: { fixed: '0', variable: { mode: 'max', parts: [{ type: 'rate', amount: '40' }, { type: 'hourly', amount: '1200' }] } }, salesAmt: '400000', workedH: '170' }));
+  near(baseOf(r), 204000, 0, 'max(売上×40%=16万, 時給×170h=20.4万)=204,000: ' + baseOf(r));
+  // 売上を上げると売上側が勝つ: 売上60万×40%=240,000 > 204,000
+  const r2 = A.compute(emp({ payType: 'カスタム', payRule: { fixed: '0', variable: { mode: 'max', parts: [{ type: 'rate', amount: '40' }, { type: 'hourly', amount: '1200' }] } }, salesAmt: '600000', workedH: '170' }));
+  near(baseOf(r2), 240000, 0, 'max(売上×40%=24万, 20.4万)=240,000: ' + baseOf(r2));
+});
 
 // ── ⑤ 介護保険=40〜64歳のみ(kojo基準) ──
 T('介護保険: 40〜64歳のみ控除に出る', function () {

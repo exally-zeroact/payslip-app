@@ -87,9 +87,16 @@ T('退職金の計算モーダル: 帳票→退職金を計算→入力→結果
   btn.click();
   ok(q('#ts-gross'), '退職金モーダルが開く');
   const set = (sel, v) => { const e = q(sel); if (e) { e.value = v; e.dispatchEvent(new win.Event('input', { bubbles: true })); } };
-  set('#ts-gross', '20000000'); set('#ts-join', '1996-04-01'); set('#ts-ret', '2026-06-30');
+  // ★実数(手計算検証)★ 退職金2000万・勤続21年(2005-04-01→2026-03-31)。控除870万・課税退職所得565万。
+  set('#ts-gross', '20000000'); set('#ts-join', '2005-04-01'); set('#ts-ret', '2026-03-31');
   ok(errs.length === before, '退職金計算で例外: ' + errs.slice(before).join(' | '));
-  const res = q('#ts-result'); ok(res && /手取り/.test(res.textContent) && /15,700,000/.test(res.textContent), '控除・手取りが計算表示される');
+  // 申告書「未提出」(いいえ)=退職金×20.42%(退職所得控除/1/2なし)→手取り15,351,000
+  const clickPill = (key, v) => { const p = [...doc.querySelectorAll('[data-tsyn="' + key + '"]')].find(x => x.dataset.v === v); if (p) p.click(); };
+  clickPill('report', '0');
+  ok(/15,351,000/.test(q('#ts-result').textContent), '未提出=×20.42%→手取り15,351,000: ' + (q('#ts-result').textContent.match(/手取り[^0-9]*([\d,]+)/) || [])[1]);
+  // 申告書「提出」(はい)=控除870万→課税565万→所得税717,252・住民税565,000→手取り18,717,748
+  clickPill('report', '1');
+  ok(/18,717,748/.test(q('#ts-result').textContent), '提出=通常計算→手取り18,717,748: ' + (q('#ts-result').textContent.match(/手取り[^0-9]*([\d,]+)/) || [])[1]);
   // モーダルを閉じる
   const cl = [...doc.querySelectorAll('.ui-modal-btn')].find(b => /閉じる/.test(b.textContent)); if (cl) cl.click();
 });
