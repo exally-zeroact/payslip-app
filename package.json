@@ -10,7 +10,8 @@
     "test:ui": "node tests/ui-smoke.mjs",
     "test:cloud": "node tests/cloud-sync.mjs",
     "test:qr": "node tests/qr.test.mjs",
-    "test:all": "node tests/run.js && node tests/integration.mjs && node tests/payroll-patterns.mjs && node tests/ui-smoke.mjs && node tests/cloud-sync.mjs && node tests/qr.test.mjs"
+    "test:nencho": "node tests/nencho-compute.test.mjs",
+    "test:all": "node tests/run.js && node tests/integration.mjs && node tests/payroll-patterns.mjs && node tests/ui-smoke.mjs && node tests/cloud-sync.mjs && node tests/qr.test.mjs && node tests/nencho-web-declaration.test.js && node tests/nencho-compute.test.mjs"
   },
   "devDependencies": {
     "jsdom": "^29.1.1",
