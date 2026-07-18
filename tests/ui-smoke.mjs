@@ -276,7 +276,19 @@ T('年調 従業員Web申告バナー: 提出があると要約+取り込みボ�
   ok(html && /data-nendecl-import="WZ1"/.test(html), '取り込むボタンがある');
   ok(/Webで年末調整の申告を提出/.test(html), '提出の見出し');
   ok(/配偶者/.test(html) && /扶養/.test(html), '申告内容の要約(生活語)が出る');
-  ok(A.nenDeclBannerHTML('NOPE') === '', '提出が無い従業員はバナー無し');
+  ok(A.nenDeclBannerHTML('NOPE') === '', '提出が無い&未公開の従業員はバナー無し');
+});
+
+T('年調 Web申告の提出状況: 未提出(公開済)は「未提出」表示・未公開は無表示', function () {
+  A.state._nenDecls = {}; // 誰も提出していない
+  A.state._nenPubIds = { PUB1: true }; // PUB1はWeb明細配布済み(申告できる)
+  const pub = A.nenDeclBannerHTML('PUB1');
+  ok(/未提出/.test(pub), '公開済で未提出→「未提出」の目印が出る');
+  ok(A.nenDeclBannerHTML('NOPUB') === '', '未公開の人は表示しない(手入力運用)');
+  // 提出済なら未提出表示でなく取り込みバナー
+  A.state._nenDecls = { PUB1: { decl: win.NenchoDecl.normalize({ fuyoIppan: 1 }), updatedAt: '2026-12-01T00:00:00Z' } };
+  const sub = A.nenDeclBannerHTML('PUB1');
+  ok(/data-nendecl-import="PUB1"/.test(sub) && !/未提出/.test(sub), '提出済は取り込みバナー(未提出表示は消える)');
 });
 
 T('給与パターン 一括適用(ロジック): 選んだ人だけに構造が反映・給与額は不変', function () {

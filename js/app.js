@@ -1673,7 +1673,11 @@
   function nenRefreshDetail(eid){ var d=$('#nen-detail-'+eid); if(!d)return; var agg=nenAggregate(state._nenRecs, eid); d.innerHTML=nenDetailInner(eid, nenStore(eid), agg); }
   // 従業員がWeb明細から出した年末調整の申告バナー(会社が「取り込む」→n.*へ反映)
   function nenDeclBannerHTML(eid){
-    var d=(state._nenDecls||{})[eid]; if(!d||!d.decl) return '';
+    var d=(state._nenDecls||{})[eid];
+    if(!d||!d.decl){ // 未提出: Web明細を配布済み(=本人が申告できる)なら「依頼中」を表示して催促の目印に
+      if(state._nenPubIds && state._nenPubIds[eid]) return '<div class="hint" style="margin:6px 0 0;color:#92500A">🕒 本人のWeb申告：<b>未提出</b>（Web明細から申告してもらえます）</div>';
+      return '';
+    }
     var nd=NDcl(), sum=(nd&&nd.summarize)?nd.summarize(d.decl):[];
     var when=''; try{ var t=d.updatedAt||d.submittedAt; if(t) when=new Date(t).toLocaleDateString('ja-JP'); }catch(_){}
     return '<div class="nen-decl-banner" style="margin:8px 0 0;background:#EAF7F0;border:1.5px solid #C8ECD8;border-radius:10px;padding:10px 12px">'
@@ -1700,8 +1704,14 @@
     var emps=state.employees.filter(function(e){ return isActiveInMonth(e, year+'-12') || (recs||[]).some(function(r){return r.employee_id===e.id;}); });
     state._nenEmps=emps;
     var yearGuard = (year<2026||year>2027) ? '<div class="cr-warn" style="margin:0 0 8px">⚠ この年末調整の税額計算は<b>令和8・9年分（2026・2027年）専用</b>です。対象年 '+year+' 年は未対応のため、控除額・税額が正しくない可能性があります（対象月を令和8・9年に設定してください）。</div>' : '';
+    // 本人のWeb申告 提出状況(提出済/未提出=公開済だが未申告)
+    var decls=state._nenDecls||{}, pubIds=state._nenPubIds||{};
+    var subN=emps.filter(function(e){ return decls[e.id]&&decls[e.id].decl; }).length;
+    var unsubN=emps.filter(function(e){ return !(decls[e.id]&&decls[e.id].decl) && pubIds[e.id]; }).length;
+    var declStatus = (subN||unsubN) ? '<div class="pay-row" style="margin-top:6px"><span>本人のWeb申告</span><span class="v"><b style="color:#2E7D54">提出 '+subN+'</b>'+(unsubN?' / <b style="color:#92500A">未提出 '+unsubN+'名</b>':'名')+'</span></div>'+(subN>1?'<div style="margin-top:6px"><button class="btn-ghost" data-nendecl-import-all="1" style="padding:7px 12px;font-size:12px">提出分をまとめて取り込む（'+subN+'名）</button></div>':'') : '';
     var head='<div class="card"><div class="card-h">年末調整 '+year+'年</div>'
       +yearGuard+statutoryStaleWarn()
+      +declStatus
       +'<p class="hint">当年1〜12月の<b>保存済みの給与・賞与明細から自動集計</b>し、保険料・扶養などの<b>申告分を入力</b>すると過不足（還付／追加徴収）を計算します。月次は「今月を確定」、賞与は「賞与を確定」で保存すると収入・源泉・社保が自動で埋まります（賞与も含めて集計）。令和8年度改正（基礎控除・給与所得控除・特定親族特別控除）に対応。<br><b style="color:#92500A">※このアプリで扱っていない他の給与所得（前職分など）がある場合のみ「年調の申告入力 ▾」で 給与収入(年)／源泉徴収済(年)／社保 を上書き入力してください。</b></p>'
       +'<div class="pay-row" style="margin-top:6px"><span>全体の過不足</span><span id="nen-total" class="v">—</span></div>'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
@@ -1715,8 +1725,11 @@
     if(!(window.Store&&Store.getPayslipsByYm&&Nen_())){ host.innerHTML='<div class="empty-cta"><div class="ec-emoji">📅</div><div class="ec-t">年末調整のデータがまだありません</div><div class="ec-s">各月の入力を「今月を確定」で記録すると、1〜12月分がここに自動集計されます。まずは入力タブで当月を確定してください。</div><button class="btn-primary ec-btn" data-scr="scr-input">入力タブへ</button></div>'; return; }
     host.innerHTML='<div class="card"><div class="card-h">年末調整 '+year+'年</div><p class="hint">読込中…</p></div>';
     var declP = (Store.listNenchoDecl) ? Store.listNenchoDecl(year).catch(function(){ return []; }) : Promise.resolve([]);
-    Promise.all([Store.getPayslipsByYm(year+'-01', year+'-12'), declP]).then(function(res){
-      var recs=res[0], decls=res[1]||[]; state._nenDecls={}; decls.forEach(function(d){ if(d&&d.employeeId) state._nenDecls[d.employeeId]=d; }); // 従業員のWeb申告(employeeId→{decl,submittedAt,updatedAt})
+    var pubP = (Store.listMeisaiPub) ? Store.listMeisaiPub().catch(function(){ return []; }) : Promise.resolve([]);
+    Promise.all([Store.getPayslipsByYm(year+'-01', year+'-12'), declP, pubP]).then(function(res){
+      var recs=res[0], decls=res[1]||[], pubs=res[2]||[];
+      state._nenDecls={}; decls.forEach(function(d){ if(d&&d.employeeId) state._nenDecls[d.employeeId]=d; }); // 従業員のWeb申告(employeeId→{decl,submittedAt,updatedAt})
+      state._nenPubIds={}; pubs.forEach(function(p){ if(p&&p.employeeId) state._nenPubIds[p.employeeId]=true; }); // Web明細を配布済み=本人が申告できる
       host.innerHTML=nenViewHTML(confirmedRecs(recs), year); nenTotal();
     }).catch(function(){ host.innerHTML='<div class="card"><p class="hint">読込に失敗しました。</p></div>'; });
   }
@@ -2234,6 +2247,7 @@
     var vnen=$('#view-nen'); if(vnen) vnen.addEventListener('input',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; if(f.tagName==='SELECT'||f.type==='checkbox')return; /* checkbox/selectはchangeに任せ二重発火を防ぐ */ nenSetField(f.dataset.eid, f.dataset.nf, f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); });
     if(vnen) vnen.addEventListener('change',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; if(f.tagName==='SELECT'||f.type==='checkbox'){ nenSetField(f.dataset.eid, f.dataset.nf, f.type==='checkbox'?f.checked:f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); } });
     if(vnen) vnen.addEventListener('click',function(e){ var t=e.target.closest('[data-ntoggle]'); if(t){ var b=$('#nen-detail-'+t.dataset.ntoggle); if(b){ var op=b.style.display==='none'; b.style.display=op?'':'none'; t.textContent=op?'閉じる ▲':'年調の申告入力 ▾'; } return; }
+      if(e.target.closest('[data-nendecl-import-all]')){ var ndAll=NDcl(); if(ndAll){ var did=0; (state._nenEmps||[]).forEach(function(em){ var dc=(state._nenDecls||{})[em.id]; if(dc&&dc.decl){ ndAll.applyToNencho(nenStore(em.id), dc.decl); did++; } }); if(did){ renderNenView(); if(window.persistSaveDebounced)persistSaveDebounced(); toast(did+'名の申告を取り込みました'); } } return; } // 提出分を全員まとめて取り込む
       var imp=e.target.closest('[data-nendecl-import]'); if(imp){ var ieid=imp.dataset.nendeclImport, dd=(state._nenDecls||{})[ieid], nd2=NDcl();
         if(dd&&dd.decl&&nd2){ nd2.applyToNencho(nenStore(ieid), dd.decl); // 従業員の申告をn.*へ反映(従業員の申告を正とする)
           var det=$('#nen-detail-'+ieid); if(det&&det.style.display==='none'){ det.style.display=''; var tg=vnen.querySelector('[data-ntoggle="'+ieid+'"]'); if(tg)tg.textContent='閉じる ▲'; } // 反映を見せるため開く
