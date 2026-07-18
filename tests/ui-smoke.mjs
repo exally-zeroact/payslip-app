@@ -394,12 +394,17 @@ T('★H1回帰★ 扶養控除: 累積入力(総数＋そのうち)を排他区�
   // 総数3(特定1・老人1非同居・一般1)
   b = fb({ fuyoIppan: 3, fuyoTokutei: 1, fuyoRoujin: 1, fuyoDoukyo: 0 });
   ok(b.ippan === 1 && b.tokutei === 1 && b.roujin === 1 && b.total === 3, '3人の内訳: ' + JSON.stringify(b));
-  // 実app compute: 20歳1人の扶養控除=63万(101万でない)。控除合計への寄与で検証
-  const base = { fuyoIppan: 0 };
-  const n1 = A.nenCompute({ shunyu: 5000000, genzen: 0, shaho: 0, months: 12 }, base);
-  const n2 = A.nenCompute({ shunyu: 5000000, genzen: 0, shaho: 0, months: 12 }, { fuyoIppan: 1, fuyoTokutei: 1 });
-  const diff = n2.res.kojoGoukei - n1.res.kojoGoukei;
-  ok(diff === 630000, '20歳1人の扶養控除増分=63万(二重101万でない): ' + diff);
+  // ★実数リテラルで扶養控除の全組み合わせを正解と突合(配線でなく金額を検証=H1再発防止)★
+  //  令和8恒久額: 一般38万/特定63万/老人(非同居)48万/同居老親58万。累積入力→排他分解の増分で検証。
+  const AGG = { shunyu: 5000000, genzen: 0, shaho: 0, months: 12 };
+  const base = A.nenCompute(AGG, { fuyoIppan: 0 }).res.kojoGoukei;
+  const inc = (n) => A.nenCompute(AGG, n).res.kojoGoukei - base;
+  ok(inc({ fuyoIppan: 1 }) === 380000, '一般1人=38万: ' + inc({ fuyoIppan: 1 }));
+  ok(inc({ fuyoIppan: 1, fuyoTokutei: 1 }) === 630000, '20歳(総数1+特定1)=63万・二重101万でない: ' + inc({ fuyoIppan: 1, fuyoTokutei: 1 }));
+  ok(inc({ fuyoIppan: 1, fuyoRoujin: 1 }) === 480000, '70歳非同居(総数1+老人1)=48万: ' + inc({ fuyoIppan: 1, fuyoRoujin: 1 }));
+  ok(inc({ fuyoIppan: 1, fuyoRoujin: 1, fuyoDoukyo: 1 }) === 580000, '72歳同居(総数1+老人1+同居1)=58万・二重144万でない: ' + inc({ fuyoIppan: 1, fuyoRoujin: 1, fuyoDoukyo: 1 }));
+  ok(inc({ fuyoIppan: 2 }) === 760000, '一般2人=76万: ' + inc({ fuyoIppan: 2 }));
+  ok(inc({ fuyoIppan: 3, fuyoTokutei: 1, fuyoRoujin: 1, fuyoDoukyo: 0 }) === 380000 + 630000 + 480000, '総数3(一般1+特定1+老人非同居1)=149万: ' + inc({ fuyoIppan: 3, fuyoTokutei: 1, fuyoRoujin: 1 }));
 });
 
 T('UI操作を通してJS例外・window.error が0', function () {
