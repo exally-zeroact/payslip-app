@@ -740,6 +740,8 @@
     var gTeate=''
       +'<div class="frow"><div class="flabel">通勤方法</div><select class="finput m-f" data-f="commuteType"><option value="public"'+(e.commuteType!=='car'?' selected':'')+'>公共交通</option><option value="car"'+(e.commuteType==='car'?' selected':'')+'>マイカー等</option></select></div>'
       +(e.commuteType==='car'?'<div class="frow2"><div class="frow"><div class="flabel">片道距離<span class="hint2">km</span></div><input class="finput num m-f" data-f="commuteKm" value="'+attr(e.commuteKm)+'"></div><div class="frow"><div class="flabel">非課税限度<span class="hint2">自動</span></div><input class="finput num" value="'+yen(commuteLimit(e))+'" readonly style="background:#f7fcf9;color:#3D6B53"></div></div>':'<div class="hint" style="margin:-4px 0 10px">公共交通＝月15万まで非課税。マイカーは距離別（自動）。</div>')
+      +'<div class="frow2"><div class="frow"><div class="flabel">郵便番号<span class="hint2">ハイフンあり</span></div><input class="finput m-f" data-f="zip" value="'+attr(e.zip)+'" placeholder="150-0001"></div>'
+        +'<div class="frow"><div class="flabel">住所<span class="hint2">源泉徴収票用</span></div><input class="finput m-f" data-f="address" value="'+attr(e.address)+'" placeholder="東京都渋谷区〇〇1-2-3 〇〇マンション101"></div></div>'
       +'<div class="frow"><div class="flabel">振込先<span class="hint2">明細に表示・任意</span></div><input class="finput m-f" data-f="bank" value="'+attr(e.bank)+'" placeholder="○○銀行 普通 1234567"></div>'
       +'<div class="sec-lb" style="border-top:1px dashed #d4eae0">総合振込データ用<span class="hint2">銀行に送る全銀ファイル用・任意</span></div>'
       +'<div class="frow2"><div class="frow"><div class="flabel">銀行名</div><input class="finput m-f" data-f="furiBankName" value="'+attr(e.furiBankName)+'" placeholder="ﾐｽﾞﾎ"></div>'
@@ -857,7 +859,7 @@
   // 従業員を表示順で1つ上(dir=-1)/下(dir=+1)へ。配列の並びを入替=入力/一覧/印刷/Excel 全部に反映・永続(sort:i)
   function moveEmp(i, dir){ var vis=visibleEmpIdx(); var p=vis.indexOf(i); var q=p+dir; if(p<0||q<0||q>=vis.length) return; var a=state.employees, j=vis[q]; var t=a[i]; a[i]=a[j]; a[j]=t; renderEmpMaster(); }
   // 従業員がWeb明細から登録した振込先(会社が従業員マスタへ取り込む)
-  var PROFILE_KEYS=['furiBankName','furiBankNo','furiBranchName','furiBranchNo','furiYokin','furiAccount','furiKana'];
+  var PROFILE_KEYS=['zip','address','furiBankName','furiBankNo','furiBranchName','furiBranchNo','furiYokin','furiAccount','furiKana'];
   function applyEmpProfile(e, data){ if(!e||!data) return; PROFILE_KEYS.forEach(function(k){ if(data[k]!=null && data[k]!=='') e[k]=data[k]; }); if(!e.bank){ var disp=[data.furiBankName,data.furiYokin,data.furiAccount].filter(Boolean).join(' '); if(disp) e.bank=disp; } }
   function loadEmpProfiles(){ if(!(window.Store&&Store.listEmpProfile)) return; Store.listEmpProfile().then(function(list){ state._empProfiles={}; (list||[]).forEach(function(p){ if(p&&p.employeeId) state._empProfiles[p.employeeId]=p; }); renderEmpMaster(); }).catch(function(){}); }
   function pendingProfileEmps(){ var profs=state._empProfiles||{}, imp=state._profImported||{}; return state.employees.filter(function(e){ return !e.retired && profs[e.id] && !imp[e.id]; }); }
@@ -1774,7 +1776,7 @@
     return '<div class="gensen">'
       +'<div class="gt">令和'+(year-2018)+'年分　給与所得の源泉徴収票</div>'
       +'<table class="gtbl">'
-      +'<tr><td class="gl">支払を受ける者</td><td colspan="3">住所　　　　　　　　　　　　　氏名　<b>'+esc(e.name||'')+'</b></td></tr>'
+      +'<tr><td class="gl">支払を受ける者</td><td colspan="3">住所　'+(e.address?'<b>'+((e.zip?'〒'+esc(e.zip)+' ':'')+esc(e.address))+'</b>':'　　　　　　　　　　　　')+'　氏名　<b>'+esc(e.name||'')+'</b></td></tr>'
       +'<tr><td class="gl">種別</td><td>給与・賞与</td>'+cell('支払金額', c.shunyu)+'</tr>'
       +'<tr>'+cell('給与所得控除後の金額', r.kyuyoShotoku)+cell('所得控除の額の合計額', r.kojoGoukei)+'</tr>'
       +'<tr>'+cell('源泉徴収税額', r.nenchouNenzei)+'<td class="gl">(源泉)控除対象配偶者の有無</td><td class="gv">'+haiUmu+'</td></tr>'
@@ -2445,7 +2447,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

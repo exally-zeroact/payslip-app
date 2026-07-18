@@ -114,14 +114,14 @@ body{font-family:'Noto Sans JP',sans-serif;color:#1a4a2e;background:#F0FAF4;-web
     <div class="dlist" id="dlist"></div>
     <p class="hint">明細をタップすると内容が表示され、PDFで保存できます。</p>
     <button class="btn ghost" id="to-nencho" style="margin-top:14px">📝 年末調整の申告（<span id="nencho-year">今年</span>分）</button>
-    <button class="btn ghost" id="to-furikomi" style="margin-top:8px">🏦 振込先（給与の受け取り口座）を登録</button>
+    <button class="btn ghost" id="to-furikomi" style="margin-top:8px">🏦 自分の情報（住所・振込先）を登録</button>
     <div class="hint" id="nencho-status"></div>
   </div>
 
   <!-- ④'' 振込先 従業員セルフ登録 -->
   <div class="card hidden" id="sc-furikomi">
-    <h2>振込先の登録</h2>
-    <p class="lead">給与を受け取る<b>ご自分の口座</b>を登録してください。通帳・キャッシュカード・銀行アプリで確認できます。分からない項目は空欄でも大丈夫です（会社が確認して反映します）。</p>
+    <h2>自分の情報（住所・振込先）の登録</h2>
+    <p class="lead"><b>ご自分の住所</b>と<b>給与を受け取る口座</b>を登録してください。住所は源泉徴収票に使います。口座は通帳・キャッシュカード・銀行アプリで確認できます。分からない項目は空欄でも大丈夫です（会社が確認して反映します）。</p>
     <div class="nen-done hidden" id="furi-saved"></div>
     <div id="furi-form" style="margin-top:10px"></div>
     <button class="btn" id="furi-save">この内容で登録する</button>

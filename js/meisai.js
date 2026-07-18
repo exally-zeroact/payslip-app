@@ -161,15 +161,18 @@
     });
   });
 
-  // ⑦ 従業員セルフ登録: 振込先(給与の受け取り口座)
+  // ⑦ 従業員セルフ登録: 自分の情報(住所＋振込先)。住所は源泉徴収票に使います。
+  // ★軽く★ 形式はラベルに（桁数・ハイフン・カナ）、例はplaceholderに。長い補足は先頭のleadに集約=各項目下の注記は置かない(スマホで濃くならない)。
   var PROFILE_FIELDS=[
-    { k:'furiBankName', label:'銀行名', ph:'みずほ銀行', help:'例：みずほ銀行／三菱UFJ銀行／ゆうちょ銀行 など。' },
-    { k:'furiBankNo', label:'銀行コード（4桁）', ph:'0001', num:true, max:4, help:'通帳・キャッシュカード・銀行アプリで確認できます。分からなければ空欄でOK。' },
-    { k:'furiBranchName', label:'支店名', ph:'本店', help:'' },
-    { k:'furiBranchNo', label:'支店コード（3桁）', ph:'001', num:true, max:3, help:'' },
+    { k:'zip', label:'郵便番号（ハイフンあり）', ph:'150-0001' },
+    { k:'address', label:'住所', ph:'東京都渋谷区〇〇1-2-3 〇〇マンション101' },
+    { k:'furiBankName', label:'銀行名', ph:'みずほ銀行' },
+    { k:'furiBankNo', label:'銀行コード（4桁）', ph:'0001', num:true, max:4 },
+    { k:'furiBranchName', label:'支店名', ph:'本店' },
+    { k:'furiBranchNo', label:'支店コード（3桁）', ph:'001', num:true, max:3 },
     { k:'furiYokin', label:'預金の種類', sel:['普通','当座','貯蓄'] },
-    { k:'furiAccount', label:'口座番号（7桁）', ph:'1234567', num:true, max:7, help:'7桁より短い場合は前に0を付けて7桁にしてください。' },
-    { k:'furiKana', label:'口座名義（カナ）', ph:'ﾔﾏﾀﾞ ﾊﾅｺ', help:'通帳のとおり（半角カナ）。空欄なら会社が氏名から補います。' }
+    { k:'furiAccount', label:'口座番号（7桁）', ph:'1234567', num:true, max:7 },
+    { k:'furiKana', label:'口座名義（半角カナ）', ph:'ﾔﾏﾀﾞ ﾊﾅｺ' }
   ];
   var profState={};
   function profFieldHTML(f){
