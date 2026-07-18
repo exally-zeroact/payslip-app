@@ -383,6 +383,25 @@ T('カスタム項目名サジェスト: 過去に使った名前＋定番がdat
   ok(/list="dl-item-shikyu"/.test(empList.innerHTML) && /list="dl-item-kojo"/.test(empList.innerHTML), '追加入力欄が候補を参照');
 });
 
+T('★H1回帰★ 扶養控除: 累積入力(総数＋そのうち)を排他区分に分解=二重計上しない', function () {
+  const fb = A.fuyoBuckets;
+  // 20歳1人: 総数1・特定1 → 一般0/特定1(二重で38+63にしない)
+  let b = fb({ fuyoIppan: 1, fuyoTokutei: 1 });
+  ok(b.ippan === 0 && b.tokutei === 1 && b.total === 1, '20歳1人→特定1のみ: ' + JSON.stringify(b));
+  // 72歳同居1人: 総数1・老人1・同居1 → 同居老親1のみ
+  b = fb({ fuyoIppan: 1, fuyoRoujin: 1, fuyoDoukyo: 1 });
+  ok(b.doukyo === 1 && b.roujin === 0 && b.ippan === 0 && b.total === 1, '72歳同居→同居老親1のみ: ' + JSON.stringify(b));
+  // 総数3(特定1・老人1非同居・一般1)
+  b = fb({ fuyoIppan: 3, fuyoTokutei: 1, fuyoRoujin: 1, fuyoDoukyo: 0 });
+  ok(b.ippan === 1 && b.tokutei === 1 && b.roujin === 1 && b.total === 3, '3人の内訳: ' + JSON.stringify(b));
+  // 実app compute: 20歳1人の扶養控除=63万(101万でない)。控除合計への寄与で検証
+  const base = { fuyoIppan: 0 };
+  const n1 = A.nenCompute({ shunyu: 5000000, genzen: 0, shaho: 0, months: 12 }, base);
+  const n2 = A.nenCompute({ shunyu: 5000000, genzen: 0, shaho: 0, months: 12 }, { fuyoIppan: 1, fuyoTokutei: 1 });
+  const diff = n2.res.kojoGoukei - n1.res.kojoGoukei;
+  ok(diff === 630000, '20歳1人の扶養控除増分=63万(二重101万でない): ' + diff);
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

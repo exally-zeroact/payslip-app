@@ -1599,6 +1599,14 @@
     });
     return { shunyu:shunyu, genzen:genzen, shaho:shaho, months:months };
   }
+  // 扶養は平易ウィザードで「累積」入力(総数＋そのうち特定/老人/同居)。控除計算・件数・票の表示は
+  //  排他区分(一般/特定/老人非同居/同居老親)に分解する=区分ごと満額を足すので二重計上を防ぐ(H1回帰の是正)。
+  function fuyoBuckets(n){
+    n=n||{}; var total=num(n.fuyoIppan), tokutei=num(n.fuyoTokutei), roujin=num(n.fuyoRoujin), doukyo=Math.min(num(n.fuyoDoukyo), num(n.fuyoRoujin));
+    var roujinAlone=Math.max(0, roujin-doukyo);                 // 老人扶養(非同居)
+    var ippanAlone=Math.max(0, total-tokutei-roujin);           // 一般扶養(特定でも老人でもない)
+    return { ippan:ippanAlone, tokutei:tokutei, roujin:roujinAlone, doukyo:doukyo, roujinAll:roujinAlone+doukyo, total:ippanAlone+tokutei+roujinAlone+doukyo };
+  }
   function nenCompute(agg, n){
     var Nen=Nen_(); if(!Nen) return null;
     var shunyu=(n.shunyuOverride!=null&&n.shunyuOverride!=='')?num(n.shunyuOverride):agg.shunyu;
@@ -1608,7 +1616,7 @@
     var honnin=Nen.kyuyoShotokuR8(shunyu);
     var haiKojo=0, haiTok=0;
     if(n.haiEnabled){ var hs=num(n.haiShotoku); if(hs<=620000) haiKojo=Nen.haiguushaKojo(honnin, !!n.haiRojin); else haiTok=Nen.haiguushaTokubetsuKojo(hs, honnin); }
-    var fuyo=Nen.fuyoKojo('ippan')*num(n.fuyoIppan)+Nen.fuyoKojo('tokutei')*num(n.fuyoTokutei)+Nen.fuyoKojo('roujin')*num(n.fuyoRoujin)+Nen.fuyoKojo('doukyo')*num(n.fuyoDoukyo);
+    var fb=fuyoBuckets(n); var fuyo=Nen.fuyoKojo('ippan')*fb.ippan+Nen.fuyoKojo('tokutei')*fb.tokutei+Nen.fuyoKojo('roujin')*fb.roujin+Nen.fuyoKojo('doukyo')*fb.doukyo; // 累積入力→排他区分に分解して満額加算(二重計上防止)
     var tokShin=num(n.tokuteiShinzokuShotoku)>0?Nen.tokuteiShinzokuKojo(num(n.tokuteiShinzokuShotoku)):0;
     var shougai=n.shougai?Nen.shougaiKojo(n.shougai):0;
     var kafuHitori=n.hitorioya?Nen.HITORIOYA:(n.kafu?Nen.KAFU:0);
@@ -1748,7 +1756,7 @@
     var emps=state._nenEmps||[], t={ pay:0,zei:0,kabu:0 };
     emps.forEach(function(e){ var c=nenCompute(nenAggregate(state._nenRecs,e.id), nenStore(e.id)); if(!c)return;
       var r=c.res, kl=r.kojoList, n=nenStore(e.id);
-      var fuyoN=num(n.fuyoIppan)+num(n.fuyoTokutei)+num(n.fuyoRoujin)+num(n.fuyoDoukyo);
+      var fuyoN=fuyoBuckets(n).total; // 扶養親族の数=総数(累積入力のfuyoIppanが総数・二重に足さない)
       t.pay+=c.shunyu; t.zei+=r.nenchouNenzei; t.kabu+=r.kabusoku;
       aoa.push([ e.name||'', c.shunyu, r.kyuyoShotoku, r.kojoGoukei, r.nenchouNenzei, kl.shakaiHoken, kl.seimei, kl.jishin, kl.haiguusha+kl.haiTokubetsu, fuyoN, kl.kiso, num(n.jutakuLoan), (r.kabusoku<0?'△'+fmtN(-r.kabusoku):fmtN(r.kabusoku)) ]);
     });
@@ -1761,6 +1769,7 @@
     var r=c.res, kl=r.kojoList, n=nenStore(e.id);
     var haiUmu = n.haiEnabled ? '有' : '無';
     var haiGaku = num(kl.haiguusha)+num(kl.haiTokubetsu);
+    var fbG = fuyoBuckets(n); // 扶養は累積入力→排他区分に分解して票に表示
     var cell=function(lbl,val){ return '<td class="gl">'+esc(lbl)+'</td><td class="gv">'+yen(val)+'</td>'; };
     return '<div class="gensen">'
       +'<div class="gt">令和'+(year-2018)+'年分　給与所得の源泉徴収票</div>'
@@ -1769,7 +1778,7 @@
       +'<tr><td class="gl">種別</td><td>給与・賞与</td>'+cell('支払金額', c.shunyu)+'</tr>'
       +'<tr>'+cell('給与所得控除後の金額', r.kyuyoShotoku)+cell('所得控除の額の合計額', r.kojoGoukei)+'</tr>'
       +'<tr>'+cell('源泉徴収税額', r.nenchouNenzei)+'<td class="gl">(源泉)控除対象配偶者の有無</td><td class="gv">'+haiUmu+'</td></tr>'
-      +'<tr>'+cell('配偶者(特別)控除の額', haiGaku)+'<td class="gl">控除対象扶養親族の数</td><td class="gv" style="text-align:left">特定'+num(n.fuyoTokutei)+'人／老人'+(num(n.fuyoRoujin)+num(n.fuyoDoukyo))+'人／その他'+num(n.fuyoIppan)+'人</td></tr>'
+      +'<tr>'+cell('配偶者(特別)控除の額', haiGaku)+'<td class="gl">控除対象扶養親族の数</td><td class="gv" style="text-align:left">特定'+fbG.tokutei+'人／老人'+fbG.roujinAll+'人／その他'+fbG.ippan+'人</td></tr>'
       +'<tr>'+cell('社会保険料等の金額', kl.shakaiHoken)+cell('生命保険料の控除額', kl.seimei)+'</tr>'
       +'<tr>'+cell('地震保険料の控除額', kl.jishin)+cell('住宅借入金等特別控除の額', num(n.jutakuLoan))+'</tr>'
       +'<tr>'+cell('基礎控除の額', kl.kiso)+cell('特定親族特別控除の額', kl.tokuteiShinzoku)+'</tr>'
@@ -2254,7 +2263,11 @@
     var vnen=$('#view-nen'); if(vnen) vnen.addEventListener('input',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; if(f.tagName==='SELECT'||f.type==='checkbox')return; /* checkbox/selectはchangeに任せ二重発火を防ぐ */ nenSetField(f.dataset.eid, f.dataset.nf, f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); });
     if(vnen) vnen.addEventListener('change',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; if(f.tagName==='SELECT'||f.type==='checkbox'){ nenSetField(f.dataset.eid, f.dataset.nf, f.type==='checkbox'?f.checked:f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); } });
     if(vnen) vnen.addEventListener('click',function(e){ var t=e.target.closest('[data-ntoggle]'); if(t){ var b=$('#nen-detail-'+t.dataset.ntoggle); if(b){ var op=b.style.display==='none'; b.style.display=op?'':'none'; t.textContent=op?'閉じる ▲':'年調の申告入力 ▾'; } return; }
-      if(e.target.closest('[data-nendecl-import-all]')){ var ndAll=NDcl(); if(ndAll){ var did=0; (state._nenEmps||[]).forEach(function(em){ var dc=(state._nenDecls||{})[em.id]; if(dc&&dc.decl){ ndAll.applyToNencho(nenStore(em.id), dc.decl); did++; } }); if(did){ renderNenView(); if(window.persistSaveDebounced)persistSaveDebounced(); toast(did+'名の申告を取り込みました'); } } return; } // 提出分を全員まとめて取り込む
+      if(e.target.closest('[data-nendecl-import-all]')){ var ndAll=NDcl(); if(!ndAll) return;
+        uiConfirm('提出された本人のWeb申告を、対象の従業員にまとめて取り込みます。\n各人の申告入力欄は本人の申告内容で置き換わります（手入力していた分は上書きされます）。よろしいですか？').then(function(ok){ if(!ok) return;
+          var did=0; (state._nenEmps||[]).forEach(function(em){ var dc=(state._nenDecls||{})[em.id]; if(dc&&dc.decl){ ndAll.applyToNencho(nenStore(em.id), dc.decl); did++; } });
+          if(did){ renderNenView(); if(window.persistSaveDebounced)persistSaveDebounced(); toast(did+'名の申告を取り込みました'); } });
+        return; } // 提出分を全員まとめて取り込む(一括=上書きになるため確認)
       var imp=e.target.closest('[data-nendecl-import]'); if(imp){ var ieid=imp.dataset.nendeclImport, dd=(state._nenDecls||{})[ieid], nd2=NDcl();
         if(dd&&dd.decl&&nd2){ nd2.applyToNencho(nenStore(ieid), dd.decl); // 従業員の申告をn.*へ反映(従業員の申告を正とする)
           var det=$('#nen-detail-'+ieid); if(det&&det.style.display==='none'){ det.style.display=''; var tg=vnen.querySelector('[data-ntoggle="'+ieid+'"]'); if(tg)tg.textContent='閉じる ▲'; } // 反映を見せるため開く
@@ -2432,7 +2445,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

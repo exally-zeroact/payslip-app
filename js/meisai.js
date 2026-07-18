@@ -112,7 +112,8 @@
   window.addEventListener('resize', function(){ if($('sc-view').classList.contains('hidden'))return; fitFrame(); });
 
   // ⑥ 年末調整 従業員セルフ申告(平易な質問→保存。会社が取り込む)
-  var ND=window.NenchoDecl, nenYear=new Date().getFullYear(), declState={};
+  // 年末調整の対象年: 通常11〜12月に実施。1〜3月に開くのは「前年分」の年調(会社は対象月=前年12月=前年で読む)なので前年に合わせる=年跨ぎでも会社側と一致
+  var ND=window.NenchoDecl, _nd=new Date(), nenYear=(_nd.getMonth()<=2)?_nd.getFullYear()-1:_nd.getFullYear(), declState={};
   (function(){ var y=$('nencho-year'); if(y) y.textContent=nenYear+'年'; })();
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function fmtN(v){ v=Number(String(v==null?'':v).replace(/[, ]/g,'')); return isNaN(v)||v===0?'':v.toLocaleString('en-US'); }
