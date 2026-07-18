@@ -250,6 +250,28 @@ T('退職月: 月中退職=社保0(前月まで) / 月末退職=当月社保あ�
   const end = A.compute(emp({ payType: '月給', base: '300000', taishokuYmd: '2026-06-30' }));
   ok(kojo(end, '健康保険') > 0, '6/30月末退職は当月社保あり');
 });
+// ── ⑧e ★年末調整の過不足を明細に反映★: 手取りだけ調整・税/社保/雇用は不変(法定計算後の純調整) ──
+T('年調過不足の明細反映: 還付は支給(非課税)・徴収は控除・税/社保は不変・対象月違いは無反映', function () {
+  const sup = (r, l) => { const x = (r.shikyu || []).find(k => k.label === l); return x ? x.value : null; };
+  const base = A.compute(emp({ payType: '月給', base: '300000', fuyou: '0' })); // 反映なし基準
+  // 還付15,000(kabusoku<0): 支給に「年末調整還付」(非課税)・手取り+15,000・税/社保は不変
+  const ref = A.compute(emp({ payType: '月給', base: '300000', fuyou: '0', nenchoAdj: { ym: '2026-06', amount: -15000 } }));
+  near(sup(ref, '年末調整還付'), 15000, 0, '還付15,000が支給に出る');
+  ok((ref.shikyu.find(x => x.label === '年末調整還付') || {}).hikazei === true, '還付は非課税(課税/社保/雇用に含めない)');
+  near(ref.net - base.net, 15000, 0, '手取り=基準+15,000');
+  near(kojo(ref, '所得税'), kojo(base, '所得税'), 0, '所得税は不変(法定計算に影響しない)');
+  near(kojo(ref, '健康保険'), kojo(base, '健康保険'), 0, '健保は不変');
+  near(kojo(ref, '厚生年金'), kojo(base, '厚生年金'), 0, '厚年は不変');
+  near(kojo(ref, '雇用保険'), kojo(base, '雇用保険'), 0, '雇用は不変(還付は賃金でない)');
+  // 徴収8,000(kabusoku>0): 控除に「年末調整（不足額徴収）」・手取り-8,000
+  const col = A.compute(emp({ payType: '月給', base: '300000', fuyou: '0', nenchoAdj: { ym: '2026-06', amount: 8000 } }));
+  near(kojo(col, '年末調整（不足額徴収）'), 8000, 0, '不足額8,000が控除に出る');
+  near(col.net - base.net, -8000, 0, '手取り=基準−8,000');
+  near(kojo(col, '所得税'), kojo(base, '所得税'), 0, '徴収でも所得税は不変');
+  // 対象月が違えば無反映
+  const other = A.compute(emp({ payType: '月給', base: '300000', fuyou: '0', nenchoAdj: { ym: '2026-05', amount: -15000 } }));
+  ok(sup(other, '年末調整還付') === null && other.net === base.net, '対象月(2026-05)≠当月(2026-06)は反映しない');
+});
 T('社保 翌月徴収(shahoTiming=next): 入社月は当月0', function () {
   A.state.company.shahoTiming = 'next';
   const r = A.compute(emp({ payType: '月給', base: '300000', joinYmd: '2026-06-10' }));

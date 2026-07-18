@@ -390,7 +390,16 @@
     var effTaxClass=(e.taxClass==='hei' && e.payType!=='日給') ? 'ko' : e.taxClass; // 丙×非日給は甲で計算
     // 甲欄のみ: 本人の人的加算(障害者/寡婦orひとり親/勤労学生)を扶養親族等の数に足す(乙/丙は対象外)
     var effFuyou=num(e.fuyou)+jintekiOf(e, effTaxClass);
-    return PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:effFuyou, taxClass:effTaxClass, heiTaxAmount:heiAmt, residentTax:residentTaxOf(e), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:apply, extraKojo:e.extraKojo, shahoMonth:_shMonth, shahoMult:_shMult });
+    var r=PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:effFuyou, taxClass:effTaxClass, heiTaxAmount:heiAmt, residentTax:residentTaxOf(e), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:apply, extraKojo:e.extraKojo, shahoMonth:_shMonth, shahoMult:_shMult });
+    applyNenchoAdj(e, r); // 年末調整の過不足を対象月の明細に反映(法定計算=税/社保/雇用は不変・手取りだけ調整)
+    return r;
+  }
+  // 年末調整の過不足(還付/追徴)を、指定した対象月の給与明細に反映する。★法定計算後の純調整=税/社保/雇用/課税には影響しない★。
+  //  e.nenchoAdj={ym,amount}(amount<0=還付/>0=不足額徴収)。amountは反映時にnenComputeのkabusokuを凍結して持つ。
+  function applyNenchoAdj(e, r){
+    var adj=e&&e.nenchoAdj; if(!adj || adj.ym!==state.month) return; var amt=num(adj.amount); if(!amt) return;
+    if(amt<0){ r.shikyu=(r.shikyu||[]).concat([{label:'年末調整還付', value:-amt, hikazei:true}]); r.shikyuTotal=num(r.shikyuTotal)+(-amt); r.net=num(r.net)+(-amt); }
+    else { r.kojo=(r.kojo||[]).concat([{label:'年末調整（不足額徴収）', value:amt}]); r.kojoTotal=num(r.kojoTotal)+amt; r.net=num(r.net)-amt; }
   }
   function payDateObj(){
     var ym=state.month||'2026-06', y=Number(ym.slice(0,4)), m=Number(ym.slice(5,7)), c=state.company||{};
@@ -1731,6 +1740,17 @@
       +declStatus
       +'<p class="hint">当年1〜12月の<b>保存済みの給与・賞与明細から自動集計</b>し、保険料・扶養などの<b>申告分を入力</b>すると過不足（還付／追加徴収）を計算します。月次は「今月を確定」、賞与は「賞与を確定」で保存すると収入・源泉・社保が自動で埋まります（賞与も含めて集計）。令和8年度改正（基礎控除・給与所得控除・特定親族特別控除）に対応。<br><b style="color:#92500A">※このアプリで扱っていない他の給与所得（前職分など）がある場合のみ「年調の申告入力 ▾」で 給与収入(年)／源泉徴収済(年)／社保 を上書き入力してください。</b></p>'
       +'<div class="pay-row" style="margin-top:6px"><span>全体の過不足</span><span id="nen-total" class="v">—</span></div>'
+      +(function(){ // 過不足を対象月の給与明細に反映(還付=支給/追徴=控除の行を当月明細に追加)
+          var refM=state.month, reflectedN=emps.filter(function(e){ return e.nenchoAdj && e.nenchoAdj.ym===refM; }).length;
+          var payable=emps.filter(function(e){ var c=nenCompute(nenAggregate(recs,e.id), nenStore(e.id)); return c && c.res.kabusoku!==0; }).length;
+          if(!payable && !reflectedN) return '';
+          return '<div style="margin-top:8px;background:#F0FAF4;border:1px solid #C8ECD8;border-radius:10px;padding:9px 11px">'
+            +'<div style="font-size:12px;color:#2E7D54">過不足を<b>'+esc(refM)+'</b>の給与明細に反映（還付＝支給／追加徴収＝控除の行を追加。税・社保は変わりません）'+(reflectedN?'　<b style="color:#2E7D54">反映済み '+reflectedN+'名</b>':'')+'</div>'
+            +'<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">'
+            +'<button class="btn-ghost" data-nenreflectall="1" style="padding:7px 12px;font-size:12px">'+esc(refM)+'の給与に反映（'+payable+'名）</button>'
+            +(reflectedN?'<button class="btn-ghost" data-nenreflectclear="1" style="padding:7px 12px;font-size:12px">'+esc(refM)+'の反映を解除</button>':'')
+            +'</div></div>';
+        })()
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
       +'<button class="btn-ghost" data-nxlsx="1" style="padding:8px 12px;font-size:12px">年末調整一覧（源泉徴収簿）をExcel出力</button><span class="help-i" data-help="genzenbo">💡</span>'
       +'<button class="btn-ghost" data-ngensen="1" style="padding:8px 12px;font-size:12px">源泉徴収票を印刷 / PDF保存</button>'
@@ -2285,6 +2305,11 @@
     var vnen=$('#view-nen'); if(vnen) vnen.addEventListener('input',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; if(f.tagName==='SELECT'||f.type==='checkbox')return; /* checkbox/selectはchangeに任せ二重発火を防ぐ */ nenSetField(f.dataset.eid, f.dataset.nf, f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); });
     if(vnen) vnen.addEventListener('change',function(e){ var f=e.target.closest('[data-nf]'); if(!f)return; if(f.tagName==='SELECT'||f.type==='checkbox'){ nenSetField(f.dataset.eid, f.dataset.nf, f.type==='checkbox'?f.checked:f.value); nenRefreshEmp(f.dataset.eid); if(window.persistSaveDebounced)persistSaveDebounced(); } });
     if(vnen) vnen.addEventListener('click',function(e){ var t=e.target.closest('[data-ntoggle]'); if(t){ var b=$('#nen-detail-'+t.dataset.ntoggle); if(b){ var op=b.style.display==='none'; b.style.display=op?'':'none'; t.textContent=op?'閉じる ▲':'年調の申告入力 ▾'; } return; }
+      if(e.target.closest('[data-nenreflectall]')){ // 過不足を対象月の給与明細に反映(各人の過不足を凍結してe.nenchoAdjに保存)
+        var rM=state.month, did=0; (state._nenEmps||[]).forEach(function(em){ var c=nenCompute(nenAggregate(state._nenRecs,em.id), nenStore(em.id)); if(c && c.res.kabusoku!==0){ em.nenchoAdj={ ym:rM, amount:c.res.kabusoku }; did++; } });
+        if(did){ renderNenView(); if(window.persistSaveDebounced)persistSaveDebounced(); toast(did+'名の過不足を'+rM+'の給与明細に反映しました'); } return; }
+      if(e.target.closest('[data-nenreflectclear]')){ var cM=state.month, cn=0; (state._nenEmps||[]).forEach(function(em){ if(em.nenchoAdj && em.nenchoAdj.ym===cM){ em.nenchoAdj=null; cn++; } });
+        if(cn){ renderNenView(); if(window.persistSaveDebounced)persistSaveDebounced(); toast(cM+'の反映を解除しました'); } return; }
       if(e.target.closest('[data-nendecl-import-all]')){ var ndAll=NDcl(); if(!ndAll) return;
         uiConfirm('提出された本人のWeb申告を、対象の従業員にまとめて取り込みます。\n各人の申告入力欄は本人の申告内容で置き換わります（手入力していた分は上書きされます）。よろしいですか？').then(function(ok){ if(!ok) return;
           var did=0; (state._nenEmps||[]).forEach(function(em){ var dc=(state._nenDecls||{})[em.id]; if(dc&&dc.decl){ ndAll.applyToNencho(nenStore(em.id), dc.decl); did++; } });
