@@ -138,6 +138,42 @@ T('賞与の高齢ゲート: 71歳は賞与厚年0 / 76歳は賞与健保0', fun
   st.bonus = { payYm: '', payDay: '', byEmp: {} };
 });
 
+// ── ⑧d ★アプリ層 賞与の通し★: 課税/非課税分離・SI基準=標準賞与額・源泉・任意控除・手取りの合成(H1同型の配線を実数で固定) ──
+T('賞与 通し(アプリ層): 課税/非課税分離・SIは標準賞与額基準・源泉・任意控除・手取りの合成', function () {
+  const st = A.state; st.bonus = { payYm: '2026-06', payDay: '', byEmp: {} }; A.state._bonusPrev = {}; A.state._bonusYtd = {};
+  const e = emp({ payType: '月給', base: '400000', taxClass: 'ko', fuyou: '0' }); st.employees = [e]; // tokyo/36歳/甲/扶養0
+  const en = A.bonusEntry(e);
+  en.amount = '500000'; en.prevAfter = '255000';
+  en.addShikyu = [{ label: '特別賞与', value: '100000', hikazei: false }, { label: '寸志', value: '20000', hikazei: true }];
+  en.addKojo = [{ label: '親睦会費', value: '3000' }];
+  const c = A.computeBonus(e);
+  const SZ = win.ShoyoZei;
+  // ① 課税/非課税の分離(非課税は社保/源泉の基準に入れない=標準賞与額に含めない)
+  ok(c.base === 600000, '課税賞与総額=賞与50万+特別賞与10万(非課税寸志除外)=60万: ' + c.base);
+  ok(c.totalGross === 620000, '総支給=課税60万+非課税寸志2万=62万: ' + c.totalGross);
+  ok(c.addKojoTotal === 3000, '任意控除合計=3千: ' + c.addKojoTotal);
+  // ② SI: 検証済みlibに正しい引数(base=標準賞与額/健保0.0504/厚年/雇用0.5%/kaigo無)を渡している
+  const expSi = SZ.calcBonusSI({ bonus: 600000, healthRate: 0.0504, kaigoRate: 0.00795, hasKaigo: false, employRate: 0.005, ytdKenpoBonus: 0 });
+  ok(c.si.health === expSi.health && c.si.pension === expSi.pension && c.si.employ === expSi.employ, 'SI各項がlibオラクルと一致(健保' + c.si.health + '/厚年' + c.si.pension + '/雇用' + c.si.employ + ')');
+  ok(c.si.pension === Math.round(600000 * 0.0915), '厚年=標準60万×9.15%(公式率・二重や別基準でない): ' + c.si.pension);
+  ok(c.si.health === Math.round(600000 * 0.0504), '健保=標準60万×5.04%(東京・折半後): ' + c.si.health);
+  // ③ 源泉: libに base+si.total+前月社保後+扶養0+甲 を正しく渡している
+  const expTax = SZ.calcBonusTax({ bonus: 600000, bonusSI: c.si.total, prevSalary: 255000, prevSI: 0, fuyou: 0, taxClass: 'ko', payYm: '2026-06' });
+  ok(c.taxAmt === (expTax.tax || 0), '賞与所得税がlibオラクルと一致: app' + c.taxAmt + ' / lib' + (expTax.tax || 0));
+  // ④ 手取り=総支給−社保−源泉−任意控除(合成の配線・非課税は加算/任意控除は減算)
+  ok(c.net === 620000 - c.si.total - c.taxAmt - 3000, '手取り=総支給−社保−源泉−任意控除: ' + c.net);
+  st.bonus = { payYm: '', payDay: '', byEmp: {} };
+});
+T('賞与(アプリ層): 前月給与が不明なら源泉0(手入力を促す)・手取り=賞与−社保', function () {
+  const st = A.state; st.bonus = { payYm: '2026-06', payDay: '', byEmp: {} }; A.state._bonusPrev = {}; A.state._bonusYtd = {};
+  const e = emp({ payType: '月給', base: '400000', taxClass: 'ko', fuyou: '0' }); st.employees = [e];
+  const en = A.bonusEntry(e); en.amount = '500000'; en.prevAfter = ''; en.addShikyu = []; en.addKojo = [];
+  const c = A.computeBonus(e);
+  ok(c.noPrev === true && c.taxAmt === 0, '前月不明→源泉0: noPrev=' + c.noPrev + ' tax=' + c.taxAmt);
+  ok(c.net === 500000 - c.si.total, '手取り=賞与−社保(源泉0・追加なし): ' + c.net);
+  st.bonus = { payYm: '', payDay: '', byEmp: {} };
+});
+
 // ── ⑨ 入退社の日割 ──
 T('入退社: 月途中入社/退職で基本給が日割になる', function () {
   const full = A.compute(emp({ payType: '月給', base: '300000' }));
