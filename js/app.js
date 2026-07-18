@@ -137,6 +137,12 @@
   // 残業/深夜/休日手当は「割増」機能で自動計算するためチップから除外(二重計上・単価膨張防止)
   var SUP_POOL=['基本給','役職手当','住宅手当','家族手当','通勤手当','皆勤手当','資格手当','精勤手当','調整手当'];
   var KOJO_POOL=['社宅費','組合費','財形貯蓄','生命保険','親睦会費','旅行積立'];
+  // カスタム項目名のサジェスト(全8社未対応の空白UX): 会社が過去に使った項目名＋定番を候補表示→再入力の手間/表記ゆれを減らす
+  var SUGGEST_SHIKYU=['役職手当','資格手当','精勤手当','皆勤手当','住宅手当','家族手当','扶養手当','調整手当','出張手当','食事手当','技能手当','営業手当','単身赴任手当','地域手当','特別手当'];
+  var SUGGEST_KOJO=['社宅費','寮費','組合費','財形貯蓄','親睦会費','旅行積立','貸付金返済','制服代','昼食代'];
+  function usedItemNames(group){ var s={}; (state.employees||[]).forEach(function(e){ (e[group]||[]).forEach(function(x){ var l=((x&&x.label)||'').trim(); if(l && !/基本給|通勤手当/.test(l)) s[l]=1; }); }); return Object.keys(s); }
+  function itemSuggestOptions(group){ var used=usedItemNames(group==='shikyu'?'shikyu':'extraKojo'), curated=(group==='shikyu'?SUGGEST_SHIKYU:SUGGEST_KOJO), seen={}, out=[]; used.concat(curated).forEach(function(n){ if(n && !seen[n]){ seen[n]=1; out.push(n); } }); return out; } // 実使用を先頭(MRU的)＋定番
+  function itemSuggestHTML(){ return '<datalist id="dl-item-shikyu">'+itemSuggestOptions('shikyu').map(function(n){return '<option value="'+attr(n)+'"></option>';}).join('')+'</datalist><datalist id="dl-item-kojo">'+itemSuggestOptions('kojo').map(function(n){return '<option value="'+attr(n)+'"></option>';}).join('')+'</datalist>'; }
   var LEGAL_KOJO=[['health','健康保険'],['kaigo','介護保険'],['pension','厚生年金'],['employ','雇用保険'],['incomeTax','所得税'],['resident','住民税']];
   // 雇用保険 従業員負担(令和7年度・業種別)
   // 雇用保険 労働者負担(厚労省)。区分は全国共通の3種で網羅。料率は年度で自動選択(所得税と同様)
@@ -744,10 +750,10 @@
         +'<div class="frow"><div class="flabel">口座番号<span class="hint2">7桁</span></div><input class="finput m-f" data-f="furiAccount" inputmode="numeric" maxlength="7" value="'+attr(e.furiAccount)+'" placeholder="1234567"></div></div>'
       +'<div class="frow"><div class="flabel">受取人名（半角ｶﾅ）<span class="hint2">空欄なら氏名から自動変換</span></div><input class="finput m-f" data-f="furiKana" value="'+attr(e.furiKana)+'" placeholder="ﾔﾏﾀﾞ ﾊﾅｺ"></div>'
       +'<div class="sec-lb">支給項目（タップでON/OFF・通勤は上の欄）</div><div class="chip-row">'+chips(e,SUP_POOL,'shikyu')+'</div>'
-      +'<div class="addcustom"><input class="finput ac-inp" data-g="shikyu" placeholder="自由な項目名（例：特別手当）"><button class="btn-ghost ac-btn" data-g="shikyu" style="padding:10px 12px">＋追加</button></div>'
+      +'<div class="addcustom"><input class="finput ac-inp" data-g="shikyu" list="dl-item-shikyu" placeholder="自由な項目名（例：特別手当）"><button class="btn-ghost ac-btn" data-g="shikyu" style="padding:10px 12px">＋追加</button></div>'
       +basisBoxHTML(e)
       +'<div class="sec-lb">控除項目（法定は自動・任意分のみ）</div><div class="chip-row">'+chips(e,KOJO_POOL,'extraKojo')+'</div>'
-      +'<div class="addcustom"><input class="finput ac-inp" data-g="extraKojo" placeholder="自由な項目名（例：寮費）"><button class="btn-ghost ac-btn" data-g="extraKojo" style="padding:10px 12px">＋追加</button></div>';
+      +'<div class="addcustom"><input class="finput ac-inp" data-g="extraKojo" list="dl-item-kojo" placeholder="自由な項目名（例：寮費）"><button class="btn-ghost ac-btn" data-g="extraKojo" style="padding:10px 12px">＋追加</button></div>';
     var detail=subsec('zaiseki','在籍・勤務',gZaiseki)+subsec('zei','税・住民税',gZei)+subsec('shaho','社会保険',gShaho)+subsec('teate','通勤・手当・振込・控除',gTeate)
       +'<div style="display:flex;justify-content:space-between;margin-top:10px">'
         +'<button class="m-retire btn-ghost" style="color:#7A6A2E;border-color:#e6dcb0;padding:8px 14px">'+(e.retired?'復帰させる':'退職にする')+'</button>'
@@ -878,6 +884,7 @@
     var groups={}; var order=[];
     state.employees.forEach(function(e,i){ if(!empMatchesFilter(e)) return; var g=e.dept||'未分類'; if(!groups[g]){groups[g]=[];order.push(g);} groups[g].push(i); });
     var html='<div class="emp-filter">'+FILTERS.map(function(f){ return '<b class="ef-b'+(filt===f[0]?' on':'')+'" data-empfilter="'+f[0]+'">'+f[1]+'<span class="ef-n">'+f[2]+'</span></b>'; }).join('')+'</div>';
+    html+=itemSuggestHTML(); // カスタム項目名の候補(過去に使った名前＋定番)
     html+=empProfileStripHTML();
     var pats=state.payPatterns||[];
     if(pats.length) html+='<div class="pat-strip"><span class="pat-strip-l">給与パターン</span>'+pats.map(function(p){ return '<span class="pat-chip">'+esc(p.name)+'<b class="pat-del" data-patdel="'+attr(p.id)+'">×</b></span>'; }).join('')+(cActive>=1?'<button class="btn-ghost pat-bulk" style="padding:5px 12px;font-size:12px;white-space:nowrap">選んで一括適用</button>':'')+'</div>';
@@ -2425,7 +2432,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

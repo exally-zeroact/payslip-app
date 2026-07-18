@@ -362,6 +362,27 @@ T('Web明細QR: qrSvgがSVGを生成(空入力は空)', function () {
   ok(A.qrSvg('', 200) === '', '空入力は空文字');
 });
 
+T('カスタム項目名サジェスト: 過去に使った名前＋定番がdatalist候補に出る', function () {
+  const a = A.defEmp('甲'); a.shikyu = [{ label: '基本給', value: '0' }, { label: '危険手当', value: '3000' }, { label: '通勤手当', value: '5000' }];
+  a.extraKojo = [{ label: '寮費', value: '20000' }];
+  A.state.employees = [a];
+  const sup = A.itemSuggestOptions('shikyu');
+  ok(sup.indexOf('危険手当') === 0, '実使用の項目名が先頭(MRU的): ' + sup.slice(0, 3));
+  ok(sup.indexOf('資格手当') > 0, '定番も候補に含む');
+  ok(sup.indexOf('基本給') < 0 && sup.indexOf('通勤手当') < 0, '自動項目(基本給/通勤手当)は候補に出さない');
+  const koj = A.itemSuggestOptions('kojo');
+  ok(koj.indexOf('寮費') === 0 && koj.indexOf('組合費') > 0, '控除も実使用＋定番');
+  const html = A.itemSuggestHTML();
+  ok(/<datalist id="dl-item-shikyu">/.test(html) && /<datalist id="dl-item-kojo">/.test(html), '2つのdatalistを生成');
+  ok(/<option value="危険手当">/.test(html), 'option化される');
+  // 実マスタ描画: datalistは常時出る＋カード/手当サブ節を開くと入力欄が datalist を参照
+  A.state.open = { [a.id]: true, ['D' + a.id]: true, ['DS' + a.id + 'teate']: true };
+  A.renderEmpMaster();
+  const empList = doc.getElementById('emp-list');
+  ok(/<datalist id="dl-item-shikyu">/.test(empList.innerHTML), 'datalistが常時描画される');
+  ok(/list="dl-item-shikyu"/.test(empList.innerHTML) && /list="dl-item-kojo"/.test(empList.innerHTML), '追加入力欄が候補を参照');
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });
