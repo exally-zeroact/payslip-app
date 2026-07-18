@@ -340,6 +340,16 @@ T('振込先 Web登録: 会社バナー＋取り込みで従業員マスタの�
   ok(e2.furiBankNo === '9999' && e2.furiAccount === '111', '空値は上書きしない・値ありは反映');
 });
 
+T('Web明細QR: qrSvgがSVGを生成(空入力は空)', function () {
+  ok(typeof win.qrcode === 'function' || typeof win.qrcode === 'object', 'lib/qr.js(qrcode)が読み込まれている');
+  const svg = A.qrSvg('http://localhost/meisai.html?t=abc123', 200);
+  ok(/^<svg[\s>]/.test(svg), 'svg要素で始まる');
+  ok(/<rect /.test(svg) && (svg.match(/<rect /g) || []).length > 20, '黒モジュール(rect)が多数');
+  ok(/shape-rendering="crispEdges"/.test(svg), '印刷向けcrispEdges');
+  const m = svg.match(/width="(\d+)"/); ok(m && +m[1] >= 100, '実サイズを持つ: ' + (m && m[1]));
+  ok(A.qrSvg('', 200) === '', '空入力は空文字');
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

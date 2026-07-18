@@ -2305,10 +2305,46 @@
     });
     $('#webmeisai-card').addEventListener('click',function(e){
       var cp=e.target.closest('.wm-copy'); if(cp){ try{ navigator.clipboard.writeText(cp.dataset.link); toast('コピーしました'); }catch(err){} return; }
+      var qb=e.target.closest('.wm-qr'); if(qb){ showMeisaiQR(qb.dataset.qrName, qb.dataset.qrUrl); return; } // 個人のQR表示/印刷
+      if(e.target.closest('.wm-qrall')){ // 全員のQRを印刷(リンク+初回コード同梱)
+        Store.listMeisaiPub().then(function(list){ var origin=(location.origin&&location.origin.indexOf('http')===0)?location.origin+location.pathname.replace(/[^\/]*$/,''):'';
+          printQRCards((list||[]).map(function(p){ return { name:p.name, url:origin+p.link, initCode:(!p.hasPassword?p.initCode:'') }; })); });
+        return; }
       var ri=e.target.closest('.wm-reissue'); if(ri){ var tok=ri.dataset.token; uiConfirm('初回コードを再発行しますか？\n現在のパスワードと端末の記憶は無効になり、従業員は新しい初回コードで再設定します。').then(function(ok){ if(!ok)return;
         Store.reissueMeisaiInit(tok).then(function(){ renderWebMeisai(); toast('初回コードを再発行しました'); }); }); return; }
     });
     window.addEventListener('resize',function(){ if($('#scr-print').classList.contains('active'))doPreview(); });
+  }
+  // Web明細リンクのQRコード(従業員がカメラで読むだけで自分の明細/申告/振込先登録へ)。lib/qr.js(MIT・vendored)でSVG生成=印刷でも鮮明。
+  function qrSvg(text, px){
+    var Q=(typeof qrcode!=='undefined')?qrcode:(window&&window.qrcode); if(!Q||!text) return '';
+    var qr; try{ qr=Q(0,'M'); qr.addData(String(text)); qr.make(); }catch(e){ return ''; }
+    var n=qr.getModuleCount(), quiet=4, total=n+quiet*2, cell=Math.max(1, Math.floor((px||200)/total)), size=cell*total, rects='';
+    for(var r=0;r<n;r++)for(var c=0;c<n;c++){ if(qr.isDark(r,c)) rects+='<rect x="'+((quiet+c)*cell)+'" y="'+((quiet+r)*cell)+'" width="'+cell+'" height="'+cell+'"/>'; }
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'" shape-rendering="crispEdges" role="img" aria-label="Web明細QR"><rect width="'+size+'" height="'+size+'" fill="#fff"/><g fill="#000">'+rects+'</g></svg>';
+  }
+  function showMeisaiQR(name, url){
+    var svg=qrSvg(url, 220); if(!svg){ uiAlert('QRコードを生成できませんでした。'); return; }
+    uiModal({ title:(name?name+' さんの ':'')+'Web明細 QRコード',
+      html:'<div style="text-align:center">'+svg+'<div style="font-size:11px;color:#5C7E6C;margin-top:8px;word-break:break-all">'+esc(url)+'</div><div class="hint" style="margin-top:8px">スマホのカメラで読み取ると明細ページが開きます。初回だけ「初回コード」でパスワードを設定してください。</div></div>',
+      buttons:[{label:'閉じる',val:false},{label:'このQRを印刷',val:true,primary:true}]
+    }).then(function(v){ if(v) printQRCards([{ name:name, url:url }]); });
+  }
+  // QRカードを新窓で印刷(氏名+QR+リンク+初回コード+手順)。従業員に配る用。
+  function printQRCards(items){
+    items=(items||[]).filter(function(it){ return it&&it.url; }); if(!items.length){ uiAlert('公開中のWeb明細がありません。'); return; }
+    var cards=items.map(function(it){ var svg=qrSvg(it.url,190);
+      return '<div class="qc">'+svg+'<div class="qn">'+esc(it.name||'')+'</div>'
+        +(it.initCode?'<div class="qi">初回コード：<b>'+esc(it.initCode)+'</b></div>':'<div class="qi" style="color:#2E7D54">設定済み</div>')
+        +'<div class="qh">スマホのカメラでこのQRを読み取り→初回だけ「初回コード」で自分のパスワードを設定してください。</div>'
+        +'<div class="qu">'+esc(it.url)+'</div></div>'; }).join('');
+    var w=window.open('','_blank'); if(!w){ uiAlert('印刷ウィンドウを開けませんでした（ブラウザのポップアップ許可が必要です）。'); return; }
+    w.document.write('<!doctype html><html lang="ja"><head><meta charset="UTF-8"><title>Web明細 QRコード</title><style>'
+      +'body{font-family:sans-serif;margin:14px;color:#1a4a2e}h1{font-size:15px;margin:0 0 10px}'
+      +'.grid{display:flex;flex-wrap:wrap;gap:12px}.qc{border:1px dashed #9ac3ad;border-radius:10px;padding:12px;width:250px;text-align:center;page-break-inside:avoid}'
+      +'.qc svg{width:190px;height:190px}.qn{font-weight:700;font-size:14px;margin:6px 0 2px}.qi{font-size:12px;margin:2px 0}.qh{font-size:10px;color:#5C7E6C;margin:6px 0 4px;line-height:1.5}.qu{font-size:8.5px;color:#8aa89a;word-break:break-all}'
+      +'@media print{.qc{border-color:#bbb}}</style></head><body><h1>Web給与明細 アクセス用QRコード</h1><div class="grid">'+cards+'</div></body></html>');
+    w.document.close(); w.focus(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 350);
   }
   // Web明細: 公開状況(従業員リンク＋同意＋未読/開封)を印刷タブに表示
   function renderWebMeisai(){
@@ -2317,7 +2353,8 @@
       card.style.display=list.length?'':'none'; if(!list.length){ host.innerHTML=''; return; }
       var unread=0; list.forEach(function(p){ (p.docs||[]).forEach(function(d){ if(!d.openedAt)unread++; }); });
       var origin=(location.origin&&location.origin.indexOf('http')===0)?location.origin+location.pathname.replace(/[^\/]*$/,''):'';
-      host.innerHTML='<p class="hint" style="margin:-4px 0 10px">従業員に<b>リンク＋初回コード</b>を渡してください（LINE/メール/手渡し）。初回だけコードで自分のパスワードを設定→以後はパスワードだけ。'+(unread?'<b style="color:#92500A"> 未読 '+unread+'件</b>':' <b style="color:#2E7D54">全員が閲覧済み</b>')+'</p>'
+      host.innerHTML='<p class="hint" style="margin:-4px 0 10px">従業員に<b>リンク（QR）＋初回コード</b>を渡してください（LINE/メール/手渡し）。初回だけコードで自分のパスワードを設定→以後はパスワードだけ。'+(unread?'<b style="color:#92500A"> 未読 '+unread+'件</b>':' <b style="color:#2E7D54">全員が閲覧済み</b>')+'</p>'
+        +'<div style="margin:0 0 10px"><button class="btn-ghost wm-qrall" style="padding:8px 12px;font-size:12px">全員のQRコードを印刷</button></div>'
         +list.map(function(p){
           var ds=(p.docs||[]).slice().sort(function(a,b){return (b.ym||'').localeCompare(a.ym||'');});
           var openedTxt=ds.map(function(d){ return esc(d.ym)+(d.kind==='bonus'?'賞':'')+(d.openedAt?'✓':'<span style="color:#C0392B">未</span>'); }).join(' ');
@@ -2328,7 +2365,7 @@
             : '<div style="font-size:10.5px;color:#5C7E6C;margin-top:5px">初回コードは設定後に非表示（忘れた/漏れたら「再発行」）<button class="btn-ghost wm-reissue" data-token="'+attr(p.token)+'" style="padding:4px 8px;font-size:10.5px;margin-left:6px">初回コード再発行</button></div>';
           return '<div style="border:1px solid #d4eae0;border-radius:10px;padding:9px 11px;margin-bottom:7px">'
             +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:13px">'+esc(p.name||'(氏名未取得)')+'</b><span>'+pwState+consentState+'</span></div>'
-            +'<div style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:#3D6B53;min-width:52px">リンク</span><input class="finput" readonly value="'+attr(origin+p.link)+'" style="flex:1;font-size:11px;padding:7px 9px" onclick="this.select()"><button class="btn-ghost wm-copy" data-link="'+attr(origin+p.link)+'" style="padding:7px 10px;font-size:11px">コピー</button></div>'
+            +'<div style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:#3D6B53;min-width:52px">リンク</span><input class="finput" readonly value="'+attr(origin+p.link)+'" style="flex:1;font-size:11px;padding:7px 9px" onclick="this.select()"><button class="btn-ghost wm-copy" data-link="'+attr(origin+p.link)+'" style="padding:7px 10px;font-size:11px">コピー</button><button class="btn-ghost wm-qr" data-qr-url="'+attr(origin+p.link)+'" data-qr-name="'+attr(p.name||'')+'" style="padding:7px 10px;font-size:11px">QR</button></div>'
             +codeRow
             +'<div style="font-size:10.5px;color:#5C7E6C;margin-top:5px">公開: '+openedTxt+'</div></div>';
         }).join('');
@@ -2374,7 +2411,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

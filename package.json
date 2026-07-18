@@ -9,9 +9,11 @@
     "test:patterns": "node tests/payroll-patterns.mjs",
     "test:ui": "node tests/ui-smoke.mjs",
     "test:cloud": "node tests/cloud-sync.mjs",
-    "test:all": "node tests/run.js && node tests/integration.mjs && node tests/payroll-patterns.mjs && node tests/ui-smoke.mjs && node tests/cloud-sync.mjs"
+    "test:qr": "node tests/qr.test.mjs",
+    "test:all": "node tests/run.js && node tests/integration.mjs && node tests/payroll-patterns.mjs && node tests/ui-smoke.mjs && node tests/cloud-sync.mjs && node tests/qr.test.mjs"
   },
   "devDependencies": {
-    "jsdom": "^29.1.1"
+    "jsdom": "^29.1.1",
+    "jsqr": "^1.4.0"
   }
 }
