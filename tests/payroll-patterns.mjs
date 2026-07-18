@@ -212,6 +212,11 @@ T('住民税: 月額直接 と 年額12分割(端数初月寄せ)', function () 
   near(kojo(m, '住民税'), 12500, 0, '月額直接');
   const y = A.compute(emp({ payType: '月給', base: '300000', residentTaxMode: 'annual', residentTaxAnnual: '180000' }));
   near(kojo(y, '住民税'), 15000, 0, '年額18万÷12');
+  // 退職一括(アプリ層): 1〜4月退職は残額一括が法定義務(地方税法321条の5第2項)。2027-01退職→残額一括41,500
+  const savedM = A.state.month; A.state.month = '2027-01';
+  const r = A.compute(emp({ payType: '月給', base: '300000', residentTaxMode: 'annual', residentTaxAnnual: '100000', taishokuYmd: '2027-01-20' }));
+  near(kojo(r, '住民税'), 41500, 0, '1月退職→住民税 残額一括41,500(アプリ層の退職一括配線)');
+  A.state.month = savedM;
 });
 T('退職月: 月中退職=社保0(前月まで) / 月末退職=当月社保あり', function () {
   const mid = A.compute(emp({ payType: '月給', base: '300000', taishokuYmd: '2026-06-15' }));
