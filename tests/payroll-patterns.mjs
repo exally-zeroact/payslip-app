@@ -200,6 +200,22 @@ T('賞与(アプリ層): 前月給与が不明なら源泉0(手入力を促す)�
   st.bonus = { payYm: '', payDay: '', byEmp: {} };
 });
 
+// ── ⑧g ★賞与支払届★: 当月賞与→賞与額(通貨)・標準賞与額(1000円未満切捨) を届に ──
+T('賞与支払届: 賞与額(通貨)＝社保対象賞与・標準賞与額＝1000円未満切捨', function () {
+  const st = A.state; st.bonus = { payYm: '2026-06', payDay: '2026-06-10', byEmp: {} }; A.state._bonusPrev = {}; A.state._bonusYtd = {};
+  const e = emp({ payType: '月給', base: '400000', taxClass: 'ko', fuyou: '0' }); st.employees = [e];
+  const en = A.bonusEntry(e); en.amount = '500500'; en.prevAfter = '255000'; en.addShikyu = []; en.addKojo = [];
+  const rows = A.bonusHarauRows();
+  ok(rows.length === 1, '賞与額>0の1名');
+  near(rows[0].tsuka, 500500, 0, '賞与額(通貨)=社保対象賞与50万500円');
+  near(rows[0].hyojun, 500000, 0, '標準賞与額=1000円未満切捨→50万');
+  ok(rows[0].payDate === '2026-06-10', '賞与支払年月日');
+  const aoa = A.bonusHarauAoa(rows);
+  ok(/標準賞与額/.test(aoa[0].join(',')) && /賞与支払年月日/.test(aoa[0].join(',')), 'Excelヘッダ公式項目');
+  ok(aoa[1].indexOf(500000) >= 0, 'データ行に標準賞与額50万');
+  st.bonus = { payYm: '', payDay: '', byEmp: {} };
+});
+
 // ── ⑧f ★算定基礎届(定時決定)★: 17日以上の月平均→標準報酬(健保/厚年)・17日未満は除外 ──
 T('算定基礎届の算定: 4-6月の17日以上の月を平均→標準報酬30万(公式表)・17日未満は除外', function () {
   // 平均30万→標準報酬月額30万(報酬29万以上31万未満→標準報酬30万・協会けんぽ/厚年表)

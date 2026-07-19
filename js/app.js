@@ -1443,7 +1443,8 @@
     var anyBonus=state.employees.some(function(e){ return isActiveInMonth(e,ym) && num(bonusEntry(e).amount)>0; });
     var footer = anyBonus
       ? '<div class="card" style="padding:12px;margin-top:6px"><button class="btn-primary" data-confirm-bonus style="width:100%">この賞与を確定（年調・台帳に反映）</button>'
-        +'<p class="hint" style="margin:8px 0 0">確定すると、この賞与（'+esc(ym)+'）を年末調整の自動集計と賃金台帳に反映します。あとで直せます。<b>定時決定（4〜6月の標準報酬）や前月比には賞与は含めません</b>（法令どおり）。</p></div>'
+        +'<div style="margin-top:8px;display:flex;justify-content:flex-end"><button class="btn-ghost" data-bonus-harau="1" style="padding:8px 12px;font-size:12px">賞与支払届をExcel出力</button></div>'
+        +'<p class="hint" style="margin:8px 0 0">確定すると、この賞与（'+esc(ym)+'）を年末調整の自動集計と賃金台帳に反映します。あとで直せます。<b>定時決定（4〜6月の標準報酬）や前月比には賞与は含めません</b>（法令どおり）。<br>「賞与支払届」＝年金機構提出用（標準賞与額＝1,000円未満切捨・健保 年度573万／厚年1回150万上限）。被保険者整理番号は各自入力。</p></div>'
       : '';
     host.innerHTML=bonusItemSuggestHTML()+head+(cards||'<p class="hint">対象の従業員がいません。</p>')+footer;
   }
@@ -1464,6 +1465,20 @@
       }catch(_e){}
     });
   }
+  // 賞与支払届(被保険者賞与支払届): 当月の賞与から 賞与額(通貨=社保対象賞与)・標準賞与額(1000円未満切捨) を届の一覧に。
+  //  出典=日本年金機構「被保険者賞与支払届」。整理番号は各自入力・マイナンバーは扱わない(届は整理番号/基礎年金番号)。現物は通貨のみ。
+  var BONUS_HARAU_COLS=['被保険者整理番号','氏名','生年月日','賞与支払年月日','賞与額(通貨)','賞与額(現物)','合計','標準賞与額','備考'];
+  function bonusHarauRows(){
+    var ym=bonusYmOf(), payDay=(state.bonus&&state.bonus.payDay)||'';
+    return state.employees.filter(function(e){ return isActiveInMonth(e,ym) && num(bonusEntry(e).amount)>0; }).map(function(e){
+      var c=computeBonus(e), si=c.si||{}, tsuka=num(c.base); // 社保対象賞与=課税賞与総額
+      var notes=[]; if(isOver70(e,ym+'-01'))notes.push('70歳以上'); if(c.si.kenpoBase<si.hyojun)notes.push('健保 年573万上限'); if(c.si.koseiBase<si.hyojun)notes.push('厚年 150万上限');
+      return { name:e.name||'', birthYmd:e.birthYmd||'', payDate:payDay||ym, tsuka:tsuka, genbutsu:0, goukei:tsuka, hyojun:num(si.hyojun), note:notes.join('／') };
+    });
+  }
+  function bonusHarauAoa(rows){ var aoa=[BONUS_HARAU_COLS]; rows.forEach(function(x){ aoa.push(['', x.name, x.birthYmd, x.payDate, x.tsuka||'', x.genbutsu||0, x.goukei||'', x.hyojun||'', x.note]); }); return aoa; }
+  function downloadBonusHarau(){ if(!window.PayslipXlsx) return; var rows=bonusHarauRows(); if(!rows.length){ uiAlert('賞与額が入力された従業員がいません。'); return; }
+    PayslipXlsx.downloadSheets([{name:'賞与支払届', aoa:bonusHarauAoa(rows)}], { filename:'賞与支払届_'+bonusYmOf()+'.xlsx' }); }
   function renderInputArea(){
     var ml=$('#input-list'), bv=$('#bonus-view'), hint=$('#in-hint'), bonus=(state.inputMode==='bonus');
     $$('.imode').forEach(function(x){ x.classList.toggle('on', x.dataset.imode===state.inputMode); });
@@ -2185,6 +2200,7 @@
     if(inScr){
       inScr.addEventListener('click',function(ev){
         if(ev.target.closest('[data-confirm-bonus]')){ try{ saveBonusPayslips(); }catch(_){} persistSave(); toast('賞与を確定しました（年調・台帳に反映）'); return; }
+        if(ev.target.closest('[data-bonus-harau]')){ try{ downloadBonusHarau(); }catch(_){} return; } // 賞与支払届 Excel出力
         var addS=ev.target.closest('[data-bsadd]'); if(addS){ var es=bonusById(addS.dataset.bsadd); if(es){ var i1=inScr.querySelector('[data-bsaddl="'+addS.dataset.bsadd+'"]'); var l1=(i1&&i1.value||'').trim()||'特別賞与'; bonusEntry(es).addShikyu.push({label:l1,value:'',hikazei:false}); renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); } return; }
         var addK=ev.target.closest('[data-bkadd]'); if(addK){ var ek=bonusById(addK.dataset.bkadd); if(ek){ var i2=inScr.querySelector('[data-bkaddl="'+addK.dataset.bkadd+'"]'); var l2=(i2&&i2.value||'').trim()||'控除'; bonusEntry(ek).addKojo.push({label:l2,value:''}); renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); } return; }
         var dS=ev.target.closest('[data-bsx]'); if(dS){ var rS=bxParse(dS.dataset.bsx,'addShikyu'); if(rS){ rS.arr.splice(rS.idx,1); renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); } return; }
@@ -2555,7 +2571,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';
