@@ -1552,6 +1552,22 @@
       +'<table class="sumtab"><thead><tr><th>部署 / 従業員</th><th>支給合計</th><th>控除合計</th><th>差引支給</th></tr></thead>'
       +'<tbody>'+body+'<tr class="total" style="background:#E7F5EC"><td>総合計</td><td class="num">'+yen(g.total.s)+'</td><td class="num">'+yen(g.total.k)+'</td><td class="num">'+yen(g.total.n)+'</td></tr></tbody></table>'
       +'<p class="hint" style="margin-top:6px">部署は従業員マスタの「部署」で設定。未設定は「未分類」。</p></div>'; }
+  /* ---------- 算定基礎届(定時決定・4〜6月→標準報酬) ---------- */
+  // 算定の核: 4〜6月の{days,pay}から、支払基礎日数がthreshold(17・短時間11)以上の月だけ平均→報酬月額→標準報酬(健保/厚年)。
+  //  出典=日本年金機構「被保険者報酬月額算定基礎届」(17日以上の月の報酬合計÷該当月数=平均額→標準報酬月額表)。
+  function santeiKisoRow(months, threshold){
+    var SHH=(typeof SHAKAIHOKEN_HYO!=='undefined')?SHAKAIHOKEN_HYO:(window&&window.SHAKAIHOKEN_HYO);
+    var withData=months.filter(function(m){ return num(m.days)>0 || num(m.pay)>0; });
+    var qualifying=months.filter(function(m){ return num(m.days)>=threshold; });
+    var use = qualifying.length ? qualifying : withData; // 17日以上が1つも無ければ有る月で(要確認・実務は個別対応)
+    var soukei=use.reduce(function(a,m){ return a+num(m.pay); },0);
+    var cnt=use.length;
+    var heikin = cnt ? Math.floor(soukei/cnt) : 0; // 平均額=総計÷該当月数(円未満切捨)
+    var decP=(SHH&&SHH.gradeOf)?SHH.gradeOf(heikin):{hyojun:0,tokyu:0};
+    var decH=(SHH&&SHH.gradeOfHealth)?SHH.gradeOfHealth(heikin):{hyojun:0,tokyu:0};
+    return { soukei:soukei, heikin:heikin, count:cnt, allQualify:(withData.length>0 && qualifying.length===withData.length), noQualify:(qualifying.length===0),
+      decPension:decP.hyojun, decPensionGrade:decP.tokyu, decHealth:decH.hyojun, decHealthGrade:decH.tokyu };
+  }
   // 賃金台帳(年間・従業員別・確定済み月から)
   function chinginDaichoHTML(L, year){
     var CDm=CD(); var note='<p class="hint" style="margin:0 0 10px">「今月を確定」で保存した月だけ反映（労基法108条の賃金台帳）。<span class="help-i" data-help="chingindaicho">💡</span>横スクロール可。<button class="btn-ghost" data-choxlsx="daicho" style="margin-left:8px;padding:4px 10px;font-size:11px">Excel</button></p>';
@@ -1581,21 +1597,62 @@
     if(!(window.Store&&Store.getPayslipsByYm)){ host.innerHTML=sub+'<div class="card"><p class="hint">履歴保存が未対応です（保存を有効化してください）。</p></div>'; return; }
     Store.getPayslipsByYm(year+'-01', year+'-12').then(function(recs){ recs=confirmedRecs(recs).filter(function(r){return r.data.kind!=='bonus';}); host.innerHTML=sub+chinginDaichoHTML(CD().buildLedger(recs, year, state.employees), year); }) // 賃金台帳(月次)は賞与除外
       .catch(function(){ host.innerHTML=sub+'<div class="card"><p class="hint">読込に失敗しました。</p></div>'; }); }
-  function choSub(v){ return '<div class="seg" style="margin-bottom:10px">'
+  function choSub(v){ return '<div class="seg" style="margin-bottom:10px;flex-wrap:wrap">'
     +'<button class="seg-b'+(v==='shakai'?' on':'')+'" data-cho="shakai">社保一覧</button>'
     +'<button class="seg-b'+(v==='dept'?' on':'')+'" data-cho="dept">部署別</button>'
-    +'<button class="seg-b'+(v==='daicho'?' on':'')+'" data-cho="daicho">賃金台帳</button></div>'; }
+    +'<button class="seg-b'+(v==='daicho'?' on':'')+'" data-cho="daicho">賃金台帳</button>'
+    +'<button class="seg-b'+(v==='santei'?' on':'')+'" data-cho="santei">算定基礎届</button></div>'; }
+  // 算定基礎届: 確定済みの4〜6月明細(総支給・支払基礎日数)から各人の標準報酬を決定して一覧化(年金機構提出の素)。
+  var SANTEI_COLS=['被保険者整理番号','氏名','生年月日','従前(健保)','従前(厚年)','4月 日数','4月 報酬','5月 日数','5月 報酬','6月 日数','6月 報酬','総計','平均額','決定 標準報酬(健保)','等級(健保)','決定 標準報酬(厚年)','等級(厚年)','備考'];
+  function santeiRows(recs, year, emps){
+    var SHH=(typeof SHAKAIHOKEN_HYO!=='undefined')?SHAKAIHOKEN_HYO:(window&&window.SHAKAIHOKEN_HYO);
+    var byEmp={}; (recs||[]).forEach(function(r){ var m=parseInt(String(r.ym).slice(5,7),10); if(m<4||m>6)return; var d=r.data||{}; (byEmp[r.employee_id]||(byEmp[r.employee_id]={}))[m]={ days:num(d.paymentDays), pay:num(d.shikyuTotal) }; });
+    return (emps||[]).filter(function(e){ return !e.retired; }).map(function(e){
+      var mo=byEmp[e.id]||{}, months=[4,5,6].map(function(m){ return mo[m]||{days:0,pay:0}; }), th=e.shortTime?11:17;
+      var row=santeiKisoRow(months, th);
+      var sb=shahoBasisOf(e), prevHoshu=(sb&&sb.hoshu>0)?sb.hoshu:0;
+      var prevP=(SHH&&prevHoshu)?SHH.gradeOf(prevHoshu).hyojun:0, prevH=(SHH&&prevHoshu)?SHH.gradeOfHealth(prevHoshu).hyojun:0;
+      var notes=[]; if(e.shortTime)notes.push('短時間労働者'); if(isOver70(e,year+'-07'))notes.push('70歳以上'); if(row.noQualify)notes.push('17日以上の月なし=要確認');
+      var hasData=months.some(function(m){return m.days>0||m.pay>0;});
+      return { emp:e, name:e.name||'', birthYmd:e.birthYmd||'', months:months, prevH:prevH, prevP:prevP, r:row, note:notes.join('／'), hasData:hasData };
+    });
+  }
+  function isOver70(e, ym){ if(!e.birthYmd)return false; var b=/^(\d{4})-(\d{2})/.exec(e.birthYmd), t=/^(\d{4})-(\d{2})/.exec(ym); if(!b||!t)return false; return (parseInt(t[1])-parseInt(b[1]))-((parseInt(t[2])<parseInt(b[2]))?1:0) >= 70; }
+  function santeiAoa(rows, year){
+    var aoa=[SANTEI_COLS]; rows.forEach(function(x){ var m=x.months, r=x.r;
+      aoa.push(['', x.name, x.birthYmd, x.prevH||'', x.prevP||'', m[0].days||'', m[0].pay||'', m[1].days||'', m[1].pay||'', m[2].days||'', m[2].pay||'', r.soukei||'', r.heikin||'', r.decHealth||'', r.decHealthGrade||'', r.decPension||'', r.decPensionGrade||'', x.note]); });
+    return aoa;
+  }
+  function santeiHTML(rows, year){
+    var note='<p class="hint" style="margin:0 0 10px">確定済みの<b>'+year+'年4〜6月</b>の明細（総支給・支払基礎日数）から標準報酬を決定（'+year+'年9月〜適用）。<span class="help-i" data-help="santeikiso">💡</span>被保険者整理番号は年金機構の番号を各自入力。横スクロール可。<button class="btn-ghost" data-choxlsx="santei" style="margin-left:8px;padding:4px 10px;font-size:11px">Excel</button></p>';
+    var withData=rows.filter(function(x){return x.hasData;});
+    if(!withData.length) return note+'<div class="card"><p class="hint">4〜6月の確定済み明細がありません。各月を「今月を確定」で保存してください。</p></div>';
+    var head='<tr>'+SANTEI_COLS.map(function(c){return '<th>'+esc(c)+'</th>';}).join('')+'</tr>';
+    var body=withData.map(function(x){ var m=x.months, r=x.r;
+      var cells=['', x.name, x.birthYmd, x.prevH?yen(x.prevH):'', x.prevP?yen(x.prevP):'', (m[0].days||''), (m[0].pay?yen(m[0].pay):''), (m[1].days||''), (m[1].pay?yen(m[1].pay):''), (m[2].days||''), (m[2].pay?yen(m[2].pay):''), yen(r.soukei), yen(r.heikin), yen(r.decHealth), r.decHealthGrade, yen(r.decPension), r.decPensionGrade, x.note];
+      return '<tr>'+cells.map(function(c,i){ return '<td class="'+(i>=3&&i<=16?'num':'')+'">'+esc(String(c))+'</td>'; }).join('')+'</tr>';
+    }).join('');
+    return note+'<div class="card"><div class="card-h">算定基礎届（'+year+'年4〜6月）</div><div class="dc-wrap"><table class="dc-tab"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div></div>';
+  }
+  function renderSantei(sub){ var host=$('#view-cho'); var year=parseInt(String(state.month||'').slice(0,4),10)||2026;
+    if(!(window.Store&&Store.getPayslipsByYm)){ host.innerHTML=sub+'<div class="card"><p class="hint">履歴保存が未対応です。</p></div>'; return; }
+    Store.getPayslipsByYm(year+'-04', year+'-06').then(function(recs){ recs=confirmedRecs(recs).filter(function(r){return r.data.kind!=='bonus';});
+      state._santeiRows=santeiRows(recs, year, state.employees); host.innerHTML=sub+santeiHTML(state._santeiRows, year); })
+      .catch(function(){ host.innerHTML=sub+'<div class="card"><p class="hint">読込に失敗しました。</p></div>'; }); }
   function renderChoView(){ var host=$('#view-cho'); if(!host)return; var v=state.choView||'shakai'; var sub=choSub(v)
     +'<div class="card" style="padding:12px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-size:13px;color:#2E7D54">退職金の税金</b><span class="hint" style="flex:1;min-width:150px">退職金は毎月の給与と別（退職所得・分離課税）。ここで源泉を計算。</span><button class="btn-ghost" data-taishoku-calc="1" style="white-space:nowrap">退職金を計算</button></div>';
     if(v==='dept') host.innerHTML=sub+deptSummaryHTML();
     else if(v==='daicho'){ host.innerHTML=sub+'<div class="card"><div class="card-h">賃金台帳</div><p class="hint">読込中…</p></div>'; renderChinginDaicho(sub); }
+    else if(v==='santei'){ host.innerHTML=sub+'<div class="card"><div class="card-h">算定基礎届</div><p class="hint">読込中…</p></div>'; renderSantei(sub); }
     else host.innerHTML=sub+shakaiListHTML(); }
   function downloadChoXlsx(kind){ if(!window.PayslipXlsx) return; var co=(state.company||{}).name, mlabel=monthLabel().replace(/ /g,'');
     if(kind==='shakai'){ PayslipXlsx.downloadSheets([{name:'社保一覧', aoa:PayslipXlsx.shakaiListAOA(shakaiRows(),{company:co,monthLabel:mlabel})}], {filename:'社保一覧_'+state.month+'.xlsx'}); return; }
     if(kind==='dept'){ var g=CD().deptGroups(deptRows()); PayslipXlsx.downloadSheets([{name:'部署別集計', aoa:PayslipXlsx.deptSummaryAOA(g,{company:co,monthLabel:mlabel})}], {filename:'部署別集計_'+state.month+'.xlsx'}); return; }
     if(kind==='daicho'){ var year=parseInt(String(state.month||'').slice(0,4),10)||2026;
       Store.getPayslipsByYm(year+'-01',year+'-12').then(function(recs){ recs=confirmedRecs(recs).filter(function(r){return r.data.kind!=='bonus';}); var L=CD().buildLedger(recs,year,state.employees); // 賃金台帳(月次)は賞与除外
-        var sheets=PayslipXlsx.chinginDaichoSheets(L, year, CD(), {company:co}); if(!sheets.length){ uiAlert('確定済みの月がありません。'); return; } PayslipXlsx.downloadSheets(sheets,{filename:'賃金台帳_'+year+'.xlsx'}); }); return; } }
+        var sheets=PayslipXlsx.chinginDaichoSheets(L, year, CD(), {company:co}); if(!sheets.length){ uiAlert('確定済みの月がありません。'); return; } PayslipXlsx.downloadSheets(sheets,{filename:'賃金台帳_'+year+'.xlsx'}); }); return; }
+    if(kind==='santei'){ var yr=parseInt(String(state.month||'').slice(0,4),10)||2026; var rows=state._santeiRows||[]; var withData=rows.filter(function(x){return x.hasData;});
+      if(!withData.length){ uiAlert('4〜6月の確定済み明細がありません。'); return; } PayslipXlsx.downloadSheets([{name:'算定基礎届', aoa:santeiAoa(withData, yr)}], {filename:'算定基礎届_'+yr+'.xlsx'}); return; } }
 
   /* ---------- 年末調整(view-nen) ---------- */
   function Nen_(){ return (typeof Nenmatsu!=='undefined')?Nenmatsu:(window&&window.Nenmatsu); }
@@ -2498,7 +2555,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

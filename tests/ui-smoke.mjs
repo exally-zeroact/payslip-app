@@ -421,6 +421,30 @@ T('★H1回帰★ 扶養控除: 累積入力(総数＋そのうち)を排他区�
   ok(inc({ fuyoIppan: 3, fuyoTokutei: 1, fuyoRoujin: 1, fuyoDoukyo: 0 }) === 380000 + 630000 + 480000, '総数3(一般1+特定1+老人非同居1)=149万: ' + inc({ fuyoIppan: 3, fuyoTokutei: 1, fuyoRoujin: 1 }));
 });
 
+T('算定基礎届: 確定4-6月明細から標準報酬を決定しExcel列に配線', function () {
+  const e = A.defEmp('山田'); e.birthYmd = '1990-01-01';
+  A.state.employees = [e];
+  const recs = [
+    { ym: '2026-04', employee_id: e.id, data: { paymentDays: 30, shikyuTotal: 300000, kind: 'monthly' } },
+    { ym: '2026-05', employee_id: e.id, data: { paymentDays: 31, shikyuTotal: 305000, kind: 'monthly' } },
+    { ym: '2026-06', employee_id: e.id, data: { paymentDays: 30, shikyuTotal: 295000, kind: 'monthly' } },
+  ];
+  const rows = A.santeiRows(recs, 2026, A.state.employees);
+  ok(rows.length === 1 && rows[0].hasData, '対象1名(4-6月データあり)');
+  ok(rows[0].r.heikin === 300000, '平均30万: ' + rows[0].r.heikin);
+  ok(rows[0].r.decPension === 300000 && rows[0].r.decHealth === 300000, '標準報酬30万(健保/厚年)');
+  const aoa = A.santeiAoa(rows, 2026);
+  ok(/氏名/.test(aoa[0].join(',')) && /決定 標準報酬\(健保\)/.test(aoa[0].join(',')), 'Excelヘッダに公式項目');
+  ok(aoa[1].indexOf('山田') >= 0 && aoa[1].indexOf(300000) >= 0, 'データ行に氏名と標準報酬30万');
+  // 17日未満は除外(4月15日)
+  const recs2 = [
+    { ym: '2026-04', employee_id: e.id, data: { paymentDays: 15, shikyuTotal: 200000, kind: 'monthly' } },
+    { ym: '2026-05', employee_id: e.id, data: { paymentDays: 20, shikyuTotal: 305000, kind: 'monthly' } },
+    { ym: '2026-06', employee_id: e.id, data: { paymentDays: 22, shikyuTotal: 295000, kind: 'monthly' } },
+  ];
+  ok(A.santeiRows(recs2, 2026, A.state.employees)[0].r.heikin === 300000, '4月17日未満を除外→平均30万');
+});
+
 T('賞与 項目名サジェスト: 賞与で使った名前＋賞与定番がdatalist候補に出る', function () {
   A.state.bonus = { payYm: '2026-06', payDay: '', byEmp: { E1: { addShikyu: [{ label: '決算賞与', value: '50000' }], addKojo: [{ label: '共済会費', value: '2000' }] } } };
   const sup = A.bonusItemSuggestOptions('shikyu');
