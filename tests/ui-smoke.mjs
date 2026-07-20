@@ -445,6 +445,38 @@ T('算定基礎届: 確定4-6月明細から標準報酬を決定しExcel列に�
   ok(A.santeiRows(recs2, 2026, A.state.employees)[0].r.heikin === 300000, '4月17日未満を除外→平均30万');
 });
 
+T('月額変更届: 随時改定該当者を確定明細から判定→該当行がExcelに', function () {
+  const e = A.defEmp('高橋'); e.birthYmd = '1985-03-10';
+  e.shaho = Object.assign({}, e.shaho, { mode: 'zuiji', henkoYm: '2026-04', prevHyojun: '200000', fixedChanged: true });
+  A.state.employees = [e];
+  const recs = [
+    { ym: '2026-04', employee_id: e.id, data: { paymentDays: 20, shikyuTotal: 300000, kind: 'monthly' } },
+    { ym: '2026-05', employee_id: e.id, data: { paymentDays: 22, shikyuTotal: 300000, kind: 'monthly' } },
+    { ym: '2026-06', employee_id: e.id, data: { paymentDays: 21, shikyuTotal: 300000, kind: 'monthly' } },
+  ];
+  const rows = A.gekkakuRows(recs, A.state.employees);
+  ok(rows.length === 1 && rows[0].hasData, '対象1名(3か月データあり)');
+  const z = rows[0].z;
+  ok(z.avg === 300000, '3か月平均30万: ' + z.avg);
+  ok(z.pension.prevHyojun === 200000 && z.pension.newHyojun === 300000, '厚年 従前20万→改定30万');
+  ok(z.gradeDiff >= 2 && z.eligible, '2等級以上差＋固定給変動＋17日以上=該当');
+  ok(z.applyYm === '2026-07', '適用月=変動月の4か月目(2026-07): ' + z.applyYm);
+  const aoa = A.gekkakuAoa(rows);
+  ok(/変動月/.test(aoa[0].join(',')) && /適用月/.test(aoa[0].join(',')) && /該当/.test(aoa[0].join(',')), 'Excelヘッダに公式項目(変動月/適用月/該当)');
+  ok(aoa[1].indexOf('高橋') >= 0 && aoa[1].indexOf('該当') >= 0 && aoa[1].indexOf('2026-04') >= 0, 'データ行に氏名・変動月・該当');
+  // 固定給変動なし=非該当(届出対象外)
+  const e2 = A.defEmp('未変動'); e2.shaho = Object.assign({}, e2.shaho, { henkoYm: '2026-04', prevHyojun: '200000', fixedChanged: false });
+  const rows2 = A.gekkakuRows(recs.map(r => ({ ym: r.ym, employee_id: e2.id, data: r.data })), [e2]);
+  ok(rows2.length === 1 && !rows2[0].z.eligible, '固定給変動なし=非該当(候補には出るが届出対象外)');
+  // 17日未満が混じる=非該当
+  const recs3 = [
+    { ym: '2026-04', employee_id: e.id, data: { paymentDays: 10, shikyuTotal: 300000, kind: 'monthly' } },
+    { ym: '2026-05', employee_id: e.id, data: { paymentDays: 22, shikyuTotal: 300000, kind: 'monthly' } },
+    { ym: '2026-06', employee_id: e.id, data: { paymentDays: 21, shikyuTotal: 300000, kind: 'monthly' } },
+  ];
+  ok(!A.gekkakuRows(recs3, A.state.employees)[0].z.eligible, '3か月17日以上でない=非該当');
+});
+
 T('賞与 項目名サジェスト: 賞与で使った名前＋賞与定番がdatalist候補に出る', function () {
   A.state.bonus = { payYm: '2026-06', payDay: '', byEmp: { E1: { addShikyu: [{ label: '決算賞与', value: '50000' }], addKojo: [{ label: '共済会費', value: '2000' }] } } };
   const sup = A.bonusItemSuggestOptions('shikyu');

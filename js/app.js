@@ -1616,7 +1616,8 @@
     +'<button class="seg-b'+(v==='shakai'?' on':'')+'" data-cho="shakai">社保一覧</button>'
     +'<button class="seg-b'+(v==='dept'?' on':'')+'" data-cho="dept">部署別</button>'
     +'<button class="seg-b'+(v==='daicho'?' on':'')+'" data-cho="daicho">賃金台帳</button>'
-    +'<button class="seg-b'+(v==='santei'?' on':'')+'" data-cho="santei">算定基礎届</button></div>'; }
+    +'<button class="seg-b'+(v==='santei'?' on':'')+'" data-cho="santei">算定基礎届</button>'
+    +'<button class="seg-b'+(v==='gekkaku'?' on':'')+'" data-cho="gekkaku">月額変更届</button></div>'; }
   // 算定基礎届: 確定済みの4〜6月明細(総支給・支払基礎日数)から各人の標準報酬を決定して一覧化(年金機構提出の素)。
   var SANTEI_COLS=['被保険者整理番号','氏名','生年月日','従前(健保)','従前(厚年)','4月 日数','4月 報酬','5月 日数','5月 報酬','6月 日数','6月 報酬','総計','平均額','決定 標準報酬(健保)','等級(健保)','決定 標準報酬(厚年)','等級(厚年)','備考'];
   function santeiRows(recs, year, emps){
@@ -1654,11 +1655,51 @@
     Store.getPayslipsByYm(year+'-04', year+'-06').then(function(recs){ recs=confirmedRecs(recs).filter(function(r){return r.data.kind!=='bonus';});
       state._santeiRows=santeiRows(recs, year, state.employees); host.innerHTML=sub+santeiHTML(state._santeiRows, year); })
       .catch(function(){ host.innerHTML=sub+'<div class="card"><p class="hint">読込に失敗しました。</p></div>'; }); }
+  // 月額変更届(被保険者報酬月額変更届): 固定的賃金が変わった人を、変動月からの確定明細3か月で随時改定判定→該当者を届に。
+  //  出典=日本年金機構(随時改定・被保険者報酬月額変更届)。要件=①固定的賃金の変動 ②変動月から継続3か月すべて支払基礎日数17日(短時間11日)以上 ③従前と2等級以上差。適用=変動月の4か月目。
+  //  ★変動月・従前の標準報酬・固定給変動の有無は従業員設定(随時改定)から、実際の報酬は確定明細から。マイナンバー不使用(整理番号は各自入力)。
+  var GEKKAKU_COLS=['被保険者整理番号','氏名','生年月日','変動月','従前(健保)','従前(厚年)','①日数','①報酬','②日数','②報酬','③日数','③報酬','総計','平均額','改定 標準報酬(健保)','等級(健保)','改定 標準報酬(厚年)','等級(厚年)','適用月','該当','備考'];
+  function ymAddLocal(ym,n){ var mo=/^(\d{4})-(\d{1,2})$/.exec(String(ym||'')); if(!mo)return ''; var y=+mo[1], m=+mo[2]+n; while(m>12){m-=12;y++;} while(m<1){m+=12;y--;} return y+'-'+('0'+m).slice(-2); }
+  function gekkakuRows(recs, emps){
+    var PC=window.PayrollCalc;
+    var byEmp={}; (recs||[]).forEach(function(r){ if((r.data||{}).kind==='bonus')return; (byEmp[r.employee_id]||(byEmp[r.employee_id]={}))[r.ym]={ days:num((r.data||{}).paymentDays), pay:num((r.data||{}).shikyuTotal), has:true }; });
+    return (emps||[]).filter(function(e){ if(e.retired)return false; var s=e.shaho||{}; return !!s.henkoYm && (s.fixedChanged || num(s.prevHyojun)>0); }).map(function(e){
+      var s=e.shaho||{}, henko=s.henkoYm, th=e.shortTime?11:17;
+      var yms=[henko, ymAddLocal(henko,1), ymAddLocal(henko,2)];
+      var mo=byEmp[e.id]||{}, months=yms.map(function(ym){ var d=mo[ym]; return { ym:ym, days:d?d.days:0, pay:d?d.pay:0, has:!!d }; });
+      var prevHyojun=num(s.prevHyojun)>0?num(s.prevHyojun):((shahoBasisOf(e)||{}).hoshu||0);
+      var z=(PC&&PC.zuijiKaitei)?PC.zuijiKaitei({ months:months.map(function(m){return {pay:m.pay,days:m.days};}), prevHyojun:prevHyojun, fixedChanged:!!s.fixedChanged, henkoYm:henko, threshold:th }):null;
+      var hasData=months.every(function(m){return m.has;});
+      var notes=[]; if(!s.fixedChanged)notes.push('固定的賃金の変動を要確認'); if(!hasData)notes.push('3か月の確定明細が未そろい'); if(z&&hasData&&!z.allDays)notes.push('3か月17日以上でない'); if(isOver70(e, ymAddLocal(henko,3)))notes.push('70歳以上'); if(z&&z.gradeDiff<2)notes.push('2等級差なし');
+      return { emp:e, name:e.name||'', birthYmd:e.birthYmd||'', henko:henko, months:months, z:z, hasData:hasData, note:notes.join('／') };
+    });
+  }
+  function gekkakuAoa(rows){
+    var aoa=[GEKKAKU_COLS]; rows.forEach(function(x){ var m=x.months, z=x.z||{}, hp=z.health||{}, pp=z.pension||{}; var soukei=(m[0].pay||0)+(m[1].pay||0)+(m[2].pay||0);
+      aoa.push(['', x.name, x.birthYmd, x.henko, hp.prevHyojun||'', pp.prevHyojun||'', m[0].days||'', m[0].pay||'', m[1].days||'', m[1].pay||'', m[2].days||'', m[2].pay||'', soukei||'', z.avg||'', hp.newHyojun||'', hp.newGrade||'', pp.newHyojun||'', pp.newGrade||'', z.applyYm||'', z.eligible?'該当':'非該当', x.note]); });
+    return aoa;
+  }
+  function gekkakuHTML(rows){
+    var note='<p class="hint" style="margin:0 0 10px">従業員設定で<b>随時改定（変動月・従前の標準報酬・固定給変動）</b>を入れた人を、<b>変動月からの確定明細3か月</b>で判定。2等級以上差＋3か月17日（短時間11日）以上＋固定給変動で「該当」＝届出対象（変動月の4か月目〜適用）。<span class="help-i" data-help="toukyu">💡</span>被保険者整理番号は各自入力。横スクロール可。<button class="btn-ghost" data-choxlsx="gekkaku" style="margin-left:8px;padding:4px 10px;font-size:11px">Excel（該当者）</button></p>';
+    if(!rows.length) return note+'<div class="card"><p class="hint">随時改定の候補がいません。従業員マスタで対象者の社会保険を「給料が変わった（随時改定）」にし、変動月・従前の標準報酬を入力してください。</p></div>';
+    var head='<tr>'+GEKKAKU_COLS.map(function(c){return '<th>'+esc(c)+'</th>';}).join('')+'</tr>';
+    var body=rows.map(function(x){ var m=x.months, z=x.z||{}, hp=z.health||{}, pp=z.pension||{}; var soukei=(m[0].pay||0)+(m[1].pay||0)+(m[2].pay||0);
+      var cells=['', x.name, x.birthYmd, x.henko, hp.prevHyojun?yen(hp.prevHyojun):'', pp.prevHyojun?yen(pp.prevHyojun):'', (m[0].days||''), (m[0].pay?yen(m[0].pay):''), (m[1].days||''), (m[1].pay?yen(m[1].pay):''), (m[2].days||''), (m[2].pay?yen(m[2].pay):''), yen(soukei), z.avg?yen(z.avg):'', hp.newHyojun?yen(hp.newHyojun):'', (hp.newGrade||''), pp.newHyojun?yen(pp.newHyojun):'', (pp.newGrade||''), (z.applyYm||''), (z.eligible?'該当':'非該当'), x.note];
+      return '<tr'+(z.eligible?' style="background:#EAF7EF"':'')+'>'+cells.map(function(c,i){ return '<td class="'+((i>=4&&i<=17)?'num':'')+'">'+esc(String(c))+'</td>'; }).join('')+'</tr>';
+    }).join('');
+    return note+'<div class="card"><div class="card-h">月額変更届（随時改定）</div><div class="dc-wrap"><table class="dc-tab"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div></div>';
+  }
+  function renderGekkaku(sub){ var host=$('#view-cho'); var year=parseInt(String(state.month||'').slice(0,4),10)||2026;
+    if(!(window.Store&&Store.getPayslipsByYm)){ host.innerHTML=sub+'<div class="card"><p class="hint">履歴保存が未対応です。</p></div>'; return; }
+    Store.getPayslipsByYm((year-1)+'-01', year+'-12').then(function(recs){ recs=confirmedRecs(recs); // 変動月は各人バラバラ=前年〜当年を広めに取得
+      state._gekkakuRows=gekkakuRows(recs, state.employees); host.innerHTML=sub+gekkakuHTML(state._gekkakuRows); })
+      .catch(function(){ host.innerHTML=sub+'<div class="card"><p class="hint">読込に失敗しました。</p></div>'; }); }
   function renderChoView(){ var host=$('#view-cho'); if(!host)return; var v=state.choView||'shakai'; var sub=choSub(v)
     +'<div class="card" style="padding:12px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-size:13px;color:#2E7D54">退職金の税金</b><span class="hint" style="flex:1;min-width:150px">退職金は毎月の給与と別（退職所得・分離課税）。ここで源泉を計算。</span><button class="btn-ghost" data-taishoku-calc="1" style="white-space:nowrap">退職金を計算</button></div>';
     if(v==='dept') host.innerHTML=sub+deptSummaryHTML();
     else if(v==='daicho'){ host.innerHTML=sub+'<div class="card"><div class="card-h">賃金台帳</div><p class="hint">読込中…</p></div>'; renderChinginDaicho(sub); }
     else if(v==='santei'){ host.innerHTML=sub+'<div class="card"><div class="card-h">算定基礎届</div><p class="hint">読込中…</p></div>'; renderSantei(sub); }
+    else if(v==='gekkaku'){ host.innerHTML=sub+'<div class="card"><div class="card-h">月額変更届</div><p class="hint">読込中…</p></div>'; renderGekkaku(sub); }
     else host.innerHTML=sub+shakaiListHTML(); }
   function downloadChoXlsx(kind){ if(!window.PayslipXlsx) return; var co=(state.company||{}).name, mlabel=monthLabel().replace(/ /g,'');
     if(kind==='shakai'){ PayslipXlsx.downloadSheets([{name:'社保一覧', aoa:PayslipXlsx.shakaiListAOA(shakaiRows(),{company:co,monthLabel:mlabel})}], {filename:'社保一覧_'+state.month+'.xlsx'}); return; }
@@ -1667,7 +1708,10 @@
       Store.getPayslipsByYm(year+'-01',year+'-12').then(function(recs){ recs=confirmedRecs(recs).filter(function(r){return r.data.kind!=='bonus';}); var L=CD().buildLedger(recs,year,state.employees); // 賃金台帳(月次)は賞与除外
         var sheets=PayslipXlsx.chinginDaichoSheets(L, year, CD(), {company:co}); if(!sheets.length){ uiAlert('確定済みの月がありません。'); return; } PayslipXlsx.downloadSheets(sheets,{filename:'賃金台帳_'+year+'.xlsx'}); }); return; }
     if(kind==='santei'){ var yr=parseInt(String(state.month||'').slice(0,4),10)||2026; var rows=state._santeiRows||[]; var withData=rows.filter(function(x){return x.hasData;});
-      if(!withData.length){ uiAlert('4〜6月の確定済み明細がありません。'); return; } PayslipXlsx.downloadSheets([{name:'算定基礎届', aoa:santeiAoa(withData, yr)}], {filename:'算定基礎届_'+yr+'.xlsx'}); return; } }
+      if(!withData.length){ uiAlert('4〜6月の確定済み明細がありません。'); return; } PayslipXlsx.downloadSheets([{name:'算定基礎届', aoa:santeiAoa(withData, yr)}], {filename:'算定基礎届_'+yr+'.xlsx'}); return; }
+    if(kind==='gekkaku'){ var grows=(state._gekkakuRows||[]).filter(function(x){return x.z&&x.z.eligible;});
+      if(!grows.length){ uiAlert('随時改定に「該当」する人がいません。変動月・従前の標準報酬・固定給変動の入力と、3か月の確定明細をご確認ください。'); return; }
+      PayslipXlsx.downloadSheets([{name:'月額変更届', aoa:gekkakuAoa(grows)}], {filename:'月額変更届_'+state.month+'.xlsx'}); return; } }
 
   /* ---------- 年末調整(view-nen) ---------- */
   function Nen_(){ return (typeof Nenmatsu!=='undefined')?Nenmatsu:(window&&window.Nenmatsu); }
@@ -2571,7 +2615,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';
