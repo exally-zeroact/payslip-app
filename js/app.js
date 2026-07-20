@@ -221,7 +221,7 @@
   function defCompany(){ return { name:'株式会社 ゼロアクト',addr:'',close:'末日',paydayRel:'next',paydayDay:'25', payCycle:'monthly',
       holidays:[0], dailyWorkH:'8', dailyWorkM:'0', annualHolidays:'120',
       ruleOn:{teikyu:true,shotei:true,annual:true,warimashiRate:true,koyoGyoshu:true},
-      rateOt:'', rateHoliday:'', rateNight:'', rateOver60:'', gyoshu:'ippan',
+      rateOt:'', rateHoliday:'', rateNight:'', rateOver60:'', gyoshu:'ippan', rousaiRate:'',
       furiCode:'', furiName:'', furiBankNo:'', furiBankName:'', furiBranchNo:'', furiBranchName:'', furiYokin:'普通', furiAccount:'', furiDate:'' }; }
   // 対象月の既定=当月(初回起動時)。保存済みがあればロード時に上書きされる(過去月固定を防ぐ)。
   function curYm(){ var d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2); }
@@ -1617,7 +1617,8 @@
     +'<button class="seg-b'+(v==='dept'?' on':'')+'" data-cho="dept">部署別</button>'
     +'<button class="seg-b'+(v==='daicho'?' on':'')+'" data-cho="daicho">賃金台帳</button>'
     +'<button class="seg-b'+(v==='santei'?' on':'')+'" data-cho="santei">算定基礎届</button>'
-    +'<button class="seg-b'+(v==='gekkaku'?' on':'')+'" data-cho="gekkaku">月額変更届</button></div>'; }
+    +'<button class="seg-b'+(v==='gekkaku'?' on':'')+'" data-cho="gekkaku">月額変更届</button>'
+    +'<button class="seg-b'+(v==='roudou'?' on':'')+'" data-cho="roudou">労働保険</button></div>'; }
   // 算定基礎届: 確定済みの4〜6月明細(総支給・支払基礎日数)から各人の標準報酬を決定して一覧化(年金機構提出の素)。
   var SANTEI_COLS=['被保険者整理番号','氏名','生年月日','従前(健保)','従前(厚年)','4月 日数','4月 報酬','5月 日数','5月 報酬','6月 日数','6月 報酬','総計','平均額','決定 標準報酬(健保)','等級(健保)','決定 標準報酬(厚年)','等級(厚年)','備考'];
   function santeiRows(recs, year, emps){
@@ -1694,12 +1695,81 @@
     Store.getPayslipsByYm((year-1)+'-01', year+'-12').then(function(recs){ recs=confirmedRecs(recs); // 変動月は各人バラバラ=前年〜当年を広めに取得
       state._gekkakuRows=gekkakuRows(recs, state.employees); host.innerHTML=sub+gekkakuHTML(state._gekkakuRows); })
       .catch(function(){ host.innerHTML=sub+'<div class="card"><p class="hint">読込に失敗しました。</p></div>'; }); }
+  // 労働保険 年度更新(算定基礎賃金集計表): 労働保険年度(4月〜翌3月)の確定明細から、労災対象(全労働者・役員除く)と
+  //  雇用保険対象(被保険者)の賃金総額を月別集計→年度計→保険料(雇用保険=全体率で自動・労災=業種別率を会社入力)。
+  //  出典=労働保険料徴収法。★雇用保険 全体率は koyo-hoken.js(厚労省照合済)★。マイナンバー不使用。
+  function roudouFYof(){ var y=parseInt(String(state.month||'').slice(0,4),10)||2026, m=parseInt(String(state.month||'').slice(5,7),10)||1; return (m>=4)?y:y-1; }
+  var ROUDOU_COLS=['月','労災 対象人数','労災 賃金','雇用保険 対象人数','雇用保険 賃金'];
+  function roudouRows(recs, fy, emps){
+    var byId={}; (emps||[]).forEach(function(e){ byId[e.id]=e; });
+    var yms=[]; for(var i=0;i<12;i++){ var mm=4+i, yy=fy; if(mm>12){ mm-=12; yy=fy+1; } yms.push(yy+'-'+('0'+mm).slice(-2)); }
+    var byYm={}; (recs||[]).forEach(function(r){ (byYm[r.ym]||(byYm[r.ym]=[])).push(r); });
+    var rows=yms.map(function(ym){
+      var rousaiW=0, koyoW=0, rSet={}, kSet={};
+      (byYm[ym]||[]).forEach(function(r){ var e=byId[r.employee_id]; if(!e)return; var w=num((r.data||{}).shikyuTotal); if(w<=0)return;
+        var isRousai=(e.payType!=='役員');                                      // 労災=全労働者(役員は労働者でない=対象外)
+        var isKoyo=isRousai && !(e.apply&&e.apply.employ===false);             // 雇用保険=被保険者(雇用保険オフ=非加入)
+        if(isRousai){ rousaiW+=w; rSet[e.id]=1; }
+        if(isKoyo){ koyoW+=w; kSet[e.id]=1; }
+      });
+      return { ym:ym, rousaiCount:Object.keys(rSet).length, rousaiWage:rousaiW, koyoCount:Object.keys(kSet).length, koyoWage:koyoW };
+    });
+    return rows;
+  }
+  function roudouSummary(recs, fy, emps){
+    var rows=roudouRows(recs, fy, emps);
+    var rousaiWageTotal=rows.reduce(function(a,x){return a+x.rousaiWage;},0), koyoWageTotal=rows.reduce(function(a,x){return a+x.koyoWage;},0);
+    var gyoshu=(state.company||{}).gyoshu||'ippan', k=KH();
+    var koyoFull=(k&&k.fullRate)?k.fullRate(gyoshu, fy):null;                  // 雇用保険 全体率(労働者＋事業主・厚労省照合済)。未収録年度=null
+    var koyoRyo=(koyoFull!=null)?Math.round(koyoWageTotal*koyoFull):null;
+    var rousaiPermil=num((state.company||{}).rousaiRate);                       // 労災率(‰)は業種別=会社入力
+    var rousaiRyo=(rousaiPermil>0)?Math.round(rousaiWageTotal*(rousaiPermil/1000)):null;
+    return { rows:rows, fy:fy, rousaiWageTotal:rousaiWageTotal, koyoWageTotal:koyoWageTotal, gyoshu:gyoshu, koyoFull:koyoFull, koyoRyo:koyoRyo, rousaiPermil:rousaiPermil, rousaiRyo:rousaiRyo };
+  }
+  function roudouAoa(sum, fy){
+    var aoa=[['労働保険 算定基礎賃金集計表　'+fy+'年度（労働保険年度 '+fy+'-04〜'+(fy+1)+'-03）'], [(state.company||{}).name||''], [], ROUDOU_COLS.slice()];
+    sum.rows.forEach(function(x){ aoa.push([x.ym, x.rousaiCount||'', x.rousaiWage||'', x.koyoCount||'', x.koyoWage||'']); });
+    aoa.push(['年度計', '', sum.rousaiWageTotal||'', '', sum.koyoWageTotal||'']);
+    aoa.push([]);
+    var gLabel={ippan:'一般の事業',kensetsu:'建設の事業',norin:'農林水産・清酒製造'}[sum.gyoshu]||sum.gyoshu;
+    aoa.push(['【保険料の概算】']);
+    aoa.push(['雇用保険 業種', gLabel]);
+    aoa.push(['雇用保険 全体率(‰)', sum.koyoFull!=null?(sum.koyoFull*1000):'（率未収録・申告書でご確認）']);
+    aoa.push(['雇用保険料（賃金計×全体率）', sum.koyoRyo!=null?sum.koyoRyo:'—']);
+    aoa.push(['労災 保険率(‰・業種別=入力)', sum.rousaiPermil>0?sum.rousaiPermil:'（未入力）']);
+    aoa.push(['労災保険料（賃金計×労災率）', sum.rousaiRyo!=null?sum.rousaiRyo:'—']);
+    aoa.push([]);
+    aoa.push(['※ 賃金＝総支給（通勤手当・賞与含む）。役員は労災・雇用とも対象外、雇用保険オフの人は雇用保険の対象外。労災率は業種別のため申告書の率を入力してください。']);
+    return aoa;
+  }
+  function roudouHTML(sum, fy){
+    var gLabel={ippan:'一般の事業',kensetsu:'建設の事業',norin:'農林水産・清酒製造'}[sum.gyoshu]||sum.gyoshu;
+    var note='<p class="hint" style="margin:0 0 10px">確定済み明細から<b>'+fy+'年度（'+fy+'-04〜'+(fy+1)+'-03）</b>の賃金総額を集計。労災＝全労働者（役員除く）、雇用保険＝被保険者。<span class="help-i" data-help="koyoGyoshu">💡</span>横スクロール可。<button class="btn-ghost" data-choxlsx="roudou" style="margin-left:8px;padding:4px 10px;font-size:11px">Excel</button></p>';
+    var anyData=sum.rows.some(function(x){return x.rousaiWage>0||x.koyoWage>0;});
+    if(!anyData) return note+'<div class="card"><p class="hint">'+fy+'年度の確定済み明細がありません。各月を「今月を確定」で保存してください。</p></div>';
+    var head='<tr>'+ROUDOU_COLS.map(function(c){return '<th>'+esc(c)+'</th>';}).join('')+'</tr>';
+    var body=sum.rows.map(function(x){ return '<tr><td>'+esc(x.ym)+'</td><td class="num">'+(x.rousaiCount||'')+'</td><td class="num">'+(x.rousaiWage?yen(x.rousaiWage):'')+'</td><td class="num">'+(x.koyoCount||'')+'</td><td class="num">'+(x.koyoWage?yen(x.koyoWage):'')+'</td></tr>'; }).join('');
+    body+='<tr class="dc-net"><td>年度計</td><td class="num"></td><td class="num">'+yen(sum.rousaiWageTotal)+'</td><td class="num"></td><td class="num">'+yen(sum.koyoWageTotal)+'</td></tr>';
+    var koyoRateTxt=sum.koyoFull!=null?('全体 '+(sum.koyoFull*1000).toFixed(1)+'‰（労働者＋事業主・自動）'):'率未収録（申告書でご確認）';
+    var ryoBox='<div class="card" style="margin-top:10px"><div class="card-h">保険料の概算</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:14px 24px;padding:4px 2px;font-size:13px">'
+      +'<div><div class="hint">雇用保険（'+esc(gLabel)+'・'+koyoRateTxt+'）</div><b style="font-size:16px">'+(sum.koyoRyo!=null?yen(sum.koyoRyo):'—')+'</b></div>'
+      +'<div><div class="hint">労災（業種別の率を入力）</div><span style="display:inline-flex;align-items:center;gap:6px"><input class="finput num" data-rousai-rate="1" inputmode="decimal" value="'+attr(sum.rousaiPermil>0?sum.rousaiPermil:'')+'" placeholder="例 3.0" style="width:80px">‰　<b id="roudou-rousai-ryo" style="font-size:16px">'+(sum.rousaiRyo!=null?yen(sum.rousaiRyo):'—')+'</b></span></div>'
+      +'</div><p class="hint" style="margin:8px 0 0">雇用保険 全体率は年度で自動（厚労省照合）。労災率は業種別のため<b>申告書の率を入力</b>してください。賃金＝総支給（通勤・賞与含む）。</p></div>';
+    return note+'<div class="card"><div class="card-h">労働保険 算定基礎賃金集計表（'+fy+'年度）</div><div class="dc-wrap"><table class="dc-tab"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div></div>'+ryoBox;
+  }
+  function renderRoudou(sub){ var host=$('#view-cho'); var fy=roudouFYof();
+    if(!(window.Store&&Store.getPayslipsByYm)){ host.innerHTML=sub+'<div class="card"><p class="hint">履歴保存が未対応です。</p></div>'; return; }
+    Store.getPayslipsByYm(fy+'-04', (fy+1)+'-03').then(function(recs){ recs=confirmedRecs(recs);
+      state._roudouSum=roudouSummary(recs, fy, state.employees); host.innerHTML=sub+roudouHTML(state._roudouSum, fy); })
+      .catch(function(){ host.innerHTML=sub+'<div class="card"><p class="hint">読込に失敗しました。</p></div>'; }); }
   function renderChoView(){ var host=$('#view-cho'); if(!host)return; var v=state.choView||'shakai'; var sub=choSub(v)
     +'<div class="card" style="padding:12px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-size:13px;color:#2E7D54">退職金の税金</b><span class="hint" style="flex:1;min-width:150px">退職金は毎月の給与と別（退職所得・分離課税）。ここで源泉を計算。</span><button class="btn-ghost" data-taishoku-calc="1" style="white-space:nowrap">退職金を計算</button></div>';
     if(v==='dept') host.innerHTML=sub+deptSummaryHTML();
     else if(v==='daicho'){ host.innerHTML=sub+'<div class="card"><div class="card-h">賃金台帳</div><p class="hint">読込中…</p></div>'; renderChinginDaicho(sub); }
     else if(v==='santei'){ host.innerHTML=sub+'<div class="card"><div class="card-h">算定基礎届</div><p class="hint">読込中…</p></div>'; renderSantei(sub); }
     else if(v==='gekkaku'){ host.innerHTML=sub+'<div class="card"><div class="card-h">月額変更届</div><p class="hint">読込中…</p></div>'; renderGekkaku(sub); }
+    else if(v==='roudou'){ host.innerHTML=sub+'<div class="card"><div class="card-h">労働保険</div><p class="hint">読込中…</p></div>'; renderRoudou(sub); }
     else host.innerHTML=sub+shakaiListHTML(); }
   function downloadChoXlsx(kind){ if(!window.PayslipXlsx) return; var co=(state.company||{}).name, mlabel=monthLabel().replace(/ /g,'');
     if(kind==='shakai'){ PayslipXlsx.downloadSheets([{name:'社保一覧', aoa:PayslipXlsx.shakaiListAOA(shakaiRows(),{company:co,monthLabel:mlabel})}], {filename:'社保一覧_'+state.month+'.xlsx'}); return; }
@@ -1711,7 +1781,9 @@
       if(!withData.length){ uiAlert('4〜6月の確定済み明細がありません。'); return; } PayslipXlsx.downloadSheets([{name:'算定基礎届', aoa:santeiAoa(withData, yr)}], {filename:'算定基礎届_'+yr+'.xlsx'}); return; }
     if(kind==='gekkaku'){ var grows=(state._gekkakuRows||[]).filter(function(x){return x.z&&x.z.eligible;});
       if(!grows.length){ uiAlert('随時改定に「該当」する人がいません。変動月・従前の標準報酬・固定給変動の入力と、3か月の確定明細をご確認ください。'); return; }
-      PayslipXlsx.downloadSheets([{name:'月額変更届', aoa:gekkakuAoa(grows)}], {filename:'月額変更届_'+state.month+'.xlsx'}); return; } }
+      PayslipXlsx.downloadSheets([{name:'月額変更届', aoa:gekkakuAoa(grows)}], {filename:'月額変更届_'+state.month+'.xlsx'}); return; }
+    if(kind==='roudou'){ var rsum=state._roudouSum; if(!rsum||!rsum.rows.some(function(x){return x.rousaiWage>0||x.koyoWage>0;})){ uiAlert('対象年度の確定済み明細がありません。'); return; }
+      PayslipXlsx.downloadSheets([{name:'労働保険 賃金集計', aoa:roudouAoa(rsum, rsum.fy)}], {filename:'労働保険_算定基礎賃金集計_'+rsum.fy+'年度.xlsx'}); return; } }
 
   /* ---------- 年末調整(view-nen) ---------- */
   function Nen_(){ return (typeof Nenmatsu!=='undefined')?Nenmatsu:(window&&window.Nenmatsu); }
@@ -2500,6 +2572,9 @@
     var vcho=$('#view-cho'); if(vcho) vcho.addEventListener('click',function(e){
       var st=e.target.closest('[data-cho]'); if(st){ state.choView=st.dataset.cho; renderChoView(); return; }
       var dl=e.target.closest('[data-choxlsx]'); if(dl){ downloadChoXlsx(dl.dataset.choxlsx); return; } });
+    if(vcho) vcho.addEventListener('input',function(e){ var rr=e.target.closest('[data-rousai-rate]'); if(!rr)return; // 労災率(‰)入力→労災保険料だけ即時再計算(集計は再取得しない=入力フォーカス維持)
+      if(!state.company)state.company={}; state.company.rousaiRate=rr.value.replace(/[^0-9.]/g,''); if(window.persistSaveDebounced)persistSaveDebounced();
+      var s=state._roudouSum; if(s){ var p=num(state.company.rousaiRate); s.rousaiPermil=p; s.rousaiRyo=(p>0)?Math.round(s.rousaiWageTotal*(p/1000)):null; var b=$('#roudou-rousai-ryo'); if(b) b.textContent=(s.rousaiRyo!=null?yen(s.rousaiRyo):'—'); } });
     $('#view-list').addEventListener('click',function(e){ var tg=e.target.closest('[data-ltoggle]'); if(!tg)return; var id=tg.dataset.ltoggle; state.open['L'+id]=!state.open['L'+id]; $('#view-list .acc[data-lid="'+id+'"]').classList.toggle('open'); });
 
     // 印刷
@@ -2660,7 +2735,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

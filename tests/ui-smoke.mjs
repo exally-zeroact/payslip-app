@@ -528,6 +528,31 @@ T('給与支払報告書: 市区町村抽出＋源泉徴収票と同じ集計で
   ok(goukei && goukei[1] === 1 && goukei[2] === 3600000, '総括表 合計行');
 });
 
+T('労働保険 年度更新: 労災/雇用の賃金を年度集計＋雇用保険料は全体率で自動(役員/雇用オフ除外)', function () {
+  const K = win.KoyoHoken;
+  ok(Math.abs(K.fullRate('ippan', 2026) - 0.0135) < 1e-9, '令和8 一般 全体13.5‰(厚労省照合): ' + (K.fullRate('ippan', 2026) * 1000));
+  ok(Math.abs(K.fullRate('kensetsu', 2026) - 0.0165) < 1e-9, '令和8 建設 全体16.5‰');
+  ok(Math.abs(K.fullRate('ippan', 2025) - 0.0145) < 1e-9, '令和7 一般 全体14.5‰');
+  ok(K.fullRate('ippan', 2024) === null, '未収録年度=null(捏造しない)');
+  A.state.month = '2026-07'; A.state.company.gyoshu = 'ippan'; A.state.company.rousaiRate = '3';
+  const lab = A.defEmp('労働 太郎'), part = A.defEmp('パート 花子'), yaku = A.defEmp('役員 一郎');
+  lab.id = 'E_lab'; part.id = 'E_part'; yaku.id = 'E_yaku'; // 明示id(uidは同一ミリ秒で衝突しうる)
+  part.apply = { employ: false }; yaku.payType = '役員';
+  A.state.employees = [lab, part, yaku];
+  const recs = [];
+  ['2026-04', '2026-05', '2026-06'].forEach(ym => { recs.push({ ym, employee_id: lab.id, data: { shikyuTotal: 300000, kind: 'monthly' } }); recs.push({ ym, employee_id: part.id, data: { shikyuTotal: 100000, kind: 'monthly' } }); recs.push({ ym, employee_id: yaku.id, data: { shikyuTotal: 500000, kind: 'monthly' } }); });
+  const sum = A.roudouSummary(recs, 2026, A.state.employees);
+  ok(sum.rousaiWageTotal === 1200000, '労災賃金=120万(役員除外・(30万+10万)×3): ' + sum.rousaiWageTotal);
+  ok(sum.koyoWageTotal === 900000, '雇用保険賃金=90万(雇用オフのパート除外・30万×3): ' + sum.koyoWageTotal);
+  ok(sum.koyoRyo === Math.round(900000 * 0.0135), '雇用保険料=賃金計×全体率13.5‰=' + Math.round(900000 * 0.0135) + ': ' + sum.koyoRyo);
+  ok(sum.rousaiRyo === 3600, '労災保険料=賃金計×3‰=3600: ' + sum.rousaiRyo);
+  const aoa = A.roudouAoa(sum, 2026);
+  ok(/算定基礎賃金集計表/.test(aoa[0].join('')) && aoa[3].indexOf('労災 賃金') >= 0 && aoa[3].indexOf('雇用保険 賃金') >= 0, '集計表ヘッダ');
+  const totalRow = aoa.find(r => r[0] === '年度計');
+  ok(totalRow && totalRow[2] === 1200000 && totalRow[4] === 900000, '年度計行に労災120万/雇用90万');
+  ok(A.roudouFYof() === 2026, '労働保険年度=2026(7月起点)');
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });
