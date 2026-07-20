@@ -501,6 +501,33 @@ T('源泉徴収票 Web交付: 単独HTML(自己完結)が氏名・見出し・CS
   ok(!/マイナンバー|個人番号/.test(html), '★本人交付用=マイナンバー(個人番号)を記載しない(平成28年〜)★');
 });
 
+T('給与支払報告書: 市区町村抽出＋源泉徴収票と同じ集計で総括表/個人別明細書を生成', function () {
+  ok(A.extractCity('東京都渋谷区神南1-2-3') === '渋谷区', '渋谷区: ' + A.extractCity('東京都渋谷区神南1-2-3'));
+  ok(A.extractCity('神奈川県横浜市西区みなとみらい1-1') === '横浜市', '政令市は市に寄る(横浜市): ' + A.extractCity('神奈川県横浜市西区みなとみらい1-1'));
+  ok(A.extractCity('千葉県市川市1-1') === '市川市', '名称内の市を誤らない(市川市): ' + A.extractCity('千葉県市川市1-1'));
+  ok(A.extractCity('東京都港区6-1') === '港区', '港区: ' + A.extractCity('東京都港区6-1'));
+  ok(A.extractCity('') === '（住所未登録）', '空は未登録');
+  A.state.month = '2026-06';
+  const e = A.defEmp('田中 一郎'); e.address = '東京都新宿区西新宿2-8-1'; e.birthYmd = '1990-04-01';
+  A.state._nenEmps = [e]; A.state.nencho = {}; A.state._nenRecs = [];
+  for (let m = 1; m <= 12; m++) A.state._nenRecs.push({ ym: '2026-' + ('0' + m).slice(-2), employee_id: e.id, data: { shikyuTotal: 300000, tax: 5000, si: { health: 15000, pension: 27000, employ: 1800 }, kind: 'monthly', confirmed: true } });
+  const rows = A.gyoyoRows(A.state._nenRecs, 2026, A.state._nenEmps);
+  ok(rows.length === 1, '対象1名');
+  ok(rows[0].city === '新宿区', '市区町村=新宿区: ' + rows[0].city);
+  ok(rows[0].shunyu === 3600000, '支払金額=360万(12×30万): ' + rows[0].shunyu);
+  const mei = A.gyoyoMeisaiAoa(rows, 2026);
+  ok(/個人別明細書/.test(mei[0].join('')) && mei[3].indexOf('提出先 市区町村') >= 0 && mei[3].indexOf('支払金額') >= 0, '個人別明細ヘッダ');
+  const drow = mei.find(r => r.indexOf('田中 一郎') >= 0);
+  ok(drow && drow.indexOf('新宿区') >= 0 && drow.indexOf(3600000) >= 0, 'データ行に市区町村・支払金額');
+  ok(!/個人番号|マイナンバー/.test(mei.map(r => r.join('|')).join('||')), '★マイナンバー欄なし★');
+  const sou = A.gyoyoSoukatsuAoa(rows, 2026);
+  ok(/総括表/.test(sou[0].join('')), '総括表見出し');
+  const cityRow = sou.find(r => r[0] === '新宿区');
+  ok(cityRow && cityRow[1] === 1 && cityRow[2] === 3600000, '総括表: 新宿区 1名 360万');
+  const goukei = sou.find(r => r[0] === '合計');
+  ok(goukei && goukei[1] === 1 && goukei[2] === 3600000, '総括表 合計行');
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

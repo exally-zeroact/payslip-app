@@ -1875,7 +1875,8 @@
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
       +'<button class="btn-ghost" data-nxlsx="1" style="padding:8px 12px;font-size:12px">年末調整一覧（源泉徴収簿）をExcel出力</button><span class="help-i" data-help="genzenbo">💡</span>'
       +'<button class="btn-ghost" data-ngensen="1" style="padding:8px 12px;font-size:12px">源泉徴収票を印刷 / PDF保存</button>'
-      +'<button class="btn-ghost" data-ngensenweb="1" style="padding:8px 12px;font-size:12px">源泉徴収票を従業員へWeb交付</button></div></div>';
+      +'<button class="btn-ghost" data-ngensenweb="1" style="padding:8px 12px;font-size:12px">源泉徴収票を従業員へWeb交付</button>'
+      +'<button class="btn-ghost" data-ngyoyo="1" style="padding:8px 12px;font-size:12px">給与支払報告書（市区町村提出）をExcel出力</button></div></div>';
     if(!emps.length) return head+'<div class="card"><p class="hint">対象の従業員がいません。</p></div>';
     return head+emps.map(function(e){ return nenEmpHTML(e, recs); }).join('');
   }
@@ -1906,6 +1907,49 @@
     });
     aoa.push(['合計', t.pay, '', '', t.zei, '', '', '', '', '', '', '', (t.kabu<0?'△'+fmtN(-t.kabu):fmtN(t.kabu))]);
     PayslipXlsx.downloadSheets([{ name:'年末調整一覧', aoa:aoa, cols:[{wch:16},{wch:12},{wch:13},{wch:13},{wch:15},{wch:12},{wch:12},{wch:12},{wch:13},{wch:9},{wch:11},{wch:15},{wch:14}] }], { filename:'年末調整一覧_'+year+'.xlsx' });
+  }
+  // 給与支払報告書(市区町村提出): 源泉徴収票と同じ年調集計から、総括表(市区町村別 人員・支払金額)＋個人別明細書を生成。
+  //  出典=地方税法317条の6(給与支払報告書)。★本人交付用と同様マイナンバー(個人番号)は扱わない=各自記入。市区町村は住所から自動抽出(要確認)。
+  function extractCity(addr){
+    var s=String(addr||'').trim(); if(!s) return '（住所未登録）';
+    s=s.replace(/^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/, ''); // 都道府県を除去
+    var m=/^.+?[市区町村]/.exec(s);                              // 先頭から最初の市区町村字まで(政令市は市が区より先=市に寄る)
+    return m ? m[0] : (s || '（住所未登録）');
+  }
+  var GYOYO_COLS=['提出先 市区町村','受給者番号','氏名','生年月日','住所','種別','支払金額','給与所得控除後の金額','所得控除の額の合計額','源泉徴収税額','社会保険料等の金額','生命保険料の控除額','地震保険料の控除額','配偶者(特別)控除の額','扶養(特定)','扶養(老人)','扶養(その他)','基礎控除の額','特定親族特別控除の額','住宅借入金等特別控除の額','摘要'];
+  function gyoyoRows(recs, year, emps){
+    return (emps||[]).map(function(e){
+      var c=nenCompute(nenAggregate(recs, e.id), nenStore(e.id)); if(!c) return null;
+      var r=c.res, kl=r.kojoList, n=nenStore(e.id), fb=fuyoBuckets(n);
+      return { emp:e, city:extractCity(e.address), name:e.name||'', birthYmd:e.birthYmd||'', zip:e.zip||'', address:e.address||'',
+        shunyu:c.shunyu, kyuyoShotoku:r.kyuyoShotoku, kojoGoukei:r.kojoGoukei, nenzei:r.nenchouNenzei,
+        shakaiHoken:kl.shakaiHoken, seimei:kl.seimei, jishin:kl.jishin, haiGaku:kl.haiguusha+kl.haiTokubetsu,
+        kiso:kl.kiso, tokuteiShinzoku:kl.tokuteiShinzoku, jutaku:num(n.jutakuLoan), fb:fb };
+    }).filter(Boolean).filter(function(x){ return x.shunyu>0; }); // 年内に支払のあった人のみ
+  }
+  function gyoyoSoukatsuAoa(rows, year){
+    var co=state.company||{}, byCity={};
+    rows.forEach(function(x){ (byCity[x.city]||(byCity[x.city]={n:0,pay:0})); byCity[x.city].n++; byCity[x.city].pay+=x.shunyu; });
+    var aoa=[['給与支払報告書（総括表）　令和'+(year-2018)+'年分（'+year+'年中の給与）'], ['提出者（事業所）', co.name||''], ['所在地', co.addr||''], [],
+      ['提出先 市区町村','報告人員','支払金額合計','摘要']];
+    var tot={n:0,pay:0};
+    Object.keys(byCity).sort().forEach(function(city){ var g=byCity[city]; tot.n+=g.n; tot.pay+=g.pay; aoa.push([city, g.n, g.pay, '']); });
+    aoa.push(['合計', tot.n, tot.pay, '']);
+    aoa.push([]); aoa.push(['※ 市区町村は住所から自動抽出（要確認）。特別徴収／普通徴収の別・受給者番号・個人番号は各自記入。マイナンバーは扱いません。']);
+    return aoa;
+  }
+  function gyoyoMeisaiAoa(rows, year){
+    var aoa=[['給与支払報告書（個人別明細書）　令和'+(year-2018)+'年分'], [ (state.company||{}).name||'' ], [], GYOYO_COLS.slice()];
+    rows.slice().sort(function(a,b){ return a.city<b.city?-1:a.city>b.city?1:0; }).forEach(function(x){
+      aoa.push([ x.city, '', x.name, x.birthYmd, (x.zip?'〒'+x.zip+' ':'')+x.address, '給与・賞与', x.shunyu, x.kyuyoShotoku, x.kojoGoukei, x.nenzei, x.shakaiHoken, x.seimei, x.jishin, x.haiGaku, x.fb.tokutei, x.fb.roujinAll, x.fb.ippan, x.kiso, x.tokuteiShinzoku, x.jutaku, '' ]);
+    });
+    return aoa;
+  }
+  function downloadGyoyoHoukoku(){
+    if(!(window.PayslipXlsx&&Nen_())) return; var year=nenYear();
+    var rows=gyoyoRows(state._nenRecs, year, state._nenEmps||[]);
+    if(!rows.length){ uiAlert('対象の給与データがありません。年末調整の対象月・確定明細をご確認ください。'); return; }
+    PayslipXlsx.downloadSheets([ { name:'総括表', aoa:gyoyoSoukatsuAoa(rows, year) }, { name:'個人別明細書', aoa:gyoyoMeisaiAoa(rows, year) } ], { filename:'給与支払報告書_'+year+'.xlsx' });
   }
   // 源泉徴収票(従業員配布用の個票)。公式項目を揃えた印刷フォーム→印刷/PDF保存。
   function nenGensenHTML(e, year){
@@ -2450,7 +2494,8 @@
         nenRefreshEmp(yne); if(window.persistSaveDebounced)persistSaveDebounced(); return; } // はい/いいえトグル
       var x=e.target.closest('[data-nxlsx]'); if(x){ nenDownloadXlsx(); return; }
       var g=e.target.closest('[data-ngensen]'); if(g){ nenPrintGensen(); return; }
-      var gw=e.target.closest('[data-ngensenweb]'); if(gw){ nenPublishGensen(); return; } });
+      var gw=e.target.closest('[data-ngensenweb]'); if(gw){ nenPublishGensen(); return; }
+      var gy=e.target.closest('[data-ngyoyo]'); if(gy){ downloadGyoyoHoukoku(); return; } });
     // 帳票のサブ切替(賃金台帳/社保一覧/部署別)＋Excel
     var vcho=$('#view-cho'); if(vcho) vcho.addEventListener('click',function(e){
       var st=e.target.closest('[data-cho]'); if(st){ state.choView=st.dataset.cho; renderChoView(); return; }
@@ -2615,7 +2660,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';
