@@ -502,10 +502,15 @@ T('源泉徴収票 Web交付: 単独HTML(自己完結)が氏名・見出し・CS
 });
 
 T('給与支払報告書: 市区町村抽出＋源泉徴収票と同じ集計で総括表/個人別明細書を生成', function () {
-  ok(A.extractCity('東京都渋谷区神南1-2-3') === '渋谷区', '渋谷区: ' + A.extractCity('東京都渋谷区神南1-2-3'));
-  ok(A.extractCity('神奈川県横浜市西区みなとみらい1-1') === '横浜市', '政令市は市に寄る(横浜市): ' + A.extractCity('神奈川県横浜市西区みなとみらい1-1'));
-  ok(A.extractCity('千葉県市川市1-1') === '市川市', '名称内の市を誤らない(市川市): ' + A.extractCity('千葉県市川市1-1'));
-  ok(A.extractCity('東京都港区6-1') === '港区', '港区: ' + A.extractCity('東京都港区6-1'));
+  ok(A.extractCity('東京都渋谷区神南1-2-3') === '東京都渋谷区', '23区(都道府県付き): ' + A.extractCity('東京都渋谷区神南1-2-3'));
+  ok(A.extractCity('神奈川県横浜市西区みなとみらい1-1') === '神奈川県横浜市', '政令市は市に寄る: ' + A.extractCity('神奈川県横浜市西区みなとみらい1-1'));
+  ok(A.extractCity('千葉県市川市1-1') === '千葉県市川市', '名称内の市を誤らない(市川市): ' + A.extractCity('千葉県市川市1-1'));
+  ok(A.extractCity('三重県四日市市西新地1') === '三重県四日市市', '★末尾の市が切れない(四日市市)★: ' + A.extractCity('三重県四日市市西新地1'));
+  ok(A.extractCity('広島県廿日市市宮島町1') === '広島県廿日市市', '廿日市市: ' + A.extractCity('広島県廿日市市宮島町1'));
+  ok(A.extractCity('東京都港区6-1') === '東京都港区', '港区: ' + A.extractCity('東京都港区6-1'));
+  ok(A.extractCity('広島県安芸郡府中町1') === '広島県安芸郡府中町', '郡部の町(郡付き): ' + A.extractCity('広島県安芸郡府中町1'));
+  // ★同名別自治体(東京都府中市 と 広島県府中市)を都道府県付きで区別=合算しない★
+  ok(A.extractCity('東京都府中市1') !== A.extractCity('広島県府中市1'), '同名別自治体を区別: ' + A.extractCity('東京都府中市1') + ' vs ' + A.extractCity('広島県府中市1'));
   ok(A.extractCity('') === '（住所未登録）', '空は未登録');
   A.state.month = '2026-06';
   const e = A.defEmp('田中 一郎'); e.address = '東京都新宿区西新宿2-8-1'; e.birthYmd = '1990-04-01';
@@ -513,17 +518,17 @@ T('給与支払報告書: 市区町村抽出＋源泉徴収票と同じ集計で
   for (let m = 1; m <= 12; m++) A.state._nenRecs.push({ ym: '2026-' + ('0' + m).slice(-2), employee_id: e.id, data: { shikyuTotal: 300000, tax: 5000, si: { health: 15000, pension: 27000, employ: 1800 }, kind: 'monthly', confirmed: true } });
   const rows = A.gyoyoRows(A.state._nenRecs, 2026, A.state._nenEmps);
   ok(rows.length === 1, '対象1名');
-  ok(rows[0].city === '新宿区', '市区町村=新宿区: ' + rows[0].city);
+  ok(rows[0].city === '東京都新宿区', '市区町村=東京都新宿区: ' + rows[0].city);
   ok(rows[0].shunyu === 3600000, '支払金額=360万(12×30万): ' + rows[0].shunyu);
   const mei = A.gyoyoMeisaiAoa(rows, 2026);
   ok(/個人別明細書/.test(mei[0].join('')) && mei[3].indexOf('提出先 市区町村') >= 0 && mei[3].indexOf('支払金額') >= 0, '個人別明細ヘッダ');
   const drow = mei.find(r => r.indexOf('田中 一郎') >= 0);
-  ok(drow && drow.indexOf('新宿区') >= 0 && drow.indexOf(3600000) >= 0, 'データ行に市区町村・支払金額');
-  ok(!/個人番号|マイナンバー/.test(mei.map(r => r.join('|')).join('||')), '★マイナンバー欄なし★');
+  ok(drow && drow.indexOf('東京都新宿区') >= 0 && drow.indexOf(3600000) >= 0, 'データ行に市区町村・支払金額');
+  ok(!/個人番号|マイナンバー/.test(mei[3].join('|')), '★列ヘッダにマイナンバー欄なし★');
   const sou = A.gyoyoSoukatsuAoa(rows, 2026);
   ok(/総括表/.test(sou[0].join('')), '総括表見出し');
-  const cityRow = sou.find(r => r[0] === '新宿区');
-  ok(cityRow && cityRow[1] === 1 && cityRow[2] === 3600000, '総括表: 新宿区 1名 360万');
+  const cityRow = sou.find(r => r[0] === '東京都新宿区');
+  ok(cityRow && cityRow[1] === 1 && cityRow[2] === 3600000, '総括表: 東京都新宿区 1名 360万');
   const goukei = sou.find(r => r[0] === '合計');
   ok(goukei && goukei[1] === 1 && goukei[2] === 3600000, '総括表 合計行');
 });
@@ -544,13 +549,65 @@ T('労働保険 年度更新: 労災/雇用の賃金を年度集計＋雇用保�
   const sum = A.roudouSummary(recs, 2026, A.state.employees);
   ok(sum.rousaiWageTotal === 1200000, '労災賃金=120万(役員除外・(30万+10万)×3): ' + sum.rousaiWageTotal);
   ok(sum.koyoWageTotal === 900000, '雇用保険賃金=90万(雇用オフのパート除外・30万×3): ' + sum.koyoWageTotal);
-  ok(sum.koyoRyo === Math.round(900000 * 0.0135), '雇用保険料=賃金計×全体率13.5‰=' + Math.round(900000 * 0.0135) + ': ' + sum.koyoRyo);
-  ok(sum.rousaiRyo === 3600, '労災保険料=賃金計×3‰=3600: ' + sum.rousaiRyo);
+  ok(sum.koyoRyo === 12150, '雇用保険料=90万×13.5‰=12150: ' + sum.koyoRyo);
+  ok(sum.rousaiRyo === 3600, '労災保険料=120万×3‰=3600: ' + sum.rousaiRyo);
   const aoa = A.roudouAoa(sum, 2026);
   ok(/算定基礎賃金集計表/.test(aoa[0].join('')) && aoa[3].indexOf('労災 賃金') >= 0 && aoa[3].indexOf('雇用保険 賃金') >= 0, '集計表ヘッダ');
   const totalRow = aoa.find(r => r[0] === '年度計');
   ok(totalRow && totalRow[2] === 1200000 && totalRow[4] === 900000, '年度計行に労災120万/雇用90万');
   ok(A.roudouFYof() === 2026, '労働保険年度=2026(7月起点)');
+});
+
+T('★総点検是正★ 労働保険料の端数=賃金1000円未満切捨→×率→1円未満切捨(徴収法)', function () {
+  A.state.month = '2026-07'; A.state.company.gyoshu = 'ippan'; A.state.company.rousaiRate = '3';
+  const e = A.defEmp('端数 太郎'); e.id = 'E_hasu';
+  A.state.employees = [e];
+  // 年度計 雇用保険賃金 = 12,345,678 になるよう1か月で投入
+  const recs = [{ ym: '2026-04', employee_id: e.id, data: { shikyuTotal: 12345678, kind: 'monthly' } }];
+  const sum = A.roudouSummary(recs, 2026, A.state.employees);
+  ok(sum.koyoWageTotal === 12345678, '賃金総額=12,345,678: ' + sum.koyoWageTotal);
+  // 公式: 12,345,000(1000円未満切捨) × 0.0135 = 166,657.5 → 1円未満切捨 = 166,657（旧round実装は166,667で+10円誤り）
+  ok(sum.koyoRyo === 166657, '雇用保険料=Math.floor(12,345,000×0.0135)=166,657(旧round=166,667は誤り): ' + sum.koyoRyo);
+  // 労災: 12,345,000 × 3‰ = 37,035 → 切捨 37,035
+  ok(sum.rousaiRyo === 37035, '労災保険料=Math.floor(12,345,000×3‰)=37,035: ' + sum.rousaiRyo);
+});
+
+T('★総点検是正★ 被保険者判定を在籍単一ソースに統一(退職ボタンだけ/退職日だけの取りこぼし)', function () {
+  A.state.month = '2026-07';
+  // (a) 退職ボタンだけ押した人(retired=true・退職日未入力)は資格喪失届に「要入力」で必ず出る(静かに落とさない)
+  const r1 = A.defEmp('退職ボタン 太郎'); r1.id = 'E_rb'; r1.retired = true; r1.taishokuYmd = '';
+  ok(A.shikakuRows([r1]).some(x => x.kind === '喪失' && /退職日を入力/.test(x.note)), 'retiredだけ→喪失届に要入力で表示');
+  // (b) 退職日だけ入れて退職フラグ無し(taishokuYmd過去)は算定基礎届から除外(過剰計上しない)
+  const r2 = A.defEmp('退職日だけ 花子'); r2.id = 'E_td'; r2.retired = false; r2.taishokuYmd = '2026-05-31';
+  A.state._santeiRecs = ['2026-04', '2026-05', '2026-06'].map(ym => ({ ym, employee_id: r2.id, data: { paymentDays: 30, shikyuTotal: 300000, kind: 'monthly' } }));
+  const srows = A.santeiRows(A.state._santeiRecs, 2026, [r2]);
+  ok(srows.length === 0, '7/1に被保険者でない(5月末退職)→算定基礎届から除外: ' + srows.length);
+  // (c) 在籍中(日付なし)は従来どおり対象
+  const act = A.defEmp('在籍 一郎'); act.id = 'E_act';
+  const arows = A.santeiRows(['2026-04', '2026-05', '2026-06'].map(ym => ({ ym, employee_id: act.id, data: { paymentDays: 30, shikyuTotal: 300000, kind: 'monthly' } })), 2026, [act]);
+  ok(arows.length === 1, '在籍中は算定基礎届の対象');
+});
+
+T('★総点検是正★ 役員も資格取得・喪失届の対象(健保・厚年 被保険者)＋備考「役員」', function () {
+  A.state.month = '2026-07';
+  const yaku = A.defEmp('役員 太郎'); yaku.id = 'E_yk'; yaku.payType = '役員'; yaku.joinYmd = '2026-04-01'; yaku.taishokuYmd = '';
+  const rows = A.shikakuRows([yaku]);
+  const acq = rows.find(x => x.kind === '取得');
+  ok(acq && acq.name === '役員 太郎' && /役員/.test(acq.note), '役員の資格取得届が出る＋備考「役員」: ' + (acq && acq.note));
+});
+
+T('★総点検是正★ 賞与支払届の支払年月日=未入力なら空＋要入力(月だけの値を出さない)', function () {
+  A.state.month = '2026-07';
+  const e = A.defEmp('賞与 太郎'); e.id = 'E_bns'; e.base = '300000';
+  A.state.employees = [e];
+  A.state.bonus = { payYm: '2026-07', payDay: '', byEmp: { E_bns: { amount: '500000' } } };
+  const rows = A.bonusHarauRows();
+  ok(rows.length === 1, '賞与対象1名');
+  ok(rows[0].payDate === '', '支払日未入力→支払年月日は空(月だけの値を出さない): "' + rows[0].payDate + '"');
+  ok(/賞与支払日を入力/.test(rows[0].note), '要入力を備考で案内');
+  // 入力すればその値
+  A.state.bonus.payDay = '2026-07-10';
+  ok(A.bonusHarauRows()[0].payDate === '2026-07-10', '入力すれば支払年月日に反映');
 });
 
 T('資格取得・喪失届: 入社日=取得/退職日翌日=喪失・標準報酬・喪失日の月末年末繰上げ', function () {
@@ -572,7 +629,7 @@ T('資格取得・喪失届: 入社日=取得/退職日翌日=喪失・標準報
   ok(acq && acq.decH === 300000 && acq.decP === 300000, '取得の標準報酬=30万(見込み)');
   ok(loss && loss.date === '2026-07-01', '喪失日=退職日6/30の翌日=7/1: ' + (loss && loss.date));
   ok(loss && loss.reason === '退職等', '喪失理由=退職等');
-  ok(!rows.some(r => r.name === '役員 一郎'), '役員は労働者の取得/喪失一覧から除外');
+  ok(rows.some(r => r.name === '役員 一郎' && r.kind === '取得' && /役員/.test(r.note)), '役員も被保険者=取得届に出る＋備考「役員」');
   const aoa = A.shikakuAoa(rows);
   ok(/資格取得届／資格喪失届/.test(aoa[0].join('')) && aoa[3].indexOf('資格取得日／喪失日') >= 0, 'Excelヘッダ公式項目');
   const arow = aoa.find(r => r.indexOf('入社 太郎') >= 0);

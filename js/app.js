@@ -1469,11 +1469,12 @@
   //  出典=日本年金機構「被保険者賞与支払届」。整理番号は各自入力・マイナンバーは扱わない(届は整理番号/基礎年金番号)。現物は通貨のみ。
   var BONUS_HARAU_COLS=['被保険者整理番号','氏名','生年月日','賞与支払年月日','賞与額(通貨)','賞与額(現物)','合計','標準賞与額','備考'];
   function bonusHarauRows(){
-    var ym=bonusYmOf(), payDay=(state.bonus&&state.bonus.payDay)||'';
+    var ym=bonusYmOf(), payDay=String((state.bonus&&state.bonus.payDay)||'').trim();
     return state.employees.filter(function(e){ return isActiveInMonth(e,ym) && num(bonusEntry(e).amount)>0; }).map(function(e){
       var c=computeBonus(e), si=c.si||{}, tsuka=num(c.base); // 社保対象賞与=課税賞与総額
-      var notes=[]; if(isOver70(e,ym+'-01'))notes.push('70歳以上'); if(c.si.kenpoBase<si.hyojun)notes.push('健保 年573万上限'); if(c.si.koseiBase<si.hyojun)notes.push('厚年 150万上限');
-      return { name:e.name||'', birthYmd:e.birthYmd||'', payDate:payDay||ym, tsuka:tsuka, genbutsu:0, goukei:tsuka, hyojun:num(si.hyojun), note:notes.join('／') };
+      var notes=[]; if(!payDay)notes.push('賞与支払日を入力してください'); if(isOver70(e,ym+'-01'))notes.push('70歳以上'); if(c.si.kenpoBase<si.hyojun)notes.push('健保 年573万上限'); if(c.si.koseiBase<si.hyojun)notes.push('厚年 150万上限');
+      // 賞与支払年月日は様式で年月日必須=支払日未入力なら空にして要入力(月だけの値を出さない)
+      return { name:e.name||'', birthYmd:e.birthYmd||'', payDate:payDay||'', tsuka:tsuka, genbutsu:0, goukei:tsuka, hyojun:num(si.hyojun), note:notes.join('／') };
     });
   }
   function bonusHarauAoa(rows){ var aoa=[BONUS_HARAU_COLS]; rows.forEach(function(x){ aoa.push(['', x.name, x.birthYmd, x.payDate, x.tsuka||'', x.genbutsu||0, x.goukei||'', x.hyojun||'', x.note]); }); return aoa; }
@@ -1625,7 +1626,7 @@
   function santeiRows(recs, year, emps){
     var SHH=(typeof SHAKAIHOKEN_HYO!=='undefined')?SHAKAIHOKEN_HYO:(window&&window.SHAKAIHOKEN_HYO);
     var byEmp={}; (recs||[]).forEach(function(r){ var m=parseInt(String(r.ym).slice(5,7),10); if(m<4||m>6)return; var d=r.data||{}; (byEmp[r.employee_id]||(byEmp[r.employee_id]={}))[m]={ days:num(d.paymentDays), pay:num(d.shikyuTotal) }; });
-    return (emps||[]).filter(function(e){ return !e.retired; }).map(function(e){
+    return (emps||[]).filter(function(e){ return isActiveInMonth(e, year+'-07'); }).map(function(e){ // 算定基礎日=7/1の被保険者(退職済/退職日が7月前=除外)。退職判定は在籍単一ソースに統一
       var mo=byEmp[e.id]||{}, months=[4,5,6].map(function(m){ return mo[m]||{days:0,pay:0}; }), th=e.shortTime?11:17;
       var row=santeiKisoRow(months, th);
       var sb=shahoBasisOf(e), prevHoshu=(sb&&sb.hoshu>0)?sb.hoshu:0;
@@ -1665,7 +1666,7 @@
   function gekkakuRows(recs, emps){
     var PC=window.PayrollCalc;
     var byEmp={}; (recs||[]).forEach(function(r){ if((r.data||{}).kind==='bonus')return; (byEmp[r.employee_id]||(byEmp[r.employee_id]={}))[r.ym]={ days:num((r.data||{}).paymentDays), pay:num((r.data||{}).shikyuTotal), has:true }; });
-    return (emps||[]).filter(function(e){ if(e.retired)return false; var s=e.shaho||{}; return !!s.henkoYm && (s.fixedChanged || num(s.prevHyojun)>0); }).map(function(e){
+    return (emps||[]).filter(function(e){ if(!isActiveInMonth(e, state.month))return false; var s=e.shaho||{}; return !!s.henkoYm && (s.fixedChanged || num(s.prevHyojun)>0); }).map(function(e){ // 在籍単一ソースに統一(退職者は随時改定対象外)
       var s=e.shaho||{}, henko=s.henkoYm, th=e.shortTime?11:17;
       var yms=[henko, ymAddLocal(henko,1), ymAddLocal(henko,2)];
       var mo=byEmp[e.id]||{}, months=yms.map(function(ym){ var d=mo[ym]; return { ym:ym, days:d?d.days:0, pay:d?d.pay:0, has:!!d }; });
@@ -1717,14 +1718,16 @@
     });
     return rows;
   }
+  // 労働保険料の端数(労働保険料徴収法)=①賃金総額の1,000円未満切捨→②率を乗じる→③保険料額の1円未満切捨。
+  function roudouRyo(wageTotal, rate){ if(rate==null) return null; var base=Math.floor(wageTotal/1000)*1000; return Math.floor(base*rate); }
   function roudouSummary(recs, fy, emps){
     var rows=roudouRows(recs, fy, emps);
     var rousaiWageTotal=rows.reduce(function(a,x){return a+x.rousaiWage;},0), koyoWageTotal=rows.reduce(function(a,x){return a+x.koyoWage;},0);
     var gyoshu=(state.company||{}).gyoshu||'ippan', k=KH();
     var koyoFull=(k&&k.fullRate)?k.fullRate(gyoshu, fy):null;                  // 雇用保険 全体率(労働者＋事業主・厚労省照合済)。未収録年度=null
-    var koyoRyo=(koyoFull!=null)?Math.round(koyoWageTotal*koyoFull):null;
+    var koyoRyo=roudouRyo(koyoWageTotal, koyoFull);                            // 賃金1000円未満切捨→×率→1円未満切捨
     var rousaiPermil=num((state.company||{}).rousaiRate);                       // 労災率(‰)は業種別=会社入力
-    var rousaiRyo=(rousaiPermil>0)?Math.round(rousaiWageTotal*(rousaiPermil/1000)):null;
+    var rousaiRyo=(rousaiPermil>0)?roudouRyo(rousaiWageTotal, rousaiPermil/1000):null;
     return { rows:rows, fy:fy, rousaiWageTotal:rousaiWageTotal, koyoWageTotal:koyoWageTotal, gyoshu:gyoshu, koyoFull:koyoFull, koyoRyo:koyoRyo, rousaiPermil:rousaiPermil, rousaiRyo:rousaiRyo };
   }
   function roudouAoa(sum, fy){
@@ -1774,15 +1777,17 @@
   function shikakuRows(emps){
     var SHH=(typeof SHAKAIHOKEN_HYO!=='undefined')?SHAKAIHOKEN_HYO:(window&&window.SHAKAIHOKEN_HYO);
     var rows=[];
-    (emps||[]).forEach(function(e){ if(e.payType==='役員')return; // 役員は健保/厚年の被保険者(取得/喪失は同じだが労働者と別・ここは労働者を対象)
+    (emps||[]).forEach(function(e){ var yakuin=(e.payType==='役員'); // 役員も健保・厚年の被保険者=取得/喪失の対象(備考で区別)
       var sb=shahoBasisOf(e), hoshu=(sb&&sb.hoshu>0)?sb.hoshu:0;
       var decH=(SHH&&hoshu)?SHH.gradeOfHealth(hoshu):null, decP=(SHH&&hoshu)?SHH.gradeOf(hoshu):null;
       // 取得届: 入社日あり
-      if(e.joinYmd){ var notesA=[]; if(isKaigoNow(e,e.joinYmd))notesA.push('介護保険 第2号'); if(e.shortTime)notesA.push('短時間労働者'); if(isOver70(e,String(e.joinYmd).slice(0,7)))notesA.push('70歳以上');
+      if(e.joinYmd){ var notesA=[]; if(yakuin)notesA.push('役員'); if(isKaigoNow(e,e.joinYmd))notesA.push('介護保険 第2号'); if(e.shortTime)notesA.push('短時間労働者'); if(isOver70(e,String(e.joinYmd).slice(0,7)))notesA.push('70歳以上');
         rows.push({ kind:'取得', name:e.name||'', birthYmd:e.birthYmd||'', date:e.joinYmd, decH:decH?decH.hyojun:0, decHGrade:decH?decH.tokyu:0, decP:decP?decP.hyojun:0, decPGrade:decP?decP.tokyu:0, reason:'', note:notesA.join('／') }); }
-      // 喪失届: 退職日あり(退職フラグの有無に依らず日付優先)
-      if(e.taishokuYmd){ var lossYmd=ymdPlus1(e.taishokuYmd); var notesL=[]; if(isOver70(e,String(e.taishokuYmd).slice(0,7)))notesL.push('70歳以上');
+      // 喪失届: 退職日あり=喪失日を計算。★退職ボタンだけ(retired)で退職日未入力の人も静かに落とさず、要入力として拾う★
+      if(e.taishokuYmd){ var lossYmd=ymdPlus1(e.taishokuYmd); var notesL=[]; if(yakuin)notesL.push('役員'); if(isOver70(e,String(e.taishokuYmd).slice(0,7)))notesL.push('70歳以上');
         rows.push({ kind:'喪失', name:e.name||'', birthYmd:e.birthYmd||'', date:lossYmd, decH:0, decHGrade:0, decP:0, decPGrade:0, reason:'退職等', note:notesL.join('／') }); }
+      else if(e.retired){ var notesR=[]; if(yakuin)notesR.push('役員'); notesR.push('退職日を入力してください'); // retired=trueだが退職日未入力→喪失届が漏れないよう要入力で表示
+        rows.push({ kind:'喪失', name:e.name||'', birthYmd:e.birthYmd||'', date:'', decH:0, decHGrade:0, decP:0, decPGrade:0, reason:'退職等', note:notesR.join('／') }); }
     });
     return rows;
   }
@@ -2027,9 +2032,12 @@
   //  出典=地方税法317条の6(給与支払報告書)。★本人交付用と同様マイナンバー(個人番号)は扱わない=各自記入。市区町村は住所から自動抽出(要確認)。
   function extractCity(addr){
     var s=String(addr||'').trim(); if(!s) return '（住所未登録）';
-    s=s.replace(/^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/, ''); // 都道府県を除去
-    var m=/^.+?[市区町村]/.exec(s);                              // 先頭から最初の市区町村字まで(政令市は市が区より先=市に寄る)
-    return m ? m[0] : (s || '（住所未登録）');
+    var pref='', pm=/^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/.exec(s);
+    if(pm){ pref=pm[0]; s=s.slice(pref.length); } // 都道府県は残して同名別自治体(東京都府中市↔広島県府中市)を区別
+    // ★市を貪欲に取る=名称途中に市を含む市(四日市市/廿日市市/野々市市)が切れない。政令市「◯◯市××区」は市に寄る(給与支払報告書の提出先は市)。市→区→町→村の順。
+    var m=/^.+市/.exec(s) || /^.+区/.exec(s) || /^.+町/.exec(s) || /^.+村/.exec(s);
+    var city=m ? m[0] : (s || '（住所未登録）');
+    return pref+city;
   }
   var GYOYO_COLS=['提出先 市区町村','受給者番号','氏名','生年月日','住所','種別','支払金額','給与所得控除後の金額','所得控除の額の合計額','源泉徴収税額','社会保険料等の金額','生命保険料の控除額','地震保険料の控除額','配偶者(特別)控除の額','扶養(特定)','扶養(老人)','扶養(その他)','基礎控除の額','特定親族特別控除の額','住宅借入金等特別控除の額','摘要'];
   function gyoyoRows(recs, year, emps){
@@ -2617,7 +2625,7 @@
       var dl=e.target.closest('[data-choxlsx]'); if(dl){ downloadChoXlsx(dl.dataset.choxlsx); return; } });
     if(vcho) vcho.addEventListener('input',function(e){ var rr=e.target.closest('[data-rousai-rate]'); if(!rr)return; // 労災率(‰)入力→労災保険料だけ即時再計算(集計は再取得しない=入力フォーカス維持)
       if(!state.company)state.company={}; state.company.rousaiRate=rr.value.replace(/[^0-9.]/g,''); if(window.persistSaveDebounced)persistSaveDebounced();
-      var s=state._roudouSum; if(s){ var p=num(state.company.rousaiRate); s.rousaiPermil=p; s.rousaiRyo=(p>0)?Math.round(s.rousaiWageTotal*(p/1000)):null; var b=$('#roudou-rousai-ryo'); if(b) b.textContent=(s.rousaiRyo!=null?yen(s.rousaiRyo):'—'); } });
+      var s=state._roudouSum; if(s){ var p=num(state.company.rousaiRate); s.rousaiPermil=p; s.rousaiRyo=(p>0)?roudouRyo(s.rousaiWageTotal, p/1000):null; var b=$('#roudou-rousai-ryo'); if(b) b.textContent=(s.rousaiRyo!=null?yen(s.rousaiRyo):'—'); } });
     $('#view-list').addEventListener('click',function(e){ var tg=e.target.closest('[data-ltoggle]'); if(!tg)return; var id=tg.dataset.ltoggle; state.open['L'+id]=!state.open['L'+id]; $('#view-list .acc[data-lid="'+id+'"]').classList.toggle('open'); });
 
     // 印刷
