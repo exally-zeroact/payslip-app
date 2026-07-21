@@ -230,9 +230,31 @@ T('算定基礎届の算定: 4-6月の17日以上の月を平均→標準報酬3
   near(r2.heikin, 300000, 0, '17日未満(4月)を除外→平均30万');
   ok(r2.count === 2 && r2.allQualify === false, '該当は2か月');
   near(r2.decPension, 300000, 0, '除外後も標準報酬30万');
-  // 短時間労働者=11日基準
+  // 短時間労働者(社保)=11日基準
   const r3 = A.santeiKisoRow([{ days: 12, pay: 150000 }, { days: 13, pay: 152000 }, { days: 10, pay: 100000 }], 11);
   ok(r3.count === 2, '短時間11日基準で10日の月は除外(2か月)');
+});
+
+// ── ⑧g ★勤務区分3種の支払基礎日数(日本年金機構)★: 通常17日/パート15日特例/短時間労働者11日 ──
+T('勤務区分: santeiRule/gekkakuTh/shahoBasisOf が区分ごとに正しい日数基準', function () {
+  // 区分ごとの算定基礎ルール
+  const gen = A.santeiRule({ shortTimeType: '' });
+  const part = A.santeiRule({ shortTimeType: 'part' });
+  const tan = A.santeiRule({ shortTimeType: 'tanjikan' });
+  ok(gen.primary === 17 && !gen.fallback, '通常=17日(特例なし)');
+  ok(part.primary === 17 && part.fallback === 15, 'パート=17日・無ければ15日特例');
+  ok(tan.primary === 11, '短時間労働者(社保)=11日');
+  // 随時改定: 短時間労働者のみ11日・パートは17日(15日特例なし)
+  ok(A.gekkakuTh({ shortTimeType: 'tanjikan' }) === 11, '月変 短時間労働者=11日');
+  ok(A.gekkakuTh({ shortTimeType: 'part' }) === 17, '月変 パート=17日(月変に15日特例なし)');
+  ok(A.gekkakuTh({ shortTimeType: '' }) === 17, '月変 通常=17日');
+  // ★パート15日特例の実挙動: 3か月とも17日未満だが16日・15日の月があれば その月で平均★
+  const months = [{ days: 16, pay: 200000 }, { days: 15, pay: 200000 }, { days: 10, pay: 100000 }];
+  const rPart = A.santeiKisoRow(months, part.primary, part.fallback); // 17→無し→15以上=16日/15日の2か月
+  ok(rPart.count === 2 && rPart.heikin === 200000, 'パート特例: 17日無し→15日以上の2か月で平均20万: ' + rPart.count + '/' + rPart.heikin);
+  // 同じ月を通常(17日・特例なし)で見ると、17日以上ゼロ→有るデータ全月(3か月)で平均
+  const rGen = A.santeiKisoRow(months, gen.primary, gen.fallback);
+  ok(rGen.count === 3, '通常: 17日以上が無い→全データ月で(要確認)3か月: ' + rGen.count);
 });
 
 // ── ⑨ 入退社の日割 ──

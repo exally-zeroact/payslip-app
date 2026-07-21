@@ -33,6 +33,7 @@
   // 保存/クラウドから読んだ従業員に既定値をマージ(会社と同じ防御)。旧保存で欠けた新項目をundefinedにしない=将来のクラッシュ防止(D2)。
   //  ネストも既定で埋める(warimashi/shaho)=浅いassignだけだと部分オブジェクトが残るため。
   function mergeEmp(x){ var e=Object.assign(defEmp(), x||{});
+    if(!e.shortTimeType && x && x.shortTime===true) e.shortTimeType='part'; // 旧shortTime(真偽・UIは15日表示)→短時間就労者(パート・15日特例)へ移行
     var d=defEmp(); e.warimashi=Object.assign({}, d.warimashi, x&&x.warimashi); if(e.warimashi&&!e.warimashi.detail) e.warimashi.detail=d.warimashi.detail;
     e.shaho=Object.assign({}, d.shaho, x&&x.shaho); if(!Array.isArray(e.shaho.months)) e.shaho.months=d.shaho.months;
     if(!Array.isArray(e.kintai)) e.kintai=d.kintai; if(!Array.isArray(e.shikyu)) e.shikyu=d.shikyu; if(!Array.isArray(e.extraKojo)) e.extraKojo=[];
@@ -208,7 +209,7 @@
       annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0', dailyEntries:[],
       kintai:[{label:'出勤日数',value:'21'},{label:'欠勤日数',value:'0'},{label:'有給取得',value:'1'}],
       shikyu:[{label:'基本給',value:'250000'},{label:'住宅手当',value:'10000'}],
-      apply:{}, taxClass:'ko', honninShogai:false, honninKafuHitorioya:'', honninKinrou:false, retired:false, workStatus:'normal', leavePay:'', leaveStartYmd:'', leaveEndYmd:'', leaveDaysInMonth:'',
+      apply:{}, taxClass:'ko', honninShogai:false, honninKafuHitorioya:'', honninKinrou:false, shortTimeType:'', retired:false, workStatus:'normal', leavePay:'', leaveStartYmd:'', leaveEndYmd:'', leaveDaysInMonth:'',
       warimashi:{ mode:'easy', otH:'', otM:'', nightH:'', nightM:'', holidayH:'', holidayM:'',
         detail:{ ot:{h:'',m:''}, otNight:{h:'',m:''}, over60:{h:'',m:''}, over60Night:{h:'',m:''}, night:{h:'',m:''}, holiday:{h:'',m:''}, holidayNight:{h:'',m:''} } },
       wbInclude:[], wbExclude:[],
@@ -242,7 +243,12 @@
     if(v>0){ if(idx<0) e.shikyu.push({label:'通勤手当',value:String(v),hikazei:true,nonTaxLimit:lim}); else { e.shikyu[idx].value=String(v); e.shikyu[idx].hikazei=true; e.shikyu[idx].nonTaxLimit=lim; } }
     else if(idx>=0) e.shikyu.splice(idx,1);
   }
-  function shahoBasisOf(e){ var s=e.shaho||{}; return PayslipCalc.shahoBase({ mode:s.mode||'teiji', months:s.months||[], mikomi:s.mikomi, value:s.manual, threshold:e.shortTime?15:17 }); }
+  // 支払基礎日数の区分(日本年金機構)。一般=17日/短時間就労者(パート)=17日、3か月とも17日未満なら15日以上の月/短時間労働者(特定適用の社保加入)=11日。
+  function stType(e){ return (e&&e.shortTimeType)||''; }
+  function stLabel(e){ var t=stType(e); return t==='tanjikan'?'短時間労働者（社保）':t==='part'?'短時間就労者（パート）':''; }
+  function santeiRule(e){ var t=stType(e); return t==='tanjikan'?{primary:11,fallback:0}:t==='part'?{primary:17,fallback:15}:{primary:17,fallback:0}; } // 算定基礎(定時決定)の日数基準
+  function gekkakuTh(e){ return stType(e)==='tanjikan'?11:17; } // 随時改定は17日(短時間労働者のみ11日・パートの15日特例は無い)
+  function shahoBasisOf(e){ var s=e.shaho||{}, t=stType(e), th=(t==='tanjikan'?11:t==='part'?15:17); return PayslipCalc.shahoBase({ mode:s.mode||'teiji', months:s.months||[], mikomi:s.mikomi, value:s.manual, threshold:th }); }
   // 割増基礎に入れるか（割増賃金は常に除外／明示include優先／明示exclude／既定は通勤・家族を除外＝実態の暫定）
   function isInBasis(e,label){
     label=label||''; if(/割増|残業|時間外|深夜|休日(出勤)?手当/.test(label)) return false; // 自動計算する割増系は単価基礎に入れない(二重防止)
@@ -810,13 +816,15 @@
   function shahoSection(e){
     var s=e.shaho||{mode:'auto',months:[]}; var mode=s.mode||'auto';
     var r=compute(e), sb=shahoBasisOf(e);
-    var th=e.shortTime?15:17;
     // 2段: 既定は「自動(基本給から)」を主役に。他4モードは「詳しく」を開いた時だけ(既に詳細選択済なら開いて表示)
     var shdOpen = !!(state.open&&state.open['SHD'+e.id]) || mode!=='auto';
     var seg;
     if(shdOpen){
       seg='<div class="sh-seg">'+SH_MODES.map(function(m){return '<b class="sh-mode'+(mode===m[0]?' on':'')+'" data-mode="'+m[0]+'">'+m[1]+'<span class="j">'+m[2]+'</span></b>';}).join('')+'</div>';
-      seg+='<div class="chip-row" style="margin:-2px 0 8px"><span class="chip'+(e.shortTime?' on':'')+'" data-short="1">'+(e.shortTime?'✓ ':'')+'短時間労働者（定時決定は'+th+'日）</span></div>';
+      // 支払基礎日数の区分(算定基礎届・月額変更届の日数基準が変わる)。通常17日/パート=17日(なければ15日)/短時間労働者(社保)=11日
+      seg+='<div class="chip-row" style="margin:-2px 0 4px"><span style="font-size:11px;color:#3D6B53;font-weight:700;margin-right:2px">勤務区分</span>'
+        +[['','通常（17日）'],['part','短時間就労者・パート（15日特例）'],['tanjikan','短時間労働者・社保（11日）']].map(function(o){ var on=(stType(e)===o[0]); return '<span class="chip'+(on?' on':'')+'" data-sttype="'+o[0]+'">'+(on?'✓ ':'')+o[1]+'</span>'; }).join('')+'</div>'
+        +'<div class="hint" style="margin:0 2px 8px;font-size:10px;color:#527A66">算定基礎届・月額変更届の支払基礎日数の基準が変わります（通常17日／パートは17日、無ければ15日／社保の短時間被保険者は11日）。</div>';
     } else {
       seg='<div class="sh-auto-lead">✓ 標準報酬は<b>基本給から自動</b>で計算（見込み・4〜6月の入力は不要）</div>'
         +'<div class="sh-dtgl" data-shd="'+e.id+'">詳しく（定時決定・入社時・随時改定・直接入力）<span class="mco-cv" style="margin-left:6px">▾</span></div>';
@@ -827,6 +835,7 @@
       body+='<div class="sh-tip">入力した<b>基本給＋手当（通勤含む）</b>から標準報酬を自動で当て、社会保険を計算します。<b>見込みや4〜6月の入力は不要</b>。正式な決定額があれば右の他タブで上書きできます。</div>';
     } else if(mode==='teiji'||mode==='zuiji'){
       var ms=s.months||[]; var labels=mode==='teiji'?['4月','5月','6月']:['1か月目','2か月目','3か月目'];
+      var th=(stType(e)==='tanjikan'?11:stType(e)==='part'?15:17); // shahoBasisOfと同じ支払基礎日数のしきい値(除外表示用)
       body+='<div class="sh-tip">'+(mode==='teiji'?'4・5・6月の<b>総支給額</b>(手当含む・賞与除く)と<b>支払基礎日数</b>。月給は原則その月の暦日数。':'昇給/降給後の<b>連続3か月</b>を入力。')+'<b>'+th+'日未満の月は自動で除外</b>。</div>';
       body+='<div class="f3">'+labels.map(function(lab,k){var mm=ms[k]||{};var ex=(num(mm.days)>0&&num(mm.days)<th);return '<div class="mcol'+(ex?' ex':'')+'"><div class="mlb">'+lab+'</div><input class="finput num sh-pay" data-k="'+k+'" value="'+attr(mm.pay)+'" placeholder="総支給"><div class="drow"><span>支払基礎日数</span><input class="dinp sh-days" data-k="'+k+'" value="'+attr(mm.days)+'"></div></div>';}).join('')+'</div>';
       if(sb.excluded&&sb.excluded.length) body+='<div class="exinfo">✓ '+sb.excluded.map(function(x){return labels[x];}).join('・')+'は支払基礎日数が'+th+'日未満のため<b>ルール上この月を計算から外しました</b>（あなたのミスではありません）。残りの月の平均で算定します。</div>';
@@ -1575,11 +1584,12 @@
   /* ---------- 算定基礎届(定時決定・4〜6月→標準報酬) ---------- */
   // 算定の核: 4〜6月の{days,pay}から、支払基礎日数がthreshold(17・短時間11)以上の月だけ平均→報酬月額→標準報酬(健保/厚年)。
   //  出典=日本年金機構「被保険者報酬月額算定基礎届」(17日以上の月の報酬合計÷該当月数=平均額→標準報酬月額表)。
-  function santeiKisoRow(months, threshold){
+  function santeiKisoRow(months, threshold, fallback){
     var SHH=(typeof SHAKAIHOKEN_HYO!=='undefined')?SHAKAIHOKEN_HYO:(window&&window.SHAKAIHOKEN_HYO);
     var withData=months.filter(function(m){ return num(m.days)>0 || num(m.pay)>0; });
     var qualifying=months.filter(function(m){ return num(m.days)>=threshold; });
-    var use = qualifying.length ? qualifying : withData; // 17日以上が1つも無ければ有る月で(要確認・実務は個別対応)
+    if(!qualifying.length && fallback>0){ qualifying=months.filter(function(m){ return num(m.days)>=fallback; }); } // パート短時間就労者=17日が無ければ15日以上の月(年金機構の特例)
+    var use = qualifying.length ? qualifying : withData; // それも無ければ有る月で(要確認・実務は個別対応)
     var soukei=use.reduce(function(a,m){ return a+num(m.pay); },0);
     var cnt=use.length;
     var heikin = cnt ? Math.floor(soukei/cnt) : 0; // 平均額=総計÷該当月数(円未満切捨)
@@ -1631,11 +1641,11 @@
     var SHH=(typeof SHAKAIHOKEN_HYO!=='undefined')?SHAKAIHOKEN_HYO:(window&&window.SHAKAIHOKEN_HYO);
     var byEmp={}; (recs||[]).forEach(function(r){ var m=parseInt(String(r.ym).slice(5,7),10); if(m<4||m>6)return; var d=r.data||{}; (byEmp[r.employee_id]||(byEmp[r.employee_id]={}))[m]={ days:num(d.paymentDays), pay:num(d.shikyuTotal) }; });
     return (emps||[]).filter(function(e){ return isActiveInMonth(e, year+'-07'); }).map(function(e){ // 算定基礎日=7/1の被保険者(退職済/退職日が7月前=除外)。退職判定は在籍単一ソースに統一
-      var mo=byEmp[e.id]||{}, months=[4,5,6].map(function(m){ return mo[m]||{days:0,pay:0}; }), th=e.shortTime?11:17;
-      var row=santeiKisoRow(months, th);
+      var mo=byEmp[e.id]||{}, months=[4,5,6].map(function(m){ return mo[m]||{days:0,pay:0}; }), rule=santeiRule(e);
+      var row=santeiKisoRow(months, rule.primary, rule.fallback);
       var sb=shahoBasisOf(e), prevHoshu=(sb&&sb.hoshu>0)?sb.hoshu:0;
       var prevP=(SHH&&prevHoshu)?SHH.gradeOf(prevHoshu).hyojun:0, prevH=(SHH&&prevHoshu)?SHH.gradeOfHealth(prevHoshu).hyojun:0;
-      var notes=[]; if(e.shortTime)notes.push('短時間労働者'); if(isOver70(e,year+'-07'))notes.push('70歳以上'); if(row.noQualify)notes.push('17日以上の月なし=要確認');
+      var notes=[]; if(stLabel(e))notes.push(stLabel(e)); if(isOver70(e,year+'-07'))notes.push('70歳以上'); if(row.noQualify)notes.push(rule.primary+'日以上の月なし=要確認');
       var hasData=months.some(function(m){return m.days>0||m.pay>0;});
       return { emp:e, name:e.name||'', birthYmd:e.birthYmd||'', months:months, prevH:prevH, prevP:prevP, r:row, note:notes.join('／'), hasData:hasData };
     });
@@ -1671,7 +1681,7 @@
     var PC=window.PayrollCalc;
     var byEmp={}; (recs||[]).forEach(function(r){ if((r.data||{}).kind==='bonus')return; (byEmp[r.employee_id]||(byEmp[r.employee_id]={}))[r.ym]={ days:num((r.data||{}).paymentDays), pay:num((r.data||{}).shikyuTotal), has:true }; });
     return (emps||[]).filter(function(e){ if(!isActiveInMonth(e, state.month))return false; var s=e.shaho||{}; return !!s.henkoYm && (s.fixedChanged || num(s.prevHyojun)>0); }).map(function(e){ // 在籍単一ソースに統一(退職者は随時改定対象外)
-      var s=e.shaho||{}, henko=s.henkoYm, th=e.shortTime?11:17;
+      var s=e.shaho||{}, henko=s.henkoYm, th=gekkakuTh(e);
       var yms=[henko, ymAddLocal(henko,1), ymAddLocal(henko,2)];
       var mo=byEmp[e.id]||{}, months=yms.map(function(ym){ var d=mo[ym]; return { ym:ym, days:d?d.days:0, pay:d?d.pay:0, has:!!d }; });
       var prevHyojun=num(s.prevHyojun)>0?num(s.prevHyojun):((shahoBasisOf(e)||{}).hoshu||0);
@@ -1785,7 +1795,7 @@
       var sb=shahoBasisOf(e), hoshu=(sb&&sb.hoshu>0)?sb.hoshu:0;
       var decH=(SHH&&hoshu)?SHH.gradeOfHealth(hoshu):null, decP=(SHH&&hoshu)?SHH.gradeOf(hoshu):null;
       // 取得届: 入社日あり
-      if(e.joinYmd){ var notesA=[]; if(yakuin)notesA.push('役員'); if(isKaigoNow(e,e.joinYmd))notesA.push('介護保険 第2号'); if(e.shortTime)notesA.push('短時間労働者'); if(isOver70(e,String(e.joinYmd).slice(0,7)))notesA.push('70歳以上');
+      if(e.joinYmd){ var notesA=[]; if(yakuin)notesA.push('役員'); if(isKaigoNow(e,e.joinYmd))notesA.push('介護保険 第2号'); if(stLabel(e))notesA.push(stLabel(e)); if(isOver70(e,String(e.joinYmd).slice(0,7)))notesA.push('70歳以上');
         rows.push({ kind:'取得', name:e.name||'', birthYmd:e.birthYmd||'', date:e.joinYmd, decH:decH?decH.hyojun:0, decHGrade:decH?decH.tokyu:0, decP:decP?decP.hyojun:0, decPGrade:decP?decP.tokyu:0, reason:'', note:notesA.join('／') }); }
       // 喪失届: 退職日あり=喪失日を計算。★退職ボタンだけ(retired)で退職日未入力の人も静かに落とさず、要入力として拾う★
       if(e.taishokuYmd){ var lossYmd=ymdPlus1(e.taishokuYmd); var notesL=[]; if(yakuin)notesL.push('役員'); if(isOver70(e,String(e.taishokuYmd).slice(0,7)))notesL.push('70歳以上');
@@ -2490,7 +2500,7 @@
       var sm=ev.target.closest('.sh-mode'); if(sm){ if(!emp.shaho)emp.shaho={months:[]}; emp.shaho.mode=sm.dataset.mode; if(sm.dataset.mode==='auto'&&state.open){ delete state.open['SHD'+emp.id]; } /* 自動選択で「詳しく」を畳む */ if(sm.dataset.mode==='teiji'){ autoFillTeijiMonths(emp, renderEmpMaster); } else { renderEmpMaster(); } return; }
       if(ev.target.dataset.refetch){ autoFillTeijiMonths(emp, renderEmpMaster); return; }
       if(ev.target.dataset.apply){ var ak=ev.target.dataset.apply; if(!emp.apply)emp.apply={}; emp.apply[ak]=(emp.apply[ak]===false)?true:false; renderEmpMaster(); return; }
-      if(ev.target.dataset.short){ emp.shortTime=!emp.shortTime; renderEmpMaster(); return; }
+      if(ev.target.dataset.sttype!=null){ emp.shortTimeType=ev.target.dataset.sttype; delete emp.shortTime; renderEmpMaster(); return; } // 勤務区分(通常/パート/短時間労働者)
       var shfx=ev.target.closest('[data-shfixed]'); if(shfx){ if(!emp.shaho)emp.shaho={months:[]}; emp.shaho.fixedChanged=(shfx.dataset.v==='1'); renderEmpMaster(); return; } // 固定給変動 はい/いいえ
       if(ev.target.dataset.rtik){ emp.residentTaxIkkatsu=!emp.residentTaxIkkatsu; renderEmpMaster(); return; }
       if(ev.target.dataset.taxc){ emp.taxClass=ev.target.dataset.taxc; renderEmpMaster(); return; }
@@ -2792,7 +2802,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, ymdPlus1:ymdPlus1, shikakuRows:shikakuRows, shikakuAoa:shikakuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, stType:stType, stLabel:stLabel, santeiRule:santeiRule, gekkakuTh:gekkakuTh, shahoBasisOf:shahoBasisOf, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, ymdPlus1:ymdPlus1, shikakuRows:shikakuRows, shikakuAoa:shikakuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';
