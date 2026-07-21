@@ -282,6 +282,24 @@ T('最賃チェック: 基本給＋算入手当で判定(通勤/家族/皆勤/�
   ok(t === 20000, 'minWageTeate=役職2万のみ(通勤/皆勤/基本給は除外): ' + t);
 });
 
+// ── ⑧i ★最賃 減額の特例(最賃法7条・労働局長許可)★: 許可された減額率で判定を下げる ──
+T('最賃 減額特例: 減額率%で最賃を下げて判定(円未満切上げ・労働者有利)', function () {
+  // 東京1226円・基本給175,000月給→時給約1071=通常なら最賃割れ
+  const base = '175000';
+  const noRed = A.minWageInfo(emp({ payType: '月給', base, shikyu: [{ label: '基本給', value: base }] }));
+  ok(noRed && !noRed.ok && noRed.reduce === 0, '減額率0=通常判定→最賃割れ(約' + (noRed && noRed.hourly) + ')');
+  // 減額率20%→減額後最賃=ceil(1226×0.8)=ceil(980.8)=981円。時給約1071≥981→クリア
+  const red20 = A.minWageInfo(emp({ payType: '月給', base, minWageReduce: '20', shikyu: [{ label: '基本給', value: base }] }));
+  ok(red20 && red20.effMinWage === 981, '減額後最賃=ceil(1226×0.8)=981(円未満切上げ): ' + (red20 && red20.effMinWage));
+  ok(red20 && red20.ok && red20.reduce === 20, '減額特例20%→最賃クリア(時給約' + (red20 && red20.hourly) + '≥981)');
+  // 減額率10%→減額後最賃=ceil(1226×0.9)=ceil(1103.4)=1104。時給約1071<1104→まだ割れ
+  const red10 = A.minWageInfo(emp({ payType: '月給', base, minWageReduce: '10', shikyu: [{ label: '基本給', value: base }] }));
+  ok(red10 && red10.effMinWage === 1104 && !red10.ok, '減額10%=ceil(1226×0.9)=1104→時給1071ではまだ割れ: ' + (red10 && red10.effMinWage));
+  // 率は0-100にクランプ(異常入力)
+  const over = A.minWageInfo(emp({ payType: '月給', base, minWageReduce: '150', shikyu: [{ label: '基本給', value: base }] }));
+  ok(over && over.reduce === 100 && over.effMinWage === 0, '率150→100にクランプ・減額後最賃0: ' + (over && over.effMinWage));
+});
+
 // ── ⑨ 入退社の日割 ──
 T('入退社: 月途中入社/退職で基本給が日割になる', function () {
   const full = A.compute(emp({ payType: '月給', base: '300000' }));

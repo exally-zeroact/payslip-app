@@ -124,6 +124,7 @@
     paymentDays:{ t:'💡 支払基礎日数の数え方', b:'社会保険の<b>定時決定（毎年4〜6月）</b>で「支払基礎日数17日以上の月」を平均して標準報酬を決めます。その日数の数え方です。\n\n● 年金機構の一般扱い＝<b>月給は暦日数／日給・時給は出勤日数</b>。\n● 会社の運用に合わせて変更できます（暦日数／所定労働日数／出勤日数）。' },
     kekkin:{ t:'💡 欠勤控除の計算', b:'月給は<b>日給月給制（欠勤分を控除）が標準</b>です（民法624条 ノーワーク・ノーペイ）。\n\n● 10日欠勤すれば10日分減ります。1日あたり＝<b>月給÷分母×欠勤日数</b>。\n● 分母＝月平均所定労働日数（既定）／当月の暦日数／当月の所定労働日数 から選べます。\n● 役員等で減額しない場合のみ「<b>完全月給制</b>」に。\n● 時給・日給は元々 日数・時間で按分されます。' },
     daikyu:{ t:'💡 代休・振替休日の使い分け', b:'<b>振替休日</b>＝事前に休日と労働日を入れ替え。その出勤は<b>通常労働（割増なし）</b>。割増の「法定休日」に入れず、ふつうの労働時間に入れてください（週40時間を超えた分だけ時間外1.25倍）。\n\n<b>代休</b>＝先に休日労働→後で別の日に休む。休日労働は<b>割増あり</b>（法定休日1.35倍／所定休日は時間外1.25倍）。休む日は入力の「代休取得」へ。\n\n代休で休む日を無給にするか（日給制向け）有給にするか（月給は相殺）は会社規程によります。「代休で休んだ日を出勤から差し引く」をオンにすると出勤から控除します。' },
+    saiteigengaku:{ t:'💡 最低賃金の減額の特例', b:'一定の労働者は、<b>都道府県労働局長の許可</b>があれば最低賃金を一定率まで<b>減額</b>できます（最賃法7条）。\n\n<b>対象（5区分）</b>\n● 精神・身体の障害により著しく労働能力の低い方\n● 試用期間中の方\n● 認定職業訓練を受けている方（基礎的な技能習得中）\n● 軽易な業務に従事する方\n● 断続的労働に従事する方\n\n<b>使い方</b>…<b>許可を受けている場合だけ</b>、許可された<b>減額率（％）</b>を入れます。判定は「最低賃金×（1−率）」（円未満切上げ・労働者有利）で行います。\n\n※許可が無い場合は空欄（0）のまま。率は会社が勝手に決めるものではなく、労働局長の審査で決まります。' },
     juminzei:{ t:'💡 住民税（市区町村の税金）', b:'住民税は前年の所得に応じて<b>市区町村が金額を決める</b>税金です。自分で計算する必要はありません。\n\n● 毎年5〜6月ごろ、市区町村から会社へ<b>「特別徴収税額の決定通知書」</b>が届きます。その<b>月額をそのまま入力</b>します（6月〜翌5月の12か月分・端数は6月に寄せます）。\n● <b>特別徴収</b>＝会社が給与から天引きして納める（原則こちら）。\n● <b>普通徴収</b>＝本人が自分で納める。\n\n※入社直後や設立直後で通知書がまだ無いときは<b>0円のままでOK</b>（通知が来たら入れます）。「年額から自動」を選ぶと年額を12分割した概算を出しますが、正は通知書の額です。' },
     chingindaicho:{ t:'💡 賃金台帳とは？', b:'賃金台帳は、従業員ごとに毎月の<b>労働時間・支給・控除</b>を記録する帳簿で、<b>労働基準法108条</b>で作成・保存が義務づけられています（賃金台帳・出勤簿・労働者名簿で「法定三帳簿」）。\n\n● 各月を入力タブで<b>「今月を確定」</b>すると、その月がこの台帳に自動で入ります。\n● Excelで出力して保存・提出できます。\n\n※未確定（下書き）の月は台帳に載りません。確定した月だけが記録されます。' },
     santeikiso:{ t:'💡 算定基礎届とは？', b:'算定基礎届は、毎年<b>7月10日まで</b>に日本年金機構へ出す届で、<b>4〜6月の給与</b>から社会保険の「標準報酬月額」（保険料計算のものさし）を決め直すものです（その年9月〜翌8月に適用）。\n\nこの一覧は、その届出や<b>納付額の確認の“素”</b>として使えます（正式な届出書そのものの作成はしません）。' },
@@ -192,10 +193,14 @@
     else if(e.payType==='カスタム'){ var wmc=workedMin(e); var prc=payRuleResult(e); var bpc=prc?prc.base:0; hourly= (wmc>0? bpc/(wmc/60) : 0)+teateHourly; } // カスタム=基本給÷総労働時間
     else { hourly= (stdH>0? num(e.base)/stdH : 0)+teateHourly; } // 月給=基本給÷月平均所定時間＋算入手当
     hourly=Math.floor(hourly);
-    return { hourly:hourly, minWage:mw, prefName:((S.todofuken||{})[e.pref]||{}).name||'', ok:(hourly===0||hourly>=mw), teate:teate, stale:(S.saiteiStale?S.saiteiStale(state.month):false) };
+    // 減額の特例(最賃法7条・労働局長許可): 障害者/試用期間/認定職業訓練/軽易業務/断続的労働。許可された減額率(%)で最賃を下げて判定。
+    //  減額後最賃=最賃×(1−率)を円未満切り上げ(労働者有利・記入要領)。率は会社が許可どおり入力。
+    var reduce=Math.max(0, Math.min(100, num(e.minWageReduce)));
+    var effMw = reduce>0 ? Math.ceil(mw*(100-reduce)/100) : mw;
+    return { hourly:hourly, minWage:mw, effMinWage:effMw, reduce:reduce, prefName:((S.todofuken||{})[e.pref]||{}).name||'', ok:(hourly===0||hourly>=effMw), teate:teate, stale:(S.saiteiStale?S.saiteiStale(state.month):false) };
   }
   // 最賃割れのtooltip/説明文(表ビューの⚠とカードのバナーで文面を統一)。製品方針=黄色・非ブロック・具体的に伝える。
-  function mwWarnText(mw){ return '最低賃金（'+esc(mw.prefName)+'：時給'+fmtN(mw.minWage)+'円）を下回っています（約'+fmtN(mw.hourly)+'円）'; }
+  function mwWarnText(mw){ var v=(mw.reduce>0)?mw.effMinWage:mw.minWage, sfx=(mw.reduce>0)?'（減額特例'+fmtN(mw.reduce)+'%後）':''; return '最低賃金（'+esc(mw.prefName)+'：時給'+fmtN(v)+'円'+sfx+'）を下回っています（約'+fmtN(mw.hourly)+'円）'; }
   // 対象月の法定値(社保料率・所得税額表・最低賃金)が未収録年度なら暫定計算の黄警告(silent-wrong防止)。値は捏造せず直近収録値で暫定。
   function statutoryStaleWarn(){
     var msgs=[]; var S=SHH();
@@ -207,7 +212,7 @@
   }
   // 経理向け警告(最賃割れ/差引マイナス/休業手当未入力)。従業員に渡す明細でなく集計/Excelに出す。
   function empWarnings(e){
-    var w=[]; var mw=minWageInfo(e); if(mw&&!mw.ok) w.push('最低賃金（'+mw.prefName+' 時給'+fmtN(mw.minWage)+'円）未満（約'+fmtN(mw.hourly)+'円）');
+    var w=[]; var mw=minWageInfo(e); if(mw&&!mw.ok) w.push('最低賃金（'+mw.prefName+' 時給'+fmtN(mw.reduce>0?mw.effMinWage:mw.minWage)+'円'+(mw.reduce>0?'・減額特例'+fmtN(mw.reduce)+'%後':'')+'）未満（約'+fmtN(mw.hourly)+'円）');
     try{ var r=compute(e); if(r&&r.netNegative) w.push('差引支給がマイナス'); }catch(_){}
     if(e.workStatus==='kyugyo'&&num(e.leavePay)<=0) w.push('休業手当が未入力（平均賃金60%以上・労基26条）');
     return w;
@@ -226,7 +231,7 @@
       annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0', dailyEntries:[],
       kintai:[{label:'出勤日数',value:'21'},{label:'欠勤日数',value:'0'},{label:'有給取得',value:'1'}],
       shikyu:[{label:'基本給',value:'250000'},{label:'住宅手当',value:'10000'}],
-      apply:{}, taxClass:'ko', honninShogai:false, honninKafuHitorioya:'', honninKinrou:false, shortTimeType:'', retired:false, workStatus:'normal', leavePay:'', leaveStartYmd:'', leaveEndYmd:'', leaveDaysInMonth:'',
+      apply:{}, taxClass:'ko', honninShogai:false, honninKafuHitorioya:'', honninKinrou:false, shortTimeType:'', minWageReduce:'', retired:false, workStatus:'normal', leavePay:'', leaveStartYmd:'', leaveEndYmd:'', leaveDaysInMonth:'',
       warimashi:{ mode:'easy', otH:'', otM:'', nightH:'', nightM:'', holidayH:'', holidayM:'',
         detail:{ ot:{h:'',m:''}, otNight:{h:'',m:''}, over60:{h:'',m:''}, over60Night:{h:'',m:''}, night:{h:'',m:''}, holiday:{h:'',m:''}, holidayNight:{h:'',m:''} } },
       wbInclude:[], wbExclude:[],
@@ -724,7 +729,12 @@
           +(e.payType==='歩合'?'<div class="ri-note" style="margin:-4px 2px 8px">歩合給額は毎月「入力」タブで。基本給＝歩合実績と保障給（保障時給×総労働時間）の高い方（労基27条）。割増は歩合給÷総労働時間に上乗せ。</div>':''))
       +parseRow(e,i)
       +payPatternRow(e,i)
-      +(function(){ var mw=minWageInfo(e); if(!mw||mw.ok) return ''; return '<div class="cr-warn" style="margin:0 2px 8px">⚠ 最低賃金（'+esc(mw.prefName)+' 時給'+fmtN(mw.minWage)+'円）を下回っています（約'+fmtN(mw.hourly)+'円）</div>'; })()
+      +(function(){ var mw=minWageInfo(e); if(!mw) return '';
+        var banner = mw.ok ? '' : '<div class="cr-warn" style="margin:0 2px 8px">⚠ '+mwWarnText(mw)+'</div>';
+        // 減額特例(最賃法7条・労働局長許可)の入力=最賃割れ警告が出ている時 or 既に率が入っている時だけ薄く出す(通常は非表示=クラッターにしない)
+        var showReduce = (!mw.ok) || num(e.minWageReduce)>0;
+        var reduceRow = showReduce ? '<div class="frow" style="margin:0 2px 8px"><div class="flabel">最賃 減額特例<span class="hint2">%・労働局長の許可がある場合のみ</span><span class="help-i" data-help="saiteigengaku">💡</span></div><input class="finput num m-f" data-f="minWageReduce" inputmode="numeric" value="'+attr(e.minWageReduce)+'" placeholder="0" style="max-width:120px"></div>' : '';
+        return banner+reduceRow; })()
       +'<div class="frow2"><div class="frow"><div class="flabel">都道府県<span class="hint2">健保率</span></div><select class="finput m-f" data-f="pref">'+prefOptions(e.pref)+'</select></div>'
         +'<div class="frow"><div class="flabel">通勤手当<span class="hint2">円/月</span><span class="help-i" data-help="commute">💡</span></div><input class="finput num m-f" data-f="commute" inputmode="numeric" value="'+attr(fmtN(e.commute))+'"></div></div>';
     // ── 詳細（折りたたみ・既定で閉じる）──
@@ -2561,7 +2571,7 @@
       if((f==='dept'||f==='role')&&ev.target.value==='__new'){ var label=f==='dept'?'部署':'役職'; var fld=f; uiPrompt('新しい'+label+'名を入力').then(function(nv){ nv=(nv||'').trim(); if(nv){ var list=fld==='dept'?state.depts:state.roles; if(list.indexOf(nv)<0)list.push(nv); emp[fld]=nv; } renderEmpMaster(); }); return; }
       emp[f]=ev.target.value; if(ev.target.classList.contains('num')){ emp[f]=String(num(ev.target.value)); ev.target.value=fmtN(emp[f]); }
       if(f==='workStatus'){ if(!emp.apply)emp.apply={}; var off=(emp.workStatus==='sankyu'||emp.workStatus==='ikukyu'); ['health','pension','kaigo'].forEach(function(k){ if(off) emp.apply[k]=false; else delete emp.apply[k]; }); }
-      if(f==='payType'||f==='dept'||f==='role'||f==='commuteType'||f==='workStatus'||f==='residentTaxMode'||f==='residentTaxAnnual'||f==='taishokuYmd') renderEmpMaster();
+      if(f==='payType'||f==='dept'||f==='role'||f==='commuteType'||f==='workStatus'||f==='residentTaxMode'||f==='residentTaxAnnual'||f==='taishokuYmd'||f==='minWageReduce') renderEmpMaster(); // minWageReduce=減額特例率→最賃警告を再判定
     });
     el.addEventListener('input',function(ev){ var card=ev.target.closest('.mco'); if(!card)return; var i=+card.dataset.i; var emp=state.employees[i]; var t=ev.target;
       if(!emp.shaho)emp.shaho={mode:'teiji',months:[]};
