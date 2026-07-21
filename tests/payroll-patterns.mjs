@@ -257,6 +257,31 @@ T('勤務区分: santeiRule/gekkakuTh/shahoBasisOf が区分ごとに正しい�
   ok(rGen.count === 3, '通常: 17日以上が無い→全データ月で(要確認)3か月: ' + rGen.count);
 });
 
+// ── ⑧h ★最賃割れチェック 強化: 手当の最賃算入(役職手当は算入/通勤・皆勤は除外)★ ──
+T('最賃チェック: 基本給＋算入手当で判定(通勤/家族/皆勤/割増/賞与は最賃法どおり除外)', function () {
+  // 最賃算入判定(ラベル)
+  ok(A.isInMinWage('役職手当') && A.isInMinWage('住宅手当') && A.isInMinWage('技能手当') && A.isInMinWage('職務手当'), '役職/住宅/技能/職務は算入');
+  ok(!A.isInMinWage('通勤手当') && !A.isInMinWage('家族手当') && !A.isInMinWage('皆勤手当') && !A.isInMinWage('精勤手当'), '通勤/家族/精皆勤は除外(規則1条6号)');
+  ok(!A.isInMinWage('時間外割増') && !A.isInMinWage('深夜割増') && !A.isInMinWage('休日手当') && !A.isInMinWage('決算賞与') && !A.isInMinWage('欠勤控除'), '割増/賞与/控除は除外');
+  ok(!A.isInMinWage('基本給'), '基本給はbaseで別計上(二重計上防止)');
+  // 東京(令和7=1226円)・年間休日120/1日8h→月平均所定 約163.3h。基本給195,000のみ→時給約1193=最賃割れ
+  const base = '195000';
+  const r1 = A.minWageInfo(emp({ payType: '月給', base, shikyu: [{ label: '基本給', value: base }] }));
+  ok(r1 && !r1.ok && r1.teate === 0, '基本給のみ195,000→最賃割れ(時給約' + (r1 && r1.hourly) + '<1226)');
+  // ★役職手当2万は算入→時給が上がり最賃クリア(旧実装=手当無視で誤警告だった)★
+  const r2 = A.minWageInfo(emp({ payType: '月給', base, shikyu: [{ label: '基本給', value: base }, { label: '役職手当', value: '20000' }] }));
+  ok(r2 && r2.ok && r2.teate === 20000, '役職手当2万を算入→最賃クリア(時給約' + (r2 && r2.hourly) + '≥1226)');
+  // 通勤手当2万は最賃算入外→割れのまま
+  const r3 = A.minWageInfo(emp({ payType: '月給', base, shikyu: [{ label: '基本給', value: base }, { label: '通勤手当', value: '20000' }] }));
+  ok(r3 && !r3.ok && r3.teate === 0, '通勤手当は最賃算入外→割れのまま');
+  // 皆勤手当2万も除外→割れのまま
+  const r4 = A.minWageInfo(emp({ payType: '月給', base, shikyu: [{ label: '基本給', value: base }, { label: '皆勤手当', value: '20000' }] }));
+  ok(r4 && !r4.ok && r4.teate === 0, '皆勤手当は最賃算入外→割れのまま');
+  // minWageTeate 単体: 算入のみ合算
+  const t = A.minWageTeate({ shikyu: [{ label: '基本給', value: '195000' }, { label: '役職手当', value: '20000' }, { label: '通勤手当', value: '15000' }, { label: '皆勤手当', value: '5000' }] });
+  ok(t === 20000, 'minWageTeate=役職2万のみ(通勤/皆勤/基本給は除外): ' + t);
+});
+
 // ── ⑨ 入退社の日割 ──
 T('入退社: 月途中入社/退職で基本給が日割になる', function () {
   const full = A.compute(emp({ payType: '月給', base: '300000' }));

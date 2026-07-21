@@ -160,7 +160,20 @@
   // ライブラリは const SHAKAIHOKEN_HYO 定義で window に付かない→bare参照で取得
   function SHH(){ try{ if(typeof SHAKAIHOKEN_HYO!=='undefined'&&SHAKAIHOKEN_HYO) return SHAKAIHOKEN_HYO; }catch(e){} return (typeof window!=='undefined'&&window.SHAKAIHOKEN_HYO)||null; }
   function SAI(){ try{ if(typeof SAITEI_CHINGIN!=='undefined'&&SAITEI_CHINGIN) return SAITEI_CHINGIN; }catch(e){} return (typeof window!=='undefined'&&window.SAITEI_CHINGIN)||null; }
-  // 最低賃金チェック(事業所所在地=従業員prefの地域別最賃と時間額を比較)。役員/休業中は対象外。返り{hourly,minWage,prefName,ok}
+  // 最賃算入判定(最賃法4条3項・施行規則1条)。★最賃に算入しないのは=割増(所定外/休日/深夜)・通勤・家族・精皆勤・臨時/1か月超(賞与等)・控除行・基本給(baseで別計上)★。
+  //  それ以外の手当(役職/職務/住宅/技能/資格/営業/地域/調整/食事/単身赴任 等)は算入。割増基礎(isInBasis)とは除外リストが異なる=別関数。
+  function isInMinWage(label){
+    label=label||'';
+    if(/割増|残業|時間外|深夜|休日(出勤)?手当/.test(label)) return false;   // 所定外・休日・深夜(規則1条3〜5号)
+    if(/通勤|家族|扶養|皆勤|精勤/.test(label)) return false;               // 精皆勤・通勤・家族(規則1条6号)
+    if(/賞与|一時金|臨時|寸志|決算賞与|報奨金|インセンティブ/.test(label)) return false; // 臨時・1か月超(4条3項1・2号)
+    if(/控除|欠勤|不就労|返還|立替/.test(label)) return false;             // マイナス行は算入賃金でない
+    if(/基本給/.test(label)) return false;                                 // 基本給はbaseで別計上(二重計上防止)
+    return true;
+  }
+  // 最賃算入の固定手当(月額・契約額=e.shikyuは日割前)。基本給と除外手当を除く。
+  function minWageTeate(e){ return (e.shikyu||[]).filter(function(x){ return isInMinWage(x.label) && num(x.value)>0; }).reduce(function(a,x){return a+num(x.value);},0); }
+  // 最低賃金チェック(事業所所在地=従業員prefの地域別最賃と時間額を比較)。役員/休業中は対象外。返り{hourly,minWage,prefName,ok,teate}
   function minWageInfo(e){
     if(!e||e.payType==='役員'||(e.workStatus&&e.workStatus!=='normal')) return null;
     var S=SAI(); if(!S||!S.getChingin) return null;
@@ -168,14 +181,18 @@
     var co=state.company||{};
     var ah=(e.annualHolidays!=null&&e.annualHolidays!=='')?e.annualHolidays:co.annualHolidays;
     var dwh=num((e.dailyWorkH!=null&&e.dailyWorkH!=='')?e.dailyWorkH:co.dailyWorkH)+num((e.dailyWorkM!=null&&e.dailyWorkM!=='')?e.dailyWorkM:co.dailyWorkM)/60;
+    var ly=parseInt(String(state.month||'').slice(0,4),10)||0, leap=(ly%4===0&&ly%100!==0)||(ly%400===0);
+    var stdH=window.Warimashi?Warimashi.monthlyStdHours(ah,dwh,leap):0;
+    var teate=minWageTeate(e);                                   // 最賃算入の固定手当(月額)
+    var teateHourly= stdH>0 ? teate/stdH : 0;                    // 手当を月平均所定時間で時給換算し基本給の時給に加算(最賃法どおり手当も算入)
     var hourly=0;
-    if(e.payType==='時給') hourly=num(e.hourly);
-    else if(e.payType==='日給') hourly= dwh>0? num(e.base)/dwh : 0;
-    else if(e.payType==='歩合'){ var wmw=workedMin(e); var gpw=window.Warimashi?Warimashi.guaranteePay(e.hourlyGuarantee,wmw):Math.round(num(e.hourlyGuarantee)*wmw/60); var bpw=Math.max(num(e.commissionAmt),gpw); hourly= wmw>0? bpw/(wmw/60) : 0; } // 歩合=賃金合計(高い方)÷総労働時間で最賃判定
-    else if(e.payType==='カスタム'){ var wmc=workedMin(e); var prc=payRuleResult(e); var bpc=prc?prc.base:0; hourly= wmc>0? bpc/(wmc/60) : 0; } // カスタム=基本給÷総労働時間
-    else { var ly=parseInt(String(state.month||'').slice(0,4),10)||0; var leap=(ly%4===0&&ly%100!==0)||(ly%400===0); var stdH=window.Warimashi?Warimashi.monthlyStdHours(ah,dwh,leap):0; hourly= stdH>0? num(e.base)/stdH : 0; }
+    if(e.payType==='時給') hourly=num(e.hourly)+teateHourly;
+    else if(e.payType==='日給') hourly= (dwh>0? num(e.base)/dwh : 0)+teateHourly;
+    else if(e.payType==='歩合'){ var wmw=workedMin(e); var gpw=window.Warimashi?Warimashi.guaranteePay(e.hourlyGuarantee,wmw):Math.round(num(e.hourlyGuarantee)*wmw/60); var bpw=Math.max(num(e.commissionAmt),gpw); hourly= (wmw>0? bpw/(wmw/60) : 0)+teateHourly; } // 歩合=賃金合計(高い方)÷総労働時間で最賃判定
+    else if(e.payType==='カスタム'){ var wmc=workedMin(e); var prc=payRuleResult(e); var bpc=prc?prc.base:0; hourly= (wmc>0? bpc/(wmc/60) : 0)+teateHourly; } // カスタム=基本給÷総労働時間
+    else { hourly= (stdH>0? num(e.base)/stdH : 0)+teateHourly; } // 月給=基本給÷月平均所定時間＋算入手当
     hourly=Math.floor(hourly);
-    return { hourly:hourly, minWage:mw, prefName:((S.todofuken||{})[e.pref]||{}).name||'', ok:(hourly===0||hourly>=mw), stale:(S.saiteiStale?S.saiteiStale(state.month):false) };
+    return { hourly:hourly, minWage:mw, prefName:((S.todofuken||{})[e.pref]||{}).name||'', ok:(hourly===0||hourly>=mw), teate:teate, stale:(S.saiteiStale?S.saiteiStale(state.month):false) };
   }
   // 最賃割れのtooltip/説明文(表ビューの⚠とカードのバナーで文面を統一)。製品方針=黄色・非ブロック・具体的に伝える。
   function mwWarnText(mw){ return '最低賃金（'+esc(mw.prefName)+'：時給'+fmtN(mw.minWage)+'円）を下回っています（約'+fmtN(mw.hourly)+'円）'; }
@@ -2802,7 +2819,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, stType:stType, stLabel:stLabel, santeiRule:santeiRule, gekkakuTh:gekkakuTh, shahoBasisOf:shahoBasisOf, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, ymdPlus1:ymdPlus1, shikakuRows:shikakuRows, shikakuAoa:shikakuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, isInMinWage:isInMinWage, minWageTeate:minWageTeate, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, stType:stType, stLabel:stLabel, santeiRule:santeiRule, gekkakuTh:gekkakuTh, shahoBasisOf:shahoBasisOf, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, ymdPlus1:ymdPlus1, shikakuRows:shikakuRows, shikakuAoa:shikakuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';
