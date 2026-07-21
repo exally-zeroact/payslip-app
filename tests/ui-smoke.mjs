@@ -528,9 +528,34 @@ T('給与支払報告書: 市区町村抽出＋源泉徴収票と同じ集計で
   const sou = A.gyoyoSoukatsuAoa(rows, 2026);
   ok(/総括表/.test(sou[0].join('')), '総括表見出し');
   const cityRow = sou.find(r => r[0] === '東京都新宿区');
-  ok(cityRow && cityRow[1] === 1 && cityRow[2] === 3600000, '総括表: 東京都新宿区 1名 360万');
+  ok(cityRow && cityRow[1] === 1 && cityRow[4] === 3600000, '総括表: 東京都新宿区 1名 支払360万');
   const goukei = sou.find(r => r[0] === '合計');
-  ok(goukei && goukei[1] === 1 && goukei[2] === 3600000, '総括表 合計行');
+  ok(goukei && goukei[1] === 1 && goukei[4] === 3600000, '総括表 合計行');
+});
+
+T('★給与支払報告書 完成度UP★ 16歳未満扶養/本人区分/徴収区分の内訳', function () {
+  A.state.month = '2026-06';
+  const e = A.defEmp('鈴木 花子'); e.id = 'E_gyoyo2'; e.address = '大阪府大阪市北区梅田1-1'; e.birthYmd = '1988-03-03';
+  e.nenshoFuyo = '2'; e.honninShogai = true; e.honninKafuHitorioya = 'hitorioya'; e.juminCollect = 'ordinary'; // 16歳未満2人・障害者・ひとり親・普通徴収
+  const f = A.defEmp('佐藤 太郎'); f.id = 'E_gyoyo3'; f.address = '大阪府大阪市北区中之島1-1'; f.birthYmd = '1980-01-01'; f.juminCollect = 'special';
+  A.state._nenEmps = [e, f]; A.state.nencho = {}; A.state._nenRecs = [];
+  [e, f].forEach(emp => { for (let m = 1; m <= 12; m++) A.state._nenRecs.push({ ym: '2026-' + ('0' + m).slice(-2), employee_id: emp.id, data: { shikyuTotal: 300000, tax: 5000, si: { health: 15000, pension: 27000, employ: 1800 }, kind: 'monthly', confirmed: true } }); });
+  const rows = A.gyoyoRows(A.state._nenRecs, 2026, A.state._nenEmps);
+  const r1 = rows.find(x => x.name === '鈴木 花子');
+  ok(r1 && r1.city === '大阪府大阪市', '政令市は市に寄る(大阪市): ' + (r1 && r1.city));
+  ok(r1 && r1.nensho === 2, '16歳未満扶養=2: ' + (r1 && r1.nensho));
+  ok(r1 && /障害者/.test(r1.honnin) && /ひとり親/.test(r1.honnin), '本人区分=障害者・ひとり親: ' + (r1 && r1.honnin));
+  ok(r1 && r1.collect === '普通徴収', '徴収区分=普通徴収');
+  const mei = A.gyoyoMeisaiAoa(rows, 2026);
+  ok(mei[3].indexOf('16歳未満扶養') >= 0 && mei[3].indexOf('本人区分') >= 0 && mei[3].indexOf('徴収区分') >= 0, 'ヘッダに新項目3つ');
+  const drow = mei.find(r => r.indexOf('鈴木 花子') >= 0);
+  ok(drow && drow.indexOf('普通徴収') >= 0 && drow.indexOf(2) >= 0 && drow.some(c => /障害者/.test(String(c))), 'データ行に徴収区分・16歳未満・本人区分');
+  // 総括表: 特別徴収1名/普通徴収1名の内訳(同じ大阪市)
+  const sou = A.gyoyoSoukatsuAoa(rows, 2026);
+  const cityRow = sou.find(r => r[0] === '大阪府大阪市');
+  ok(cityRow && cityRow[1] === 2 && cityRow[2] === 1 && cityRow[3] === 1, '総括表: 大阪市 2名(特別1/普通1)の内訳: ' + JSON.stringify(cityRow && cityRow.slice(1, 4)));
+  const goukei = sou.find(r => r[0] === '合計');
+  ok(goukei && goukei[2] === 1 && goukei[3] === 1, '合計行: 特別1/普通1');
 });
 
 T('労働保険 年度更新: 労災/雇用の賃金を年度集計＋雇用保険料は全体率で自動(役員/雇用オフ除外)', function () {

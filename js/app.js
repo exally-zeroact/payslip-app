@@ -203,7 +203,7 @@
 
   function defEmp(name){
     return { id:uid(), name:name||'山田 太郎', no:'', birthYmd:'1980-05-15', dept:'', role:'',
-      payType:'月給', base:'250000', hourly:'1200', commissionAmt:'', hourlyGuarantee:'', salesAmt:'', pieceCount:'', payRule:null, fuyou:'1', pref:'tokyo', commute:'8400', commuteType:'public', commuteKm:'', residentTax:'12500', residentTaxMode:'monthly', residentTaxAnnual:'', residentTaxIkkatsu:false, bank:'',
+      payType:'月給', base:'250000', hourly:'1200', commissionAmt:'', hourlyGuarantee:'', salesAmt:'', pieceCount:'', payRule:null, fuyou:'1', nenshoFuyo:'', pref:'tokyo', commute:'8400', commuteType:'public', commuteKm:'', residentTax:'12500', residentTaxMode:'monthly', residentTaxAnnual:'', residentTaxIkkatsu:false, juminCollect:'special', bank:'',
       furiBankName:'', furiBankNo:'', furiBranchName:'', furiBranchNo:'', furiYokin:'普通', furiAccount:'', furiKana:'',
       annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0', dailyEntries:[],
       kintai:[{label:'出勤日数',value:'21'},{label:'欠勤日数',value:'0'},{label:'有給取得',value:'1'}],
@@ -721,7 +721,8 @@
       +'<div class="frow2"><div class="frow"><div class="flabel">年間所定休日<span class="hint2">日/年</span><span class="help-i" data-help="shoteibase">💡</span></div><input class="finput num m-f" data-f="annualHolidays" value="'+attr(e.annualHolidays)+'"></div>'
         +'<div class="frow"><div class="flabel">1日の所定労働</div><span class="dur"><input class="finput m-f dur-in" data-f="dailyWorkH" inputmode="numeric" value="'+attr(e.dailyWorkH)+'"><i>時</i><input class="finput m-f dur-in" data-f="dailyWorkM" inputmode="numeric" value="'+attr(e.dailyWorkM)+'"><i>分</i></span></div></div>';
     var gZei=''
-      +'<div class="frow"><div class="flabel">扶養人数<span class="hint2">配偶者含</span><span class="help-i" data-help="fuyou">💡</span></div><input class="finput num m-f" data-f="fuyou" value="'+attr(e.fuyou)+'"></div>'
+      +'<div class="frow2"><div class="frow"><div class="flabel">扶養人数<span class="hint2">配偶者含・16歳以上</span><span class="help-i" data-help="fuyou">💡</span></div><input class="finput num m-f" data-f="fuyou" value="'+attr(e.fuyou)+'"></div>'
+        +'<div class="frow"><div class="flabel">16歳未満の扶養<span class="hint2">人・住民税用</span></div><input class="finput num m-f" data-f="nenshoFuyo" inputmode="numeric" value="'+attr(e.nenshoFuyo)+'" placeholder="0"></div></div>'
       +((e.taxClass||'ko')==='ko'
         ? '<div class="chip-row" style="margin:-2px 0 4px;align-items:center"><span style="font-size:11px;color:#3D6B53;font-weight:700;margin-right:2px">本人の事情</span>'
           +'<span class="chip'+(e.honninShogai?' on':'')+'" data-honnin="shogai">'+(e.honninShogai?'✓ ':'')+'障害者</span>'
@@ -743,7 +744,10 @@
         ? '<div class="hint" style="margin:-4px 2px 10px">当月（'+esc(state.month)+'）の天引き額 <b>'+yen(residentTaxOf(e))+'</b>'
           +((e.taishokuYmd&&/^\d{4}-(0[6-9]|1[0-2])/.test(e.taishokuYmd))?' <span class="chip'+(e.residentTaxIkkatsu?' on':'')+'" data-rtik="1" style="cursor:pointer">'+(e.residentTaxIkkatsu?'✓ ':'')+'退職時に残額を一括</span>':'')
           +'<div style="color:#92500A;margin-top:3px">特別徴収は6月〜翌5月。<b>通知書の額が正</b>（自動は端数を6月に合算した概算）。1〜4月退職は残額一括（法定）、6〜12月退職は普通徴収へ（申出で一括）。</div></div>'
-        : '');
+        : '')
+      +'<div class="chip-row" style="margin:-2px 0 10px;align-items:center"><span style="font-size:11px;color:#3D6B53;font-weight:700;margin-right:2px">住民税の納め方</span>'
+        +[['special','特別徴収（給与天引き）'],['ordinary','普通徴収（本人納付）']].map(function(o){ var on=(e.juminCollect||'special')===o[0]; return '<span class="chip'+(on?' on':'')+'" data-jumincol="'+o[0]+'">'+(on?'✓ ':'')+o[1]+'</span>'; }).join('')
+        +'<span class="hint" style="font-size:10px;color:#527A66;margin-left:4px">給与支払報告書の総括表で人員を内訳します。</span></div>';
     var gShaho=''
       +shahoSection(e)
       +'<div class="sec-lb" style="border-top:1px dashed #d4eae0">法定控除（使わないものは外せる）<span class="help-i" data-help="legalkojo">💡</span></div>'
@@ -2039,32 +2043,33 @@
     var city=m ? m[0] : (s || '（住所未登録）');
     return pref+city;
   }
-  var GYOYO_COLS=['提出先 市区町村','受給者番号','氏名','生年月日','住所','種別','支払金額','給与所得控除後の金額','所得控除の額の合計額','源泉徴収税額','社会保険料等の金額','生命保険料の控除額','地震保険料の控除額','配偶者(特別)控除の額','扶養(特定)','扶養(老人)','扶養(その他)','基礎控除の額','特定親族特別控除の額','住宅借入金等特別控除の額','摘要'];
+  var GYOYO_COLS=['提出先 市区町村','徴収区分','受給者番号','氏名','生年月日','住所','種別','支払金額','給与所得控除後の金額','所得控除の額の合計額','源泉徴収税額','社会保険料等の金額','生命保険料の控除額','地震保険料の控除額','配偶者(特別)控除の額','扶養(特定)','扶養(老人)','扶養(その他)','16歳未満扶養','基礎控除の額','特定親族特別控除の額','住宅借入金等特別控除の額','本人区分','摘要'];
+  function honninKubun(e){ var a=[]; if(e.honninShogai)a.push('障害者'); if(e.honninKafuHitorioya==='kafu')a.push('寡婦'); if(e.honninKafuHitorioya==='hitorioya')a.push('ひとり親'); if(e.honninKinrou)a.push('勤労学生'); return a.join('・'); } // 本人の区分(住民税非課税判定に必要・既存フラグ)
   function gyoyoRows(recs, year, emps){
     return (emps||[]).map(function(e){
       var c=nenCompute(nenAggregate(recs, e.id), nenStore(e.id)); if(!c) return null;
       var r=c.res, kl=r.kojoList, n=nenStore(e.id), fb=fuyoBuckets(n);
-      return { emp:e, city:extractCity(e.address), name:e.name||'', birthYmd:e.birthYmd||'', zip:e.zip||'', address:e.address||'',
+      return { emp:e, city:extractCity(e.address), collect:(e.juminCollect==='ordinary'?'普通徴収':'特別徴収'), name:e.name||'', birthYmd:e.birthYmd||'', zip:e.zip||'', address:e.address||'',
         shunyu:c.shunyu, kyuyoShotoku:r.kyuyoShotoku, kojoGoukei:r.kojoGoukei, nenzei:r.nenchouNenzei,
         shakaiHoken:kl.shakaiHoken, seimei:kl.seimei, jishin:kl.jishin, haiGaku:kl.haiguusha+kl.haiTokubetsu,
-        kiso:kl.kiso, tokuteiShinzoku:kl.tokuteiShinzoku, jutaku:num(n.jutakuLoan), fb:fb };
+        kiso:kl.kiso, tokuteiShinzoku:kl.tokuteiShinzoku, jutaku:num(n.jutakuLoan), fb:fb, nensho:num(e.nenshoFuyo), honnin:honninKubun(e) };
     }).filter(Boolean).filter(function(x){ return x.shunyu>0; }); // 年内に支払のあった人のみ
   }
   function gyoyoSoukatsuAoa(rows, year){
     var co=state.company||{}, byCity={};
-    rows.forEach(function(x){ (byCity[x.city]||(byCity[x.city]={n:0,pay:0})); byCity[x.city].n++; byCity[x.city].pay+=x.shunyu; });
+    rows.forEach(function(x){ var g=byCity[x.city]||(byCity[x.city]={n:0,pay:0,toku:0,futsu:0}); g.n++; g.pay+=x.shunyu; if(x.collect==='普通徴収')g.futsu++; else g.toku++; });
     var aoa=[['給与支払報告書（総括表）　令和'+(year-2018)+'年分（'+year+'年中の給与）'], ['提出者（事業所）', co.name||''], ['所在地', co.addr||''], [],
-      ['提出先 市区町村','報告人員','支払金額合計','摘要']];
-    var tot={n:0,pay:0};
-    Object.keys(byCity).sort().forEach(function(city){ var g=byCity[city]; tot.n+=g.n; tot.pay+=g.pay; aoa.push([city, g.n, g.pay, '']); });
-    aoa.push(['合計', tot.n, tot.pay, '']);
-    aoa.push([]); aoa.push(['※ 市区町村は住所から自動抽出（要確認）。特別徴収／普通徴収の別・受給者番号・個人番号は各自記入。マイナンバーは扱いません。']);
+      ['提出先 市区町村','報告人員','うち特別徴収','うち普通徴収','支払金額合計','摘要']];
+    var tot={n:0,pay:0,toku:0,futsu:0};
+    Object.keys(byCity).sort().forEach(function(city){ var g=byCity[city]; tot.n+=g.n; tot.pay+=g.pay; tot.toku+=g.toku; tot.futsu+=g.futsu; aoa.push([city, g.n, g.toku, g.futsu, g.pay, '']); });
+    aoa.push(['合計', tot.n, tot.toku, tot.futsu, tot.pay, '']);
+    aoa.push([]); aoa.push(['※ 市区町村は住所から自動抽出（要確認）。徴収区分は従業員マスタの「住民税の納め方」。受給者番号・個人番号は各自記入。マイナンバーは扱いません。']);
     return aoa;
   }
   function gyoyoMeisaiAoa(rows, year){
     var aoa=[['給与支払報告書（個人別明細書）　令和'+(year-2018)+'年分'], [ (state.company||{}).name||'' ], [], GYOYO_COLS.slice()];
     rows.slice().sort(function(a,b){ return a.city<b.city?-1:a.city>b.city?1:0; }).forEach(function(x){
-      aoa.push([ x.city, '', x.name, x.birthYmd, (x.zip?'〒'+x.zip+' ':'')+x.address, '給与・賞与', x.shunyu, x.kyuyoShotoku, x.kojoGoukei, x.nenzei, x.shakaiHoken, x.seimei, x.jishin, x.haiGaku, x.fb.tokutei, x.fb.roujinAll, x.fb.ippan, x.kiso, x.tokuteiShinzoku, x.jutaku, '' ]);
+      aoa.push([ x.city, x.collect, '', x.name, x.birthYmd, (x.zip?'〒'+x.zip+' ':'')+x.address, '給与・賞与', x.shunyu, x.kyuyoShotoku, x.kojoGoukei, x.nenzei, x.shakaiHoken, x.seimei, x.jishin, x.haiGaku, x.fb.tokutei, x.fb.roujinAll, x.fb.ippan, x.nensho||'', x.kiso, x.tokuteiShinzoku, x.jutaku, x.honnin, '' ]);
     });
     return aoa;
   }
@@ -2489,6 +2494,7 @@
       var shfx=ev.target.closest('[data-shfixed]'); if(shfx){ if(!emp.shaho)emp.shaho={months:[]}; emp.shaho.fixedChanged=(shfx.dataset.v==='1'); renderEmpMaster(); return; } // 固定給変動 はい/いいえ
       if(ev.target.dataset.rtik){ emp.residentTaxIkkatsu=!emp.residentTaxIkkatsu; renderEmpMaster(); return; }
       if(ev.target.dataset.taxc){ emp.taxClass=ev.target.dataset.taxc; renderEmpMaster(); return; }
+      if(ev.target.dataset.jumincol){ emp.juminCollect=ev.target.dataset.jumincol; renderEmpMaster(); return; } // 住民税の徴収区分(給与支払報告書 総括表の内訳用)
       if(ev.target.dataset.honnin){ var hk=ev.target.dataset.honnin; // 本人の人的加算(甲欄+1)。寡婦↔ひとり親は排他
         if(hk==='shogai') emp.honninShogai=!emp.honninShogai;
         else if(hk==='kinrou') emp.honninKinrou=!emp.honninKinrou;
