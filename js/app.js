@@ -1618,7 +1618,8 @@
     +'<button class="seg-b'+(v==='daicho'?' on':'')+'" data-cho="daicho">賃金台帳</button>'
     +'<button class="seg-b'+(v==='santei'?' on':'')+'" data-cho="santei">算定基礎届</button>'
     +'<button class="seg-b'+(v==='gekkaku'?' on':'')+'" data-cho="gekkaku">月額変更届</button>'
-    +'<button class="seg-b'+(v==='roudou'?' on':'')+'" data-cho="roudou">労働保険</button></div>'; }
+    +'<button class="seg-b'+(v==='roudou'?' on':'')+'" data-cho="roudou">労働保険</button>'
+    +'<button class="seg-b'+(v==='shikaku'?' on':'')+'" data-cho="shikaku">資格取得・喪失</button></div>'; }
   // 算定基礎届: 確定済みの4〜6月明細(総支給・支払基礎日数)から各人の標準報酬を決定して一覧化(年金機構提出の素)。
   var SANTEI_COLS=['被保険者整理番号','氏名','生年月日','従前(健保)','従前(厚年)','4月 日数','4月 報酬','5月 日数','5月 報酬','6月 日数','6月 報酬','総計','平均額','決定 標準報酬(健保)','等級(健保)','決定 標準報酬(厚年)','等級(厚年)','備考'];
   function santeiRows(recs, year, emps){
@@ -1763,6 +1764,45 @@
     Store.getPayslipsByYm(fy+'-04', (fy+1)+'-03').then(function(recs){ recs=confirmedRecs(recs);
       state._roudouSum=roudouSummary(recs, fy, state.employees); host.innerHTML=sub+roudouHTML(state._roudouSum, fy); })
       .catch(function(){ host.innerHTML=sub+'<div class="card"><p class="hint">読込に失敗しました。</p></div>'; }); }
+  // 資格取得届・喪失届(健康保険・厚生年金保険 被保険者資格取得届/喪失届): 入社日=資格取得日、退職日翌日=資格喪失日。
+  //  取得は標準報酬(取得時見込み=shahoBase)、喪失は喪失日＋理由(退職)。出典=日本年金機構。★マイナンバー不使用(基礎年金番号/整理番号は各自)★。
+  function ymdPlus1(ymd){ var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd||'')); if(!m) return ''; // 資格喪失日=退職日の翌日(暦日繰上げ・月末/年末対応)
+    var y=+m[1], mo=+m[2], d=+m[3], dim=new Date(y, mo, 0).getDate(); d++; if(d>dim){ d=1; mo++; if(mo>12){ mo=1; y++; } }
+    return y+'-'+('0'+mo).slice(-2)+'-'+('0'+d).slice(-2); }
+  function isKaigoNow(e, ymd){ var pc=window.PayrollCalc; var ym=String(ymd||'').slice(0,7)||state.month; return (pc&&pc.isKaigoTarget)?!!pc.isKaigoTarget(e.birthYmd, ym):false; }
+  var SHIKAKU_COLS=['区分','被保険者整理番号','氏名','生年月日','資格取得日／喪失日','標準報酬月額(健保)','等級(健保)','標準報酬月額(厚年)','等級(厚年)','喪失理由','備考'];
+  function shikakuRows(emps){
+    var SHH=(typeof SHAKAIHOKEN_HYO!=='undefined')?SHAKAIHOKEN_HYO:(window&&window.SHAKAIHOKEN_HYO);
+    var rows=[];
+    (emps||[]).forEach(function(e){ if(e.payType==='役員')return; // 役員は健保/厚年の被保険者(取得/喪失は同じだが労働者と別・ここは労働者を対象)
+      var sb=shahoBasisOf(e), hoshu=(sb&&sb.hoshu>0)?sb.hoshu:0;
+      var decH=(SHH&&hoshu)?SHH.gradeOfHealth(hoshu):null, decP=(SHH&&hoshu)?SHH.gradeOf(hoshu):null;
+      // 取得届: 入社日あり
+      if(e.joinYmd){ var notesA=[]; if(isKaigoNow(e,e.joinYmd))notesA.push('介護保険 第2号'); if(e.shortTime)notesA.push('短時間労働者'); if(isOver70(e,String(e.joinYmd).slice(0,7)))notesA.push('70歳以上');
+        rows.push({ kind:'取得', name:e.name||'', birthYmd:e.birthYmd||'', date:e.joinYmd, decH:decH?decH.hyojun:0, decHGrade:decH?decH.tokyu:0, decP:decP?decP.hyojun:0, decPGrade:decP?decP.tokyu:0, reason:'', note:notesA.join('／') }); }
+      // 喪失届: 退職日あり(退職フラグの有無に依らず日付優先)
+      if(e.taishokuYmd){ var lossYmd=ymdPlus1(e.taishokuYmd); var notesL=[]; if(isOver70(e,String(e.taishokuYmd).slice(0,7)))notesL.push('70歳以上');
+        rows.push({ kind:'喪失', name:e.name||'', birthYmd:e.birthYmd||'', date:lossYmd, decH:0, decHGrade:0, decP:0, decPGrade:0, reason:'退職等', note:notesL.join('／') }); }
+    });
+    return rows;
+  }
+  function shikakuAoa(rows){
+    var aoa=[['健康保険・厚生年金保険 被保険者 資格取得届／資格喪失届'], [(state.company||{}).name||''], [], SHIKAKU_COLS.slice()];
+    rows.forEach(function(x){ aoa.push([ x.kind, '', x.name, x.birthYmd, x.date, x.decH||'', x.decHGrade||'', x.decP||'', x.decPGrade||'', x.reason, x.note ]); });
+    aoa.push([]); aoa.push(['※ 資格取得日＝入社日、資格喪失日＝退職日の翌日。標準報酬は取得時の見込み（届出後に決定通知）。被保険者整理番号・基礎年金番号は各自記入。マイナンバーは扱いません（各自記入）。']);
+    return aoa;
+  }
+  function shikakuHTML(rows){
+    var note='<p class="hint" style="margin:0 0 10px">従業員マスタの<b>入社日＝資格取得日</b>、<b>退職日の翌日＝資格喪失日</b>から一覧化。標準報酬は取得時の見込み。<span class="help-i" data-help="shaho">💡</span>被保険者整理番号は各自入力。横スクロール可。<button class="btn-ghost" data-choxlsx="shikaku" style="margin-left:8px;padding:4px 10px;font-size:11px">Excel</button></p>';
+    if(!rows.length) return note+'<div class="card"><p class="hint">入社日・退職日が入力された従業員がいません。従業員マスタの「在籍・勤務」で入社日／退職日を入れてください。</p></div>';
+    var head='<tr>'+SHIKAKU_COLS.map(function(c){return '<th>'+esc(c)+'</th>';}).join('')+'</tr>';
+    var body=rows.map(function(x){ var isLoss=(x.kind==='喪失');
+      var cells=[x.kind, '', x.name, x.birthYmd, x.date, (x.decH?yen(x.decH):''), (x.decHGrade||''), (x.decP?yen(x.decP):''), (x.decPGrade||''), x.reason, x.note];
+      return '<tr'+(isLoss?' style="background:#FCF3F2"':'')+'>'+cells.map(function(c,i){ return '<td class="'+((i>=5&&i<=8)?'num':'')+'">'+esc(String(c))+'</td>'; }).join('')+'</tr>';
+    }).join('');
+    return note+'<div class="card"><div class="card-h">資格取得届／喪失届</div><div class="dc-wrap"><table class="dc-tab"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div></div>';
+  }
+  function renderShikaku(sub){ var host=$('#view-cho'); state._shikakuRows=shikakuRows(state.employees); host.innerHTML=sub+shikakuHTML(state._shikakuRows); }
   function renderChoView(){ var host=$('#view-cho'); if(!host)return; var v=state.choView||'shakai'; var sub=choSub(v)
     +'<div class="card" style="padding:12px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-size:13px;color:#2E7D54">退職金の税金</b><span class="hint" style="flex:1;min-width:150px">退職金は毎月の給与と別（退職所得・分離課税）。ここで源泉を計算。</span><button class="btn-ghost" data-taishoku-calc="1" style="white-space:nowrap">退職金を計算</button></div>';
     if(v==='dept') host.innerHTML=sub+deptSummaryHTML();
@@ -1770,6 +1810,7 @@
     else if(v==='santei'){ host.innerHTML=sub+'<div class="card"><div class="card-h">算定基礎届</div><p class="hint">読込中…</p></div>'; renderSantei(sub); }
     else if(v==='gekkaku'){ host.innerHTML=sub+'<div class="card"><div class="card-h">月額変更届</div><p class="hint">読込中…</p></div>'; renderGekkaku(sub); }
     else if(v==='roudou'){ host.innerHTML=sub+'<div class="card"><div class="card-h">労働保険</div><p class="hint">読込中…</p></div>'; renderRoudou(sub); }
+    else if(v==='shikaku'){ renderShikaku(sub); }
     else host.innerHTML=sub+shakaiListHTML(); }
   function downloadChoXlsx(kind){ if(!window.PayslipXlsx) return; var co=(state.company||{}).name, mlabel=monthLabel().replace(/ /g,'');
     if(kind==='shakai'){ PayslipXlsx.downloadSheets([{name:'社保一覧', aoa:PayslipXlsx.shakaiListAOA(shakaiRows(),{company:co,monthLabel:mlabel})}], {filename:'社保一覧_'+state.month+'.xlsx'}); return; }
@@ -1783,7 +1824,9 @@
       if(!grows.length){ uiAlert('随時改定に「該当」する人がいません。変動月・従前の標準報酬・固定給変動の入力と、3か月の確定明細をご確認ください。'); return; }
       PayslipXlsx.downloadSheets([{name:'月額変更届', aoa:gekkakuAoa(grows)}], {filename:'月額変更届_'+state.month+'.xlsx'}); return; }
     if(kind==='roudou'){ var rsum=state._roudouSum; if(!rsum||!rsum.rows.some(function(x){return x.rousaiWage>0||x.koyoWage>0;})){ uiAlert('対象年度の確定済み明細がありません。'); return; }
-      PayslipXlsx.downloadSheets([{name:'労働保険 賃金集計', aoa:roudouAoa(rsum, rsum.fy)}], {filename:'労働保険_算定基礎賃金集計_'+rsum.fy+'年度.xlsx'}); return; } }
+      PayslipXlsx.downloadSheets([{name:'労働保険 賃金集計', aoa:roudouAoa(rsum, rsum.fy)}], {filename:'労働保険_算定基礎賃金集計_'+rsum.fy+'年度.xlsx'}); return; }
+    if(kind==='shikaku'){ var srows=state._shikakuRows||[]; if(!srows.length){ uiAlert('入社日・退職日が入力された従業員がいません。'); return; }
+      PayslipXlsx.downloadSheets([{name:'資格取得・喪失届', aoa:shikakuAoa(srows)}], {filename:'資格取得喪失届_'+state.month+'.xlsx'}); return; } }
 
   /* ---------- 年末調整(view-nen) ---------- */
   function Nen_(){ return (typeof Nenmatsu!=='undefined')?Nenmatsu:(window&&window.Nenmatsu); }
@@ -2735,7 +2778,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, ymdPlus1:ymdPlus1, shikakuRows:shikakuRows, shikakuAoa:shikakuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

@@ -553,6 +553,35 @@ T('労働保険 年度更新: 労災/雇用の賃金を年度集計＋雇用保�
   ok(A.roudouFYof() === 2026, '労働保険年度=2026(7月起点)');
 });
 
+T('資格取得・喪失届: 入社日=取得/退職日翌日=喪失・標準報酬・喪失日の月末年末繰上げ', function () {
+  ok(A.ymdPlus1('2026-05-15') === '2026-05-16', '翌日: ' + A.ymdPlus1('2026-05-15'));
+  ok(A.ymdPlus1('2026-05-31') === '2026-06-01', '月末→翌月1日: ' + A.ymdPlus1('2026-05-31'));
+  ok(A.ymdPlus1('2026-12-31') === '2027-01-01', '年末→翌年1/1: ' + A.ymdPlus1('2026-12-31'));
+  ok(A.ymdPlus1('2028-02-29') === '2028-03-01', 'うるう2/29→3/1: ' + A.ymdPlus1('2028-02-29'));
+  ok(A.ymdPlus1('') === '', '空は空');
+  A.state.month = '2026-07';
+  const join = A.defEmp('入社 太郎'); join.id = 'E_join'; join.joinYmd = '2026-04-01'; join.taishokuYmd = ''; join.birthYmd = '1990-01-01';
+  join.shaho = { mode: 'manual', manual: '300000' }; // 取得時見込み=標準報酬30万
+  const leave = A.defEmp('退職 花子'); leave.id = 'E_leave'; leave.joinYmd = ''; leave.taishokuYmd = '2026-06-30'; leave.birthYmd = '1985-01-01';
+  const yaku = A.defEmp('役員 一郎'); yaku.id = 'E_yaku2'; yaku.payType = '役員'; yaku.joinYmd = '2026-04-01';
+  A.state.employees = [join, leave, yaku];
+  const rows = A.shikakuRows(A.state.employees);
+  const acq = rows.find(r => r.kind === '取得' && r.name === '入社 太郎');
+  const loss = rows.find(r => r.kind === '喪失' && r.name === '退職 花子');
+  ok(acq && acq.date === '2026-04-01', '取得日=入社日: ' + (acq && acq.date));
+  ok(acq && acq.decH === 300000 && acq.decP === 300000, '取得の標準報酬=30万(見込み)');
+  ok(loss && loss.date === '2026-07-01', '喪失日=退職日6/30の翌日=7/1: ' + (loss && loss.date));
+  ok(loss && loss.reason === '退職等', '喪失理由=退職等');
+  ok(!rows.some(r => r.name === '役員 一郎'), '役員は労働者の取得/喪失一覧から除外');
+  const aoa = A.shikakuAoa(rows);
+  ok(/資格取得届／資格喪失届/.test(aoa[0].join('')) && aoa[3].indexOf('資格取得日／喪失日') >= 0, 'Excelヘッダ公式項目');
+  const arow = aoa.find(r => r.indexOf('入社 太郎') >= 0);
+  ok(arow && arow[0] === '取得' && arow.indexOf('2026-04-01') >= 0 && arow.indexOf(300000) >= 0, '取得行に日付・標準報酬');
+  const lrow = aoa.find(r => r.indexOf('退職 花子') >= 0);
+  ok(lrow && lrow[0] === '喪失' && lrow.indexOf('2026-07-01') >= 0, '喪失行に喪失日');
+  ok(!/個人番号|マイナンバー/.test(aoa[3].join('|')), '★列ヘッダにマイナンバー(個人番号)欄なし★');
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });
