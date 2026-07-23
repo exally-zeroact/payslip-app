@@ -134,9 +134,12 @@ T('介護境界 1986-06-01生: 2026-05は対象/2026-04は非対象', function (
 });
 
 /* ---- ⑤ 年少者(満18歳未満)判定 isMinor(労基60/61条) ---- */
-T('isMinor: 18歳到達で年少者でなくなる境界(到達=誕生日前日の月・2008-06-15生)', function () {
-  eq(PayrollCalc.isMinor('2008-06-15', '2026-05'), true);   // 到達前月=まだ17歳=年少者
-  eq(PayrollCalc.isMinor('2008-06-15', '2026-06'), false);  // 18歳到達月=年少者でない
+T('isMinor(保護判定): 対象月初日時点で18歳未満なら年少者(誕生月の一部が年少者でも保護)', function () {
+  eq(PayrollCalc.isMinor('2008-06-15', '2026-05'), true);   // 前月=17歳
+  eq(PayrollCalc.isMinor('2008-06-15', '2026-06'), true);   // 誕生月=初日は17歳(15日に18歳)=保護対象(安全側)
+  eq(PayrollCalc.isMinor('2008-06-15', '2026-07'), false);  // 翌月=18歳
+  eq(PayrollCalc.isMinor('2008-06-01', '2026-06'), false);  // 1日生=誕生月初日で満18=過剰警告しない
+  eq(PayrollCalc.isMinor('2008-06-01', '2026-05'), true);   // 1日生の前月=17歳
   eq(PayrollCalc.isMinor('2010-01-15', '2026-06'), true);   // 16歳=年少者
   eq(PayrollCalc.isMinor('1990-01-01', '2026-06'), false);  // 成人
   eq(PayrollCalc.isMinor('', '2026-06'), false);            // 生年月日不明=安全側でfalse

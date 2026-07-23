@@ -203,6 +203,7 @@ select.finput{background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://w
 .in-table .tdim{color:#7E9E8C;text-align:right;}
 .in-table .thint{color:#6E907E;font-size:10px;}
 .in-table .tmw{color:#92500A;cursor:help;}
+.in-table .tlw{color:#92500A;cursor:help;}
 .in-table .tconf{text-align:center;}
 .in-table .tstack{display:inline-flex;flex-direction:column;gap:3px;align-items:flex-end;}
 .cap-badge{display:inline-block;font-size:10px;font-weight:700;color:#92500A;background:#fff8e1;border:1px solid #F4D8A8;border-radius:6px;padding:2px 7px;margin-right:5px;}

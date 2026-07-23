@@ -19,3 +19,9 @@ T('警告一貫性: 表ビューの最賃⚠(.tmw)は赤でなく琥珀(黄系�
   ok(!/#C0392B/i.test(body), '.tmw は赤(#C0392B)を使わない: ' + body.trim());
   ok(/#92500A/i.test(body), '.tmw は最賃警告色(#92500A 琥珀)を使う: ' + body.trim());
 });
+T('警告一貫性: 表ビューの労働時間⚠(.tlw)も赤でなく琥珀(36協定/年少者・非ブロック)', function () {
+  var body = ruleBody('.tlw');
+  ok(body != null, '.tlw ルールが存在する');
+  ok(!/#C0392B/i.test(body), '.tlw は赤を使わない: ' + body.trim());
+  ok(/#92500A/i.test(body), '.tlw は警告色(#92500A 琥珀)を使う: ' + body.trim());
+});

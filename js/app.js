@@ -242,21 +242,25 @@
     return { otMin:dmin({h:w.otH,m:w.otM}), nightMin:dmin({h:w.nightH,m:w.nightM}), holidayMin:dmin({h:w.holidayH,m:w.holidayM}) };
   }
   // ④36協定 時間外上限(労基36条)＋⑤年少者(18歳未満)の時間外/深夜/休日規制(労基60/61条)の黄警告。役員は労働時間規制の対象外。非ブロック。
-  function laborLimitWarn(e){
-    if(!e||e.payType==='役員') return '';
-    var W=window.Warimashi, PC=window.PayrollCalc; if(!W) return ''; var m=warimashiMins(e.warimashi); var out=[];
+  // ④⑤の警告メッセージ配列(HTMLの<b>込み)を単一ソースで返す。カードはcr-warn・表ビューは⚠tooltipで共用。
+  function laborLimitItems(e){
+    if(!e||e.payType==='役員') return [];
+    var W=window.Warimashi, PC=window.PayrollCalc; if(!W) return []; var m=warimashiMins(e.warimashi); var out=[];
     if(W.overtimeLimitLevel){ var lv=W.overtimeLimitLevel(m.otMin, m.holidayMin);
-      if(lv==='over100') out.push('<div class="cr-warn" style="margin:8px 0 0">⚠ <b>時間外＋休日労働</b>が<b>単月100時間以上</b>です。36協定の特別条項でも<b>上限違反の恐れ</b>があります（労基法36条・いわゆる過労死ライン）。</div>');
-      else if(lv==='over45') out.push('<div class="cr-warn" style="margin:8px 0 0">⚠ 時間外が<b>月45時間</b>を超えています。原則の上限を超えるには36協定の<b>特別条項</b>が必要です（労基法36条）。</div>'); }
+      if(lv==='over100') out.push('<b>時間外＋休日労働</b>が<b>単月100時間以上</b>です。36協定の特別条項でも<b>上限違反の恐れ</b>があります（労基法36条・いわゆる過労死ライン）');
+      else if(lv==='over45') out.push('時間外が<b>月45時間</b>を超えています。原則の上限を超えるには36協定の<b>特別条項</b>が必要です（労基法36条）'); }
     if(PC&&PC.isMinor&&PC.isMinor(e.birthYmd,state.month)){
-      if(m.nightMin>0) out.push('<div class="cr-warn" style="margin:8px 0 0">⚠ <b>18歳未満</b>の方に<b>深夜（22時〜翌5時）の労働</b>が入っています。年少者の深夜業は原則禁止です（労基法61条）。</div>');
-      if(m.otMin>0||m.holidayMin>0) out.push('<div class="cr-warn" style="margin:8px 0 0">⚠ <b>18歳未満</b>の方に<b>時間外・休日労働</b>が入っています。年少者は原則できません（労基法60条）。</div>'); }
-    return out.join('');
+      if(m.nightMin>0) out.push('<b>18歳未満</b>の方に<b>深夜（22時〜翌5時）の労働</b>が入っています。年少者の深夜業は原則禁止です（労基法61条）');
+      if(m.otMin>0||m.holidayMin>0) out.push('<b>18歳未満</b>の方に<b>時間外・休日労働</b>が入っています。年少者は原則できません（労基法60条）'); }
+    return out;
   }
+  function laborLimitWarn(e){ return laborLimitItems(e).map(function(t){ return '<div class="cr-warn" style="margin:8px 0 0">⚠ '+t+'。</div>'; }).join(''); }
+  function laborLimitText(e){ return laborLimitItems(e).map(function(t){ return t.replace(/<[^>]+>/g,''); }).join(' / '); } // 表ビューの⚠tooltip用(タグ除去)
   // ③社会保険(健保/厚年)を常用らしい人で恣意的にオフにした時の黄警告(健保法/厚年法の強制加入)。産育休/休職の免除・年齢による自動喪失・短時間は対象外。非ブロック。
   function shahoOffWarn(e){
     if(!e||(e.workStatus&&e.workStatus!=='normal')) return '';           // 産育休/休職等=正当な免除/調整
     if(!(e.payType==='月給'||e.payType==='役員')) return '';             // 時給/日給/歩合の短時間は適用除外の可能性=誤警告回避
+    if(e.shortTimeType) return '';                                       // 短時間就労者/短時間労働者を宣言済=適用除外の可能性=誤警告回避(L-3)
     var PC=window.PayrollCalc, ap=e.apply||{}, off=[];
     var healthElig=!(PC&&PC.isHealthTarget)||PC.isHealthTarget(e.birthYmd,state.month);   // 75歳未満=加入対象
     var pensionElig=!(PC&&PC.isPensionTarget)||PC.isPensionTarget(e.birthYmd,state.month); // 70歳未満=加入対象
@@ -1414,7 +1418,8 @@
       var conf=cf?'<input type="checkbox" class="econf" data-econf="'+i+'" checked title="確認済">'
         :nr?'<input type="checkbox" class="econf" data-econf="'+i+'" title="要確認">':'<span class="thint">—</span>';
       var mw=minWageInfo(e); var mwWarn=(mw&&!mw.ok)?' <span class="tmw" title="'+attr(mwWarnText(mw))+'">⚠</span>':'';
-      return '<tr class="trow" data-i="'+i+'"><td class="tnm">'+esc(e.name)+wsBadge(e)+mwWarn+'</td>'
+      var llt=laborLimitText(e); var llWarn=llt?' <span class="tlw" title="'+attr(llt)+'">⚠</span>':''; // ④⑤ 36協定/年少者を表ビューにも(L-4)
+      return '<tr class="trow" data-i="'+i+'"><td class="tnm">'+esc(e.name)+wsBadge(e)+mwWarn+llWarn+'</td>'
         +kinCell(e,i,/出勤/)+kinCell(e,i,/欠勤/)+kinCell(e,i,/有給/)
         +hmCell(0,0,e.workedH,e.workedM,'wk-f','data-wkf="workedH"','data-wkf="workedM"')
         +wariCell(e,'ot')+wariCell(e,'night')+wariCell(e,'holiday')
@@ -1430,7 +1435,8 @@
   }
   function refreshCard(i){ var e=state.employees[i];
     var trow=$('#input-list .trow[data-i="'+i+'"]'); if(trow){ var rt=compute(e); var nv=trow.querySelector('.tnet-v'); if(nv) nv.textContent=yen(rt.net); var td=trow.querySelector('.tdiff'); if(td) td.innerHTML=diffBadge(e,rt);
-      var nmc=trow.querySelector('.tnm'); if(nmc){ var mw=minWageInfo(e); var mwc=nmc.querySelector('.tmw'); if(mw&&!mw.ok){ if(!mwc){ var sp=document.createElement('span'); sp.className='tmw'; sp.title=mwWarnText(mw); sp.textContent=' ⚠'; nmc.appendChild(sp); } else { mwc.title=mwWarnText(mw); } } else if(mwc){ mwc.remove(); } } // B7: 最賃⚠も即時更新
+      var nmc=trow.querySelector('.tnm'); if(nmc){ var mw=minWageInfo(e); var mwc=nmc.querySelector('.tmw'); if(mw&&!mw.ok){ if(!mwc){ var sp=document.createElement('span'); sp.className='tmw'; sp.title=mwWarnText(mw); sp.textContent=' ⚠'; nmc.appendChild(sp); } else { mwc.title=mwWarnText(mw); } } else if(mwc){ mwc.remove(); }
+        var llt=laborLimitText(e); var llc=nmc.querySelector('.tlw'); if(llt){ if(!llc){ var sp2=document.createElement('span'); sp2.className='tlw'; sp2.textContent=' ⚠'; nmc.appendChild(sp2); llc=sp2; } llc.title=llt; } else if(llc){ llc.remove(); } } // B7: 最賃⚠＋労働時間⚠(L-4)も即時更新
       return; } // 表モードは手取り/前月比/最賃⚠セルを更新(フォーカス維持)
     var card=$('#input-list .acc[data-i="'+i+'"]'); if(!card) return; var r=compute(e); card.querySelector('.acc-net').textContent=yen(r.net); var dw=card.querySelector('.diffb-wrap'); if(dw) dw.innerHTML=diffBadge(e,r); var bn=card.querySelector('.basepay-note'); if(bn) bn.innerHTML=basePayNoteOnly(e); var cw=card.querySelector('.calc-wrap'); if(cw) cw.innerHTML=calcBoxHTML(e); var wr=card.querySelector('.wi-resw'); if(wr) wr.innerHTML=wiResHTML(e); var lw=card.querySelector('.wi-limitw'); if(lw) lw.innerHTML=laborLimitWarn(e); } // ④⑤労働時間の黄警告もライブ更新
 
