@@ -213,6 +213,27 @@
     return null;                                                                    // 月給/時給/日給=定額or時間給=保障あり(対象外)
   }
   function hoshoWarnText(){ return '<b>保障給がありません</b>（労基法27条）。出来高払・歩合で働く人には<b>労働時間に応じた保障給</b>（例：時給の下限）が必要で、保障のない完全歩合は違反の恐れがあります。決め方を<b>「高い方（完全歩合＋保障）」</b>にして<b>時給×時間</b>の候補を足すか、歩合形態なら<b>保障給の時給</b>を入れてください。'; }
+  // 割増率が法定下限を下回る時の黄警告(労基37条)。会社は上げてよいが下回りは違法の恐れ→非ブロックで注意。
+  function rateFloorWarn(co){
+    if(!window.Warimashi||!Warimashi.belowLegalRates) return '';
+    var pr=function(v){ return (v!=null&&v!=='')?num(v)/100:undefined; };
+    var low=Warimashi.belowLegalRates({ ot:pr(co.rateOt), holiday:pr(co.rateHoliday), night:pr(co.rateNight), over60Add:pr(co.rateOver60) });
+    if(!low.length) return '';
+    var names=low.map(function(x){ return x.label+'（'+Math.round(x.value*100)+'%→法定'+Math.round(x.floor*100)+'%）'; }).join('・');
+    return '<div class="cr-warn" style="margin:6px 2px 0">⚠ 割増の率が<b>法定下限</b>を下回っています：'+names+'。労基法37条の下限（時間外25%／休日35％／深夜+25%／月60時間超+25%）以上が必要です（このまま保存・計算はできます）。</div>';
+  }
+  // 年間所定労働時間が法定(週40h)目安を超える時の黄警告(労基32条)。年間休日過少/長時間所定。役員/休業中は対象外。
+  //  ★ヘルプ(annual)で「黄色で教えます」と約束している警告の実体。変形労働時間制なら適法もあり=注意のみ・非ブロック。
+  function annualHoursInfo(e){
+    if(!e||e.payType==='役員'||(e.workStatus&&e.workStatus!=='normal')) return null;
+    if(!window.Warimashi||!Warimashi.annualHoursCheck) return null;
+    var co=state.company||{};
+    var ah=(e.annualHolidays!=null&&e.annualHolidays!=='')?e.annualHolidays:co.annualHolidays;
+    var dwh=num((e.dailyWorkH!=null&&e.dailyWorkH!=='')?e.dailyWorkH:co.dailyWorkH)+num((e.dailyWorkM!=null&&e.dailyWorkM!=='')?e.dailyWorkM:co.dailyWorkM)/60;
+    var ly=parseInt(String(state.month||'').slice(0,4),10)||0, leap=(ly%4===0&&ly%100!==0)||(ly%400===0);
+    return Warimashi.annualHoursCheck(ah, dwh, leap);
+  }
+  function annualHoursWarnText(r){ return '<b>年間の労働時間が法律の目安（週40時間）を超えています</b>（約'+fmtN(Math.round(r.annualHours))+'時間／週あたり約'+(Math.round(r.avgWeekly*10)/10)+'時間・労基法32条）。年間休日を増やすか1日の所定を短くしてください。変形労働時間制なら適法な場合もあります（このまま保存・計算はできます）。'; }
   // 対象月の法定値(社保料率・所得税額表・最低賃金)が未収録年度なら暫定計算の黄警告(silent-wrong防止)。値は捏造せず直近収録値で暫定。
   function statutoryStaleWarn(){
     var msgs=[]; var S=SHH();
@@ -578,14 +599,17 @@
     if(on.shotei){ h+=ruleItemHTML('shotei','1日の働く時間','所定労働','shotei',
       '<span class="dur"><input class="cr-f cr-dur" data-cf="dailyWorkH" inputmode="numeric" value="'+attr(c.dailyWorkH)+'"><i>時間</i><input class="cr-f cr-dur" data-cf="dailyWorkM" inputmode="numeric" value="'+attr(c.dailyWorkM)+'"><i>分</i></span>'); }
     if(on.annual){
-      h+=ruleItemHTML('annual','年間の休み','日','annual','<input class="cr-f cr-wide" data-cf="annualHolidays" inputmode="numeric" value="'+attr(c.annualHolidays)+'">'); }
+      var annCo=(window.Warimashi&&Warimashi.annualHoursCheck)?(function(){ var ly=parseInt(String(state.month||'').slice(0,4),10)||0, leap=(ly%4===0&&ly%100!==0)||(ly%400===0); return Warimashi.annualHoursCheck(c.annualHolidays, num(c.dailyWorkH)+num(c.dailyWorkM)/60, leap); })():null;
+      var annWarn=(annCo&&annCo.over)?'<div class="cr-warn" style="margin:6px 2px 0">⚠ '+annualHoursWarnText(annCo)+'</div>':'';
+      h+=ruleItemHTML('annual','年間の休み','日','annual','<input class="cr-f cr-wide" data-cf="annualHolidays" inputmode="numeric" value="'+attr(c.annualHolidays)+'">'+annWarn); }
     if(on.warimashiRate){
       var rr='<div class="rate-grid">'
         +'<div><div class="mini-l">残業</div><span class="dur"><input class="cr-f cr-rate" data-cf="rateOt" inputmode="numeric" value="'+attr(c.rateOt)+'" placeholder="125"><i>%</i></span></div>'
         +'<div><div class="mini-l">法定休日</div><span class="dur"><input class="cr-f cr-rate" data-cf="rateHoliday" inputmode="numeric" value="'+attr(c.rateHoliday)+'" placeholder="135"><i>%</i></span></div>'
         +'<div><div class="mini-l">深夜（上乗せ）</div><span class="dur"><input class="cr-f cr-rate" data-cf="rateNight" inputmode="numeric" value="'+attr(c.rateNight)+'" placeholder="25"><i>+%</i></span></div>'
         +'<div><div class="mini-l">月60時間超（上乗せ）</div><span class="dur"><input class="cr-f cr-rate" data-cf="rateOver60" inputmode="numeric" value="'+attr(c.rateOver60)+'" placeholder="25"><i>+%</i></span></div>'
-        +'</div><div class="ri-note">空欄＝法定どおり自動（残業125%・休日135%・深夜+25%）。会社は上げられます（詳しくは💡）。</div>';
+        +'</div><div class="ri-note">空欄＝法定どおり自動（残業125%・休日135%・深夜+25%）。会社は上げられます（詳しくは💡）。</div>'
+        +rateFloorWarn(c);
       h+=ruleItemHTML('warimashiRate','割増の率','残業・休日・深夜','warimashi',rr); }
     if(on.koyoGyoshu){
       var gopts=EMPLOY_GYOSHU.map(function(g){return '<option value="'+g[0]+'"'+(c.gyoshu===g[0]?' selected':'')+'>'+esc(g[1])+'（労'+(employRateOf(g[0])*100).toFixed(2)+'%）</option>';}).join('');
@@ -749,6 +773,7 @@
         var reduceRow = showReduce ? '<div class="frow" style="margin:0 2px 8px"><div class="flabel">最賃 減額特例<span class="hint2">%・労働局長の許可がある場合のみ</span><span class="help-i" data-help="saiteigengaku">💡</span></div><input class="finput num m-f" data-f="minWageReduce" inputmode="numeric" value="'+attr(e.minWageReduce)+'" placeholder="0" style="max-width:120px"></div>' : '';
         return banner+reduceRow; })()
       +(function(){ var h=hoshoInfo(e); return (h&&!h.ok)?'<div class="cr-warn" style="margin:0 2px 8px">⚠ '+hoshoWarnText()+'</div>':''; })()
+      +(function(){ var a=annualHoursInfo(e); return (a&&a.over)?'<div class="cr-warn" style="margin:0 2px 8px">⚠ '+annualHoursWarnText(a)+'</div>':''; })()
       +'<div class="frow2"><div class="frow"><div class="flabel">都道府県<span class="hint2">健保率</span></div><select class="finput m-f" data-f="pref">'+prefOptions(e.pref)+'</select></div>'
         +'<div class="frow"><div class="flabel">通勤手当<span class="hint2">円/月</span><span class="help-i" data-help="commute">💡</span></div><input class="finput num m-f" data-f="commute" inputmode="numeric" value="'+attr(fmtN(e.commute))+'"></div></div>';
     // ── 詳細（折りたたみ・既定で閉じる）──
@@ -994,9 +1019,10 @@
       // 支給行は非課税を“トグル”に(任意の手当を非課税にできる)。項目名で自動判定される通勤等はON固定(自動)
       var hz='';
       if(g==='shikyu'){
-        hz = labelAuto
-          ? '<label class="row-hz" title="項目名から自動で非課税" style="font-size:10px;color:#3D9E72;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:2px"><input type="checkbox" checked disabled>非課税</label>'
-          : '<label title="チェックで所得税の非課税にする(社保は対象)" style="font-size:10px;color:'+(it.hikazei?'#3D9E72':'#6E907E')+';font-weight:'+(it.hikazei?'700':'400')+';white-space:nowrap;display:inline-flex;align-items:center;gap:2px"><input type="checkbox" class="ck" data-g="shikyu" data-ri="'+ri+'"'+(it.hikazei?' checked':'')+'>非課税</label>';
+        // 非課税は名称一致(通勤/出張/旅費/宿泊/日当)なら既定ON・ただし外せる(課税の日当等に対応)。明示hikazei(true/false)があれば尊重。
+        var isNT = (it.hikazei===true) || (it.hikazei==null && labelAuto);
+        var ttl = labelAuto ? 'この名称は通常 非課税（外せます。課税の日当・出張手当ならチェックを外す）' : 'チェックで所得税の非課税にする(社保は対象)';
+        hz = '<label class="row-hz" title="'+ttl+'" style="font-size:10px;color:'+(isNT?'#3D9E72':'#6E907E')+';font-weight:'+(isNT?'700':'400')+';white-space:nowrap;display:inline-flex;align-items:center;gap:2px"><input type="checkbox" class="ck" data-g="shikyu" data-ri="'+ri+'"'+(isNT?' checked':'')+'>非課税</label>';
       }
       return '<div class="row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px"><input class="finput" data-g="'+g+'" data-ri="'+ri+'" data-f="label" value="'+attr(it.label)+'" style="flex:1.3" placeholder="項目"><input class="finput num" data-g="'+g+'" data-ri="'+ri+'" data-f="value" value="'+attr(it.value)+'" style="flex:1" placeholder="'+(g==='kintai'?'値':'金額')+'">'+hz+'<button class="b-del m-del" data-g="'+g+'" data-ri="'+ri+'" aria-label="この項目を削除">×</button></div>';
     }).join('');
@@ -2515,7 +2541,7 @@
       var x=ev.target.closest('[data-rule-x]'); if(x){ state.company.ruleOn[x.dataset.ruleX]=false; renderRuleChips(); renderCompanyRules(); return; }
     });
     rh.addEventListener('input',function(ev){ if(ev.target.tagName==='SELECT')return; var f=ev.target.dataset.cf; if(f) state.company[f]=ev.target.value.replace(/[^0-9]/g,''); });
-    rh.addEventListener('change',function(ev){ if(ev.target.dataset.coh!=null){ state.company.companyHolidays=(state.company.companyHolidays||[]); state.company.companyHolidays[+ev.target.dataset.coh]=ev.target.value; return; } var f=ev.target.dataset.cf; if(f==='gyoshu'){ state.company.gyoshu=ev.target.value; return; } if(f==='shahoTiming'){ state.company.shahoTiming=ev.target.value; return; } if(f==='paymentDaysMethod'){ state.company.paymentDaysMethod=ev.target.value; return; } if(f==='kekkinMethod'){ state.company.kekkinMethod=ev.target.value; return; } if(f==='kanzenGekkyu'){ state.company.kanzenGekkyu=ev.target.checked; renderCompanyRules(); return; } if(f==='daikyuDeduct'){ state.company.daikyuDeduct=ev.target.checked; return; } if(f==='annualHolidays'||f==='dailyWorkH'||f==='dailyWorkM') renderCompanyRules(); });
+    rh.addEventListener('change',function(ev){ if(ev.target.dataset.coh!=null){ state.company.companyHolidays=(state.company.companyHolidays||[]); state.company.companyHolidays[+ev.target.dataset.coh]=ev.target.value; return; } var f=ev.target.dataset.cf; if(f==='gyoshu'){ state.company.gyoshu=ev.target.value; return; } if(f==='shahoTiming'){ state.company.shahoTiming=ev.target.value; return; } if(f==='paymentDaysMethod'){ state.company.paymentDaysMethod=ev.target.value; return; } if(f==='kekkinMethod'){ state.company.kekkinMethod=ev.target.value; return; } if(f==='kanzenGekkyu'){ state.company.kanzenGekkyu=ev.target.checked; renderCompanyRules(); return; } if(f==='daikyuDeduct'){ state.company.daikyuDeduct=ev.target.checked; return; } if(f==='annualHolidays'||f==='dailyWorkH'||f==='dailyWorkM'||f==='rateOt'||f==='rateHoliday'||f==='rateNight'||f==='rateOver60') renderCompanyRules(); }); // 年間労働時間(32条)/割増率(37条)の黄警告をライブ更新
     $('#b-add-emp').addEventListener('click',function(){ var e=defEmp('従業員 '+(state.employees.length+1)); state.employees.push(e); state.open[e.id]=true; if($('#emp-search'))$('#emp-search').value=''; renderEmpMaster(); });
     (function(){ var es=$('#emp-search'); if(es) es.addEventListener('input', filterEmpSearch); })(); // 氏名検索(UX#9)
 

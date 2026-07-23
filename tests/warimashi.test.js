@@ -331,3 +331,40 @@ T('hydrate: 未知キーは無視(RATEに存在するキーのみ)', function ()
   eq(W.RATE.ot, 1.28); eq(W.RATE.bogus, undefined, '未知キーは追加されない');
   W.hydrate({ ot: 1.25 }); eq(W.RATE.ot, 1.25); // 復元
 });
+
+/* ── ★割増率 法定下限チェック(belowLegalRates・労基37条)★ ── */
+T('割増率下限: 空欄/法定どおり/上げは違反なし', function () {
+  eq(W.belowLegalRates({}).length, 0);                                   // 全部空=法定自動
+  eq(W.belowLegalRates({ ot: 1.25, holiday: 1.35, night: 0.25, over60Add: 0.25 }).length, 0);
+  eq(W.belowLegalRates({ ot: 1.5, holiday: 1.6, night: 0.3 }).length, 0); // 上げるのは合法
+});
+T('割増率下限: 時間外100%(割増ゼロ)・深夜0%を検知', function () {
+  var low = W.belowLegalRates({ ot: 1.0, night: 0 });
+  var keys = low.map(function (x) { return x.key; });
+  ok(keys.indexOf('ot') >= 0, '時間外1.0<1.25を検知: ' + JSON.stringify(keys));
+  ok(keys.indexOf('night') >= 0, '深夜0<0.25を検知: ' + JSON.stringify(keys));
+});
+T('割増率下限: 休日1.2・60h超+0.1の下回りを検知(floorを返す)', function () {
+  var low = W.belowLegalRates({ holiday: 1.2, over60Add: 0.1 });
+  var keys = low.map(function (x) { return x.key; });
+  ok(keys.indexOf('holiday') >= 0 && keys.indexOf('over60Add') >= 0, JSON.stringify(keys));
+  eq(low.find(function (x) { return x.key === 'holiday'; }).floor, 1.35);
+});
+
+/* ── ★年間所定労働時間 法定超チェック(annualHoursCheck・労基32条 週40h)★ ── */
+T('年間時間: 週休2日8h(休104〜120日)は目安内=over false(誤警告しない)', function () {
+  eq(W.annualHoursCheck(120, 8, false).over, false);                    // 245日×8=1960h
+  eq(W.annualHoursCheck(104, 8, false).over, false);                    // 週40h相当=標準を警告しない
+});
+T('年間時間: 休日過少/長時間所定は over true', function () {
+  eq(W.annualHoursCheck(80, 8, false).over, true);                      // 285日×8=2280h
+  eq(W.annualHoursCheck(105, 10, false).over, true);                    // 260日×10=2600h
+});
+T('年間時間: 判定材料なし(所定0/休日空)はnull', function () {
+  eq(W.annualHoursCheck(120, 0, false), null);
+  eq(W.annualHoursCheck('', 8, false), null);
+  eq(W.annualHoursCheck(null, 8, false), null);
+});
+T('年間時間: 閏年は366日基準で計算', function () {
+  eq(W.annualHoursCheck(100, 8, true).annualHours, (366 - 100) * 8);
+});
