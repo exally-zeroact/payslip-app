@@ -113,3 +113,24 @@ T('空/無効specは0・落ちない', function () {
   eq(P.basePay(null, null).base, 0);
   eq(P.basePay({ fixed: 0, variable: { mode: 'max', parts: [] } }, {}).base, 0);
 });
+
+/* ── ★労基法27条 保障給チェック(lacksGuarantee)★ ── */
+T('27条: 完全歩合・無保障(固定0・売上×率のみ)=違反の恐れ=true', function () {
+  ok(P.lacksGuarantee({ fixed: 0, variable: { mode: 'one', parts: [{ type: 'rate', amount: 35 }] } }) === true);
+  ok(P.lacksGuarantee({ fixed: 0, variable: { mode: 'one', parts: [{ type: 'commission' }] } }) === true);
+  // 「高い方」でも候補が出来高だけ(rate と commission)で時給保障が無ければ無保障
+  ok(P.lacksGuarantee({ fixed: 0, variable: { mode: 'max', parts: [{ type: 'rate', amount: 35 }, { type: 'commission' }] } }) === true);
+});
+T('27条: 時給保障つき「高い方」は保障あり=false', function () {
+  ok(P.lacksGuarantee({ fixed: 0, variable: { mode: 'max', parts: [{ type: 'rate', amount: 35 }, { type: 'hourly', amount: 1200 }] } }) === false);
+  ok(P.lacksGuarantee({ fixed: 0, variable: { mode: 'max', parts: [{ type: 'commission' }, { type: 'daily', amount: 8000 }] } }) === false);
+});
+T('27条: 固定給がある(固定18万+歩合上乗せ)は保障あり=false', function () {
+  ok(P.lacksGuarantee({ fixed: 180000, variable: { mode: 'one', parts: [{ type: 'commission' }] } }) === false);
+});
+T('27条: 出来高が無い(固定のみ/時給のみ/空)は対象外=false', function () {
+  ok(P.lacksGuarantee({ fixed: 250000, variable: { mode: 'none', parts: [] } }) === false);
+  ok(P.lacksGuarantee({ fixed: 0, variable: { mode: 'one', parts: [{ type: 'hourly', amount: 1500 }] } }) === false);
+  ok(P.lacksGuarantee({}) === false);
+  ok(P.lacksGuarantee(null) === false);
+});

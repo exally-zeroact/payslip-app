@@ -45,12 +45,15 @@
     else { tr.from=String(val).replace(/[^0-9]/g,''); } }
   function PPARSE(){ return (typeof PayParse!=='undefined')?PayParse:(window&&window.PayParse); }
   // 雑入力の解釈結果を従業員に反映(payType+base/hourly/payRule)
-  function applyParse(e,r){ if(!r||!r.ok)return; e.payType=r.payType;
+  function applyParse(e,r){ if(!r||!r.ok)return; if(r.payType) e.payType=r.payType; // payType=null=手当のみ反映(給与形態は据え置き)
     if(r.fields.hourly!=null) e.hourly=r.fields.hourly;
     if(r.fields.base!=null) e.base=r.fields.base;
     if(r.fields.payRule){ e.payRule=JSON.parse(JSON.stringify(r.fields.payRule)); }
     if(e.payType==='カスタム') ensurePayRule(e);
-    syncBasePay(e);
+    // 手当の雑入力反映: 通勤はe.commute(syncで通勤手当行へ)・他はshikyuへupsert(同名は上書き)
+    if(r.fields.commute!=null) e.commute=r.fields.commute;
+    if(Array.isArray(r.fields.shikyu)){ if(!Array.isArray(e.shikyu))e.shikyu=[]; r.fields.shikyu.forEach(function(t){ var i=e.shikyu.findIndex(function(x){return (x.label||'')===t.label;}); if(i>=0) e.shikyu[i].value=t.value; else e.shikyu.push({label:t.label,value:t.value}); }); }
+    syncBasePay(e); syncCommute(e);
   }
   // 解釈の「数字例つき確認」テキスト。例の当月値でbasePayを計算して見せる=人が誤読を捕まえる(silent-wrong防止)
   function parseExampleText(r){
@@ -201,6 +204,15 @@
   }
   // 最賃割れのtooltip/説明文(表ビューの⚠とカードのバナーで文面を統一)。製品方針=黄色・非ブロック・具体的に伝える。
   function mwWarnText(mw){ var v=(mw.reduce>0)?mw.effMinWage:mw.minWage, sfx=(mw.reduce>0)?'（減額特例'+fmtN(mw.reduce)+'%後）':''; return '最低賃金（'+esc(mw.prefName)+'：時給'+fmtN(v)+'円'+sfx+'）を下回っています（約'+fmtN(mw.hourly)+'円）'; }
+  // 出来高払制の保障給チェック(労基法27条)。完全歩合で保障(時給/日給の下限 or 固定給)が一切ない=27条違反の恐れ。役員/休業中は対象外。返り{ok} ok=false=無保障。
+  //  ★製品方針=黄色・非ブロック(違法・グレーでもユーザーが選択/入力して使えるようにする=注意のみ)。構造判定は lib/pay-rule.js の lacksGuarantee に集約。
+  function hoshoInfo(e){
+    if(!e||e.payType==='役員'||(e.workStatus&&e.workStatus!=='normal')) return null;
+    if(e.payType==='歩合') return { ok: num(e.hourlyGuarantee)>0 };                 // 歩合payType=保障給の時給が未設定(0)なら無保障
+    if(e.payType==='カスタム'){ if(!e.payRule||!window.PayRule||!PayRule.lacksGuarantee) return null; return { ok: !PayRule.lacksGuarantee(e.payRule) }; }
+    return null;                                                                    // 月給/時給/日給=定額or時間給=保障あり(対象外)
+  }
+  function hoshoWarnText(){ return '<b>保障給がありません</b>（労基法27条）。出来高払・歩合で働く人には<b>労働時間に応じた保障給</b>（例：時給の下限）が必要で、保障のない完全歩合は違反の恐れがあります。決め方を<b>「高い方（完全歩合＋保障）」</b>にして<b>時給×時間</b>の候補を足すか、歩合形態なら<b>保障給の時給</b>を入れてください。'; }
   // 対象月の法定値(社保料率・所得税額表・最低賃金)が未収録年度なら暫定計算の黄警告(silent-wrong防止)。値は捏造せず直近収録値で暫定。
   function statutoryStaleWarn(){
     var msgs=[]; var S=SHH();
@@ -215,6 +227,7 @@
     var w=[]; var mw=minWageInfo(e); if(mw&&!mw.ok) w.push('最低賃金（'+mw.prefName+' 時給'+fmtN(mw.reduce>0?mw.effMinWage:mw.minWage)+'円'+(mw.reduce>0?'・減額特例'+fmtN(mw.reduce)+'%後':'')+'）未満（約'+fmtN(mw.hourly)+'円）');
     try{ var r=compute(e); if(r&&r.netNegative) w.push('差引支給がマイナス'); }catch(_){}
     if(e.workStatus==='kyugyo'&&num(e.leavePay)<=0) w.push('休業手当が未入力（平均賃金60%以上・労基26条）');
+    var h=hoshoInfo(e); if(h&&!h.ok) w.push('保障給なし（完全歩合・労基27条の恐れ）');
     return w;
   }
   function prefOptions(sel){
@@ -735,6 +748,7 @@
         var showReduce = (!mw.ok) || num(e.minWageReduce)>0;
         var reduceRow = showReduce ? '<div class="frow" style="margin:0 2px 8px"><div class="flabel">最賃 減額特例<span class="hint2">%・労働局長の許可がある場合のみ</span><span class="help-i" data-help="saiteigengaku">💡</span></div><input class="finput num m-f" data-f="minWageReduce" inputmode="numeric" value="'+attr(e.minWageReduce)+'" placeholder="0" style="max-width:120px"></div>' : '';
         return banner+reduceRow; })()
+      +(function(){ var h=hoshoInfo(e); return (h&&!h.ok)?'<div class="cr-warn" style="margin:0 2px 8px">⚠ '+hoshoWarnText()+'</div>':''; })()
       +'<div class="frow2"><div class="frow"><div class="flabel">都道府県<span class="hint2">健保率</span></div><select class="finput m-f" data-f="pref">'+prefOptions(e.pref)+'</select></div>'
         +'<div class="frow"><div class="flabel">通勤手当<span class="hint2">円/月</span><span class="help-i" data-help="commute">💡</span></div><input class="finput num m-f" data-f="commute" inputmode="numeric" value="'+attr(fmtN(e.commute))+'"></div></div>';
     // ── 詳細（折りたたみ・既定で閉じる）──
