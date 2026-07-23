@@ -133,6 +133,16 @@ T('介護境界 1986-06-01生: 2026-05は対象/2026-04は非対象', function (
   eq(PayrollCalc.isKaigoTarget('1986-06-01', '2026-04'), false);
 });
 
+/* ---- ⑤ 年少者(満18歳未満)判定 isMinor(労基60/61条) ---- */
+T('isMinor: 18歳到達で年少者でなくなる境界(到達=誕生日前日の月・2008-06-15生)', function () {
+  eq(PayrollCalc.isMinor('2008-06-15', '2026-05'), true);   // 到達前月=まだ17歳=年少者
+  eq(PayrollCalc.isMinor('2008-06-15', '2026-06'), false);  // 18歳到達月=年少者でない
+  eq(PayrollCalc.isMinor('2010-01-15', '2026-06'), true);   // 16歳=年少者
+  eq(PayrollCalc.isMinor('1990-01-01', '2026-06'), false);  // 成人
+  eq(PayrollCalc.isMinor('', '2026-06'), false);            // 生年月日不明=安全側でfalse
+  eq(PayrollCalc.isMinor('2010-01-15', ''), false);         // 月不明=false
+});
+
 /* ---- 標準報酬の決め方(社会保険) ---- */
 T('shahoBase 定時: 支払基礎日数17日未満の月を除外して平均', function () {
   var r = PayslipCalc.shahoBase({ mode: 'teiji', months: [{ pay: 320000, days: 30 }, { pay: 340000, days: 30 }, { pay: 180000, days: 15 }] });
@@ -216,4 +226,21 @@ T('最低賃金: getChingin(tokyo)=1226 / 未知prefはnull', function () {
 T('最低賃金チェック: 時給<最賃で割れ判定(warimashi.minWageOk)', function () {
   ok(W2 && W2.minWageOk(1100 * 160, 160 * 60, 1226) === false, '時給1100は東京1226を下回る=NG');
   ok(W2.minWageOk(1300 * 160, 160 * 60, 1226) === true, '時給1300はOK');
+});
+
+/* ---- ④ 36協定 時間外上限(労基36条) overtimeLimitLevel ---- */
+T('残業上限: 45h以下=none / 45h超=over45 / 100h以上=over100', function () {
+  eq(W2.overtimeLimitLevel(0), 'none');
+  eq(W2.overtimeLimitLevel(45 * 60), 'none');           // ちょうど45hは原則内
+  eq(W2.overtimeLimitLevel(45 * 60 + 1), 'over45');     // 45h超=特別条項が必要
+  eq(W2.overtimeLimitLevel(80 * 60), 'over45');
+  eq(W2.overtimeLimitLevel(100 * 60), 'over100');       // 時間外だけで100h以上
+  eq(W2.overtimeLimitLevel(120 * 60), 'over100');
+  eq(W2.overtimeLimitLevel(''), 'none');                // 空=0=none(誤警告しない)
+});
+T('残業上限: 単月100hは時間外＋法定休日の合計で判定(45hは時間外のみ)', function () {
+  eq(W2.overtimeLimitLevel(90 * 60, 30 * 60), 'over100'); // 時間外90+休日30=120h≧100=over100
+  eq(W2.overtimeLimitLevel(40 * 60, 65 * 60), 'over100'); // 時間外40+休日65=105h≧100(時間外単体は45未満でも合計で違反)
+  eq(W2.overtimeLimitLevel(50 * 60, 0), 'over45');        // 時間外50>45・休日0=over45(原則超は時間外のみで判定)
+  eq(W2.overtimeLimitLevel(40 * 60, 40 * 60), 'none');    // 時間外40(≤45)＋休日40=80<100=none
 });
