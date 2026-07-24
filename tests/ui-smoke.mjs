@@ -679,6 +679,20 @@ T('休業手当60%割れ警告(C): 月給kyugyoで leavePay<0.4×基本給→黄
   e.payType = '時給'; e.hourly = '1500'; e.leavePay = '10000'; render(); ok(!w60(), '時給は対象外=警告なし');
 });
 
+T('36協定 複数月80h平均警告: 履歴(state._otHist)＋当月で入力タブに黄警告(配線)', function () {
+  const q = s => doc.querySelector(s), qa = s => [...doc.querySelectorAll(s)];
+  A.state.employees = [A.defEmp('残業 太郎')];
+  const e = A.state.employees[0];
+  e.payType = '月給'; e.base = '300000'; e.warimashi = { mode: 'easy', otH: '90', otM: '0' };
+  A.state.inputView = 'card'; A.state.empFilter = 'active';
+  A.state.open = {}; A.state.open[e.id] = true;
+  const go = () => { const b = q('.bn[data-scr="scr-input"]'); if (b) b.click(); };
+  const has80 = () => qa('.cr-warn').some(x => /80時間.*36条|複数月平均80/.test(x.textContent));
+  A.state._otHist = {}; go(); ok(!has80(), '履歴なし(当月90hのみ)は複数月80h警告を出さない');
+  A.state._otHist = { [e.id]: [{ ym: '2026-04', otMin: 90 * 60, holidayMin: 0 }, { ym: '2026-05', otMin: 90 * 60, holidayMin: 0 }] };
+  go(); ok(has80(), '履歴2ヶ月@90h＋当月90h=平均90>80で複数月80h警告あり');
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

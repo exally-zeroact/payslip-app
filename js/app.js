@@ -253,6 +253,13 @@
     if(PC&&PC.isMinor&&PC.isMinor(e.birthYmd,state.month)){
       if(m.nightMin>0) out.push('<b>18歳未満</b>の方に<b>深夜（22時〜翌5時）の労働</b>が入っています。年少者の深夜業は原則禁止です（労基法61条）');
       if(m.otMin>0||m.holidayMin>0) out.push('<b>18歳未満</b>の方に<b>時間外・休日労働</b>が入っています。年少者は原則できません（労基法60条）'); }
+    // 36協定 特別条項の複数月/年の上限(履歴=保存済み過去11ヶ月[loadOtHistory]＋当月liveを合成)
+    if(W.overtime36Check){
+      var hist=((state._otHist||{})[e.id]||[]).map(function(x){ return { otMin:x.otMin, holidayMin:x.holidayMin }; });
+      var c36=W.overtime36Check(hist.concat([{ otMin:m.otMin, holidayMin:m.holidayMin }]));
+      if(c36.over80) out.push('直近<b>'+c36.over80.months+'か月</b>の時間外＋休日の平均が<b>月80時間</b>を超えています（約'+fmtN(Math.round(c36.over80.avgMin/60))+'h/月）。特別条項でも複数月平均80hが上限です（労基法36条）');
+      if(c36.over720) out.push('直近12か月の時間外が<b>年720時間</b>を超えています（約'+fmtN(Math.round(c36.over720.totalMin/60))+'h/年）。特別条項でも年720hが上限です（労基法36条）');
+      if(c36.over45count>6) out.push('時間外が<b>月45時間を超えた月が年'+c36.over45count+'回</b>あります。特別条項でも年6回までです（労基法36条）'); }
     return out;
   }
   function laborLimitWarn(e){ return laborLimitItems(e).map(function(t){ return '<div class="cr-warn" style="margin:8px 0 0">⚠ '+t+'。</div>'; }).join(''); }
@@ -1190,6 +1197,16 @@
       if($('#scr-input')&&$('#scr-input').classList.contains('active')) renderInput();
       if($('#scr-list')&&$('#scr-list').classList.contains('active')) renderListView(); }).catch(function(){});
   }
+  // 36協定の複数月/年チェック用に、直近11ヶ月の残業(otMin/holidayMin)を履歴から読む。当月はlive(warimashiMins)で合成。
+  function loadOtHistory(){ if(!(window.Store&&Store.getPayslipsByYm)) return; var ym=state.month; if(state._otHistYm===ym) return; state._otHistYm=ym;
+    var from=ymAddLocal(ym,-11), to=ymAddLocal(ym,-1); if(!from||!to) return;
+    Store.getPayslipsByYm(from,to).then(function(rows){ var m={};
+      (rows||[]).forEach(function(r){ if(r&&r.data&&r.data.kind!=='bonus'&&r.data.work){ (m[r.employee_id]=m[r.employee_id]||[]).push({ ym:String(r.ym), otMin:num(r.data.work.otMin), holidayMin:num(r.data.work.holidayMin) }); } });
+      Object.keys(m).forEach(function(k){ m[k].sort(function(a,b){ return a.ym<b.ym?-1:1; }); });
+      state._otHist=m;
+      if($('#scr-input')&&$('#scr-input').classList.contains('active')) renderInput();
+      if($('#scr-list')&&$('#scr-list').classList.contains('active')) renderListView(); }).catch(function(){}); // 表/一覧ビューもロード後に再描画(F2)
+  }
   function diffBadge(e,r){ var pv=state._prev||{}; if(!(e.id in pv)) return ''; var d=r.net-pv[e.id]; if(d===0) return ''; var cls=d>0?'up':'dn'; var t=d>0?'▲+'+fmtN(d):'▼'+fmtN(-d); return '<span class="diffb '+cls+'" title="前月比('+state._prevYm+')">'+t+'</span>'; }
   // ── 確認(未入力)ハイブリッド: 自動の前月比＋手動の確認✓・変動なしは自動済扱い ──
   function empConfirmed(e){ var c=state.confirmed&&state.confirmed[state.month]; return !!(c&&c[e.id]); }
@@ -1392,7 +1409,7 @@
     return { added:added, match:match, mismatch:mismatch, needInput:needInput, mmList:mmList, prevYm:prevYm };
   }
   function renderInput(){
-    var host=$('#input-list'); if(!host) return; loadPrev();
+    var host=$('#input-list'); if(!host) return; loadPrev(); loadOtHistory();
     var sche=scheduledDaysOf(state.month), H=HD();
     var hols=H?H.holidaysInMonth(state.month):[];
     var holStr=hols.length?hols.map(function(x){return x.day+'日 '+x.name;}).join('・'):'なし';
@@ -1691,7 +1708,7 @@
   // 一覧/集計タブの「表示中サブビュー」を再描画(月変更・タブ再表示で集計/帳票/年末調整も追従=stale防止)
   function renderListActive(){ var v=state.listView||'list'; if(v==='sum')renderSumView(); else if(v==='cho')renderChoView(); else if(v==='nen')renderNenView(); else renderListView(); }
   function renderListView(){
-    var host=$('#view-list'); if(!host) return; loadPrev();
+    var host=$('#view-list'); if(!host) return; loadPrev(); loadOtHistory();
     host.innerHTML=statutoryStaleWarn()+state.employees.filter(function(e){return isActiveInMonth(e,state.month);}).map(function(e){
       var r=compute(e), open=state.open['L'+e.id];
       var pay=r.shikyu.map(function(s){return '<div class="dl"><span>'+esc(s.label)+'</span><span class="v">'+yen(s.value)+'</span></div>';}).join('');
@@ -2983,10 +3000,10 @@
       if(!force && conf && conf[e.id]) return; // 確定済み=凍結(自動保存では上書きしない)。修正は「未確定に戻す」で明示的に
       var r=compute(e);
       var days=(window.PayrollCalc&&PayrollCalc.calcPaymentDays)?PayrollCalc.calcPaymentDays(e,ym,method):0;
-      var wc=e.warimashi||{};
-      // 賃金台帳用の内訳(後方互換=読む側は無くても壊れない)。ot/night/holidayは割増入力(かんたん)から分換算
-      var work={ days:kintaiVal(e,/出勤/), workMin:workedMin(e),
-        otMin:num(wc.otH)*60+num(wc.otM), nightMin:num(wc.nightH)*60+num(wc.nightM), holidayMin:num(wc.holidayH)*60+num(wc.holidayM) };
+      // 賃金台帳＋36協定履歴用の内訳(後方互換=読む側は無くても壊れない)。★かんたん/詳細 両モードを warimashiMins で統一算出
+      //  =当月liveと同一ソース。旧は easyフィールドのみで詳細モードの過去月が0埋め→36協定の複数月/年が発火しない不具合を解消(F1)。
+      var wm=warimashiMins(e.warimashi);
+      var work={ days:kintaiVal(e,/出勤/), workMin:workedMin(e), otMin:wm.otMin, nightMin:wm.nightMin, holidayMin:wm.holidayMin };
       var si=r.si||{};
       Store.savePayslip(ym, e.id, { name:e.name, shikyuTotal:r.shikyuTotal, paymentDays:days, kojoTotal:r.kojoTotal, net:r.net, kazei:r.kazei, siTotal:si.total||0,
         confirmed:!!(conf&&conf[e.id]), // ★確定フラグ=賃金台帳/年調は確定済みだけ集計(未確定の下書き月を混入させない)。旧データ(無し)は後方互換で集計対象

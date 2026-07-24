@@ -266,3 +266,38 @@ T('残業上限: 単月100hは時間外＋法定休日の合計で判定(45hは�
   eq(W2.overtimeLimitLevel(50 * 60, 0), 'over45');        // 時間外50>45・休日0=over45(原則超は時間外のみで判定)
   eq(W2.overtimeLimitLevel(40 * 60, 40 * 60), 'none');    // 時間外40(≤45)＋休日40=80<100=none
 });
+/* ★36協定 特別条項の複数月/年 上限(overtime36Check)★ */
+var mo = function (otH, hdH) { return { otMin: otH * 60, holidayMin: (hdH || 0) * 60 }; };
+T('36協定: 複数月平均80h超(時間外+休日)を検知', function () {
+  // 直近3ヶ月 時間外85h(休日0)→平均85>80 → over80
+  var r = W2.overtime36Check([mo(85), mo(85), mo(85)]);
+  ok(r.over80 && Math.round(r.over80.avgMin / 60) === 85, 'over80(平均85h): ' + JSON.stringify(r.over80));
+});
+T('36協定: 時間外75h+休日10hで合計85h平均→複数月80h超(休日も算入)', function () {
+  var r = W2.overtime36Check([mo(75, 10), mo(75, 10)]);
+  ok(r.over80 && r.over80.months === 2, '2ヶ月平均85h: ' + JSON.stringify(r.over80));
+});
+T('36協定: 各月70h(平均70<80)は複数月違反なし', function () {
+  eq(W2.overtime36Check([mo(70), mo(70), mo(70), mo(70)]).over80, null);
+});
+T('36協定: 年720h(時間外のみ)超を検知(休日は年720に含めない)', function () {
+  // 12ヶ月×時間外61h=732h>720 → over720
+  var many = []; for (var i = 0; i < 12; i++) many.push(mo(61));
+  var r = W2.overtime36Check(many);
+  ok(r.over720 && Math.round(r.over720.totalMin / 60) === 732, 'over720(732h): ' + JSON.stringify(r.over720));
+  // 時間外60h×12=720ちょうどは超えない
+  var many2 = []; for (var j = 0; j < 12; j++) many2.push(mo(60));
+  eq(W2.overtime36Check(many2).over720, null);
+});
+T('36協定: 時間外45h超が年6回まで(7回目で違反=over45count>6)', function () {
+  var arr = []; for (var i = 0; i < 7; i++) arr.push(mo(46)); for (var j = 0; j < 5; j++) arr.push(mo(30));
+  eq(W2.overtime36Check(arr).over45count, 7);
+  // 6回は違反でない(count=6)
+  var arr6 = []; for (var k = 0; k < 6; k++) arr6.push(mo(46)); for (var l = 0; l < 6; l++) arr6.push(mo(30));
+  eq(W2.overtime36Check(arr6).over45count, 6);
+});
+T('36協定: 空/1ヶ月は複数月・年とも違反なし(材料不足で誤検知しない)', function () {
+  var r = W2.overtime36Check([mo(90)]); // 単月90(単月上限はovertimeLimitLevel側)・複数月/年は不足
+  eq(r.over80, null); eq(r.over720, null); eq(r.over45count, 1);
+  var e = W2.overtime36Check([]); eq(e.over80, null); eq(e.over720, null); eq(e.over45count, 0);
+});
