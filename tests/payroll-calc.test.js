@@ -55,6 +55,15 @@ T('欠勤控除: 月給25万・年間休日120・欠勤10日(月平均所定日�
 T('欠勤控除: method=calendar は当月暦日数が分母(2026-06=30日)', function () {
   eq(P.calcKekkin({ base: 250000, ym: '2026-06', kekkinDays: 10, annualHolidays: 120, dailyHours: 8, method: 'calendar' }), 83333);
 });
+/* ★P1 欠勤控除の分母デグレ防止: annualHolidays未入力(空/0)でも暦日365/12(30.42)に退化させず標準120で計算 */
+T('欠勤控除: annualHolidays未入力は暦日でなく標準120相当(過少控除デグレ防止)', function () {
+  // 未入力(空)→ 年間休日120と同じ分母(20.4167日)で計算=退化しない
+  eq(P.calcKekkin({ base: 250000, ym: '2026-06', kekkinDays: 10, dailyHours: 8 }),
+     P.calcKekkin({ base: 250000, ym: '2026-06', kekkinDays: 10, annualHolidays: 120, dailyHours: 8 }));
+  eq(P.calcKekkin({ base: 250000, ym: '2026-06', kekkinDays: 10, annualHolidays: '', dailyHours: 8 }), 122449);
+  // 明示的な年間休日は尊重(105日→分母20.83で122,449より小さい1日単価)
+  ok(P.calcKekkin({ base: 250000, ym: '2026-06', kekkinDays: 10, annualHolidays: 105, dailyHours: 8 }) < 122449);
+});
 T('欠勤控除: 欠勤0なら0 / base0なら0', function () {
   eq(P.calcKekkin({ base: 250000, ym: '2026-06', kekkinDays: 0, annualHolidays: 120, dailyHours: 8 }), 0);
   eq(P.calcKekkin({ base: 0, ym: '2026-06', kekkinDays: 10, annualHolidays: 120, dailyHours: 8 }), 0);

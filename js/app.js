@@ -283,6 +283,7 @@
     var w=[]; var mw=minWageInfo(e); if(mw&&!mw.ok) w.push('最低賃金（'+mw.prefName+' 時給'+fmtN(mw.reduce>0?mw.effMinWage:mw.minWage)+'円'+(mw.reduce>0?'・減額特例'+fmtN(mw.reduce)+'%後':'')+'）未満（約'+fmtN(mw.hourly)+'円）');
     try{ var r=compute(e); if(r&&r.netNegative) w.push('差引支給がマイナス'); }catch(_){}
     if(e.workStatus==='kyugyo'&&num(e.leavePay)<=0) w.push('休業手当が未入力（平均賃金60%以上・労基26条）');
+    else if(e.workStatus==='kyugyo'&&e.payType==='月給'&&num(e.leavePay)>0&&num(e.leavePay)<0.4*num(e.base)) w.push('休業手当が平均賃金の60%を下回る可能性（労基26条・要確認）'); // 全月休業の下限≒平均賃金(月給/30.4)×0.6×所定20日≒0.4×基本給。誤警告を避け0.4未満のみ検知
     var h=hoshoInfo(e); if(h&&!h.ok) w.push('保障給なし（完全歩合・労基27条の恐れ）');
     return w;
   }
@@ -696,7 +697,8 @@
       kaigokyu:'介護休：社保は継続(無給でも本人負担あり)。介護休業給付金は雇用保険(給与でない)。',
       byoukyu:'病気休職：社保は継続(本人負担あり)。傷病手当金は健保(給与でない)。',
       kyugyo:'会社都合の休業：休業手当=平均賃金の60%以上を支給に入れる(課税・社保対象)。' }[s];
-    var warn=(s==='kyugyo'&&num(e.leavePay)<=0)?'<div class="cr-warn">⚠ 休業手当が未入力(0)です。会社都合の休業は<b>平均賃金の60%以上</b>の支払いが必要(労基法26条)。「休暇中の金額」に入れてください。</div>':'';
+    var warn=(s==='kyugyo'&&num(e.leavePay)<=0)?'<div class="cr-warn">⚠ 休業手当が未入力(0)です。会社都合の休業は<b>平均賃金の60%以上</b>の支払いが必要(労基法26条)。「休暇中の金額」に入れてください。</div>'
+      :(s==='kyugyo'&&e.payType==='月給'&&num(e.leavePay)>0&&num(e.leavePay)<0.4*num(e.base))?'<div class="cr-warn">⚠ 休業手当が<b>平均賃金の約60%</b>を下回っている可能性があります（労基法26条＝<b>平均賃金×60%以上</b>が必要）。金額をご確認ください（このまま保存・計算はできます）。</div>':'';
     // 産休/育休: 休業開始日/終了日(月末在籍基準)＋育休14日ルール用の当月日数
     var dates='';
     if(s==='sankyu'||s==='ikukyu'){
