@@ -65,6 +65,8 @@
       <div class="emp-search-wrap"><input id="emp-search" class="finput" placeholder="🔍 氏名で探す" autocomplete="off"><span id="emp-search-count" class="emp-search-count"></span></div>
       <div id="emp-list"></div>
       <button class="btn-add" id="b-add-emp">＋ 従業員を追加</button>
+      <button class="btn-add" data-migrate="1" style="margin-top:8px;border-style:dashed" title="他社の給与ソフトからCSV/Excelで一括移行">📥 他ソフトから移行（CSV/Excel 一括）<span class="help-i" data-help="migrate" style="cursor:help">💡</span></button>
+      <input type="file" id="migrate-file" accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none">
     </div>
     <div id="set-design" style="display:none">
       <div class="card">
@@ -167,6 +169,7 @@
 <script src="lib/zengin.js"></script>
 <script src="lib/qr.js"></script>
 <script src="lib/kintai-csv.js"></script>
+<script src="lib/migrate-map.js"></script>
 <script src="lib/access.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="lib/payslip-xlsx.js"></script>

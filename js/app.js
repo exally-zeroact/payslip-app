@@ -104,6 +104,7 @@
   var WORK_STATUS=[['normal','通常'],['sankyu','産休'],['ikukyu','育休'],['kaigokyu','介護休'],['byoukyu','病気休職'],['kyugyo','休業(会社都合)']];
   var WS_LABEL=function(k){ var f=WORK_STATUS.find(function(x){return x[0]===k;}); return f?f[1]:'通常'; };
   var HELP={
+    migrate:{ t:'💡 他ソフトから移行（一括）', b:'今お使いの給与ソフト（freee・マネーフォワード・弥生・ジョブカン・給料王など）や自作Excelから出した<b>CSV/Excelを1ファイル投げるだけ</b>で、<b>全従業員をまとめて</b>取り込みます（人数ぶんの手作業は不要）。\n\n● 取り込む列は<b>見出しで自動判定</b>（表記ゆれOK）：氏名／従業員番号／生年月日／基本給／各手当／通勤／扶養／時給／都道府県／住民税。\n● 「先月の総支給・差引・各控除」の列があれば、<b>先月分を再現して「1円まで合うか」突合</b>し、確認してから移行できます。\n● 取り込む前に<b>どの列を何として読むか</b>を確認・訂正できます（勝手に埋めません。読めない項目は空欄＝要入力）。\n\n※CSVはExcel(Shift-JIS)・UTF-8を自動判別。写真/PDFの読み取りは少人数向けの別機能です。' },
     kintaicsv:{ t:'💡 勤怠CSV取込', b:'他社の勤怠システム（KING OF TIME・ジョブカン勤怠など）や自作Excelから出した<b>勤怠CSV</b>を取り込んで、当月の入力に反映します。<b>打刻機能は持ちません</b>（集計済みCSVを流し込むだけ）。\n\n● 取り込む列（見出しで自動判定・表記ゆれOK）：氏名／出勤日数／欠勤／有給／労働時間／残業／深夜／休日。\n● 氏名で従業員に自動照合（「従業員番号」列があればそれを優先）。一致しない人は反映されず一覧で表示します。\n● 労働/残業/深夜/休日の時間は「160:30」「160.5」「160」どれでもOK。\n● 反映後も各自 手修正できます（上書きされるのは取り込んだ項目だけ）。\n\n※CSVはExcel(Shift-JIS)・UTF-8どちらも自動判別します。' },
     furidata:{ t:'💡 総合振込データ（全銀ファイル）', b:'給与を銀行の<b>「総合振込」</b>でまとめて振り込むためのデータです。\n\n● <b>全銀ファイル</b>＝銀行のインターネットバンキング等に取り込む固定長データ（全銀協規定形式・Shift-JIS）。手入力の振込を無くせます。\n● <b>振込一覧Excel</b>＝銀行のWeb画面に手で入れる場合や、確認用の一覧。\n\n【必要な準備】\n① 各従業員の<b>設定 ▸ 従業員マスタ ▸ 総合振込データ用</b>に、銀行コード(4桁)・支店コード(3桁)・科目・口座番号(7桁)・受取人名(半角ｶﾅ)を入力。\n② ここの<b>委託者情報</b>（委託者コード・自社の銀行/支店/口座）を入力。値は取引銀行から通知されます。\n\n※振込金額＝各人の<b>差引支給額（手取り）</b>。振込先が未入力の人は全銀ファイルから除外されます（一覧Excelには載ります）。' },
     bonusPrev:{ t:'💡 賞与の所得税と「前月の給与（社保後）」', b:'賞与（ボーナス）の所得税は、月給とは別の<b>「賞与に対する源泉徴収税額の算出率の表」</b>で決まります。\n\n● 使う数字＝<b>前月の給与から社会保険料（健保・厚年・雇用・介護）を引いた後の金額</b>と<b>扶養人数</b>。\n● この2つで「税率（％）」が決まり、賞与額（社保を引いた後）にかけて所得税を出します。\n● 前月の給与をこのアプリで計算・保存していれば<b>自動</b>で入ります。無ければ手入力してください（給与明細の「差引」ではなく、社会保険料を引いた額）。\n\n【特例＝手計算になる場合】\n● 前月に給与が無い、または\n● 賞与（社保後）が前月給与（社保後）の<b>10倍を超える</b>とき\n→ この表が使えず、<b>月額表</b>で計算します（税額が変わるため手計算が必要）。' },
@@ -1319,6 +1320,76 @@
       renderInput(); persistSaveDebounced();
       toast(ap.applied.length+'名の勤怠を反映しました'+(ap.unmatched.length?'（未一致 '+ap.unmatched.length+'名）':''));
     });
+  }
+
+  // ── 他ソフトから一括移行(CSV/Excel→従業員マスタ＋先月突合。1ファイルで全員) ──
+  function prevYmOf(ym){ var p=String(ym||'').split('-'); var y=+p[0]||new Date().getFullYear(), m=(+p[1]||1)-1; if(m<1){ m=12; y--; } return y+'-'+('0'+m).slice(-2); }
+  function migYen(x){ var n=Number(x); return isNaN(n)?'—':('¥'+n.toLocaleString('ja-JP')); }
+  // 県名→コード。★部分一致は禁止(京都→東京の誤変換を防ぐ)★ 完全一致→「都道府県」を落とした正規化名の完全一致→無ければ空。
+  function prefToCode(nm){ nm=String(nm||'').replace(/\s|　/g,''); if(!nm) return ''; var S=(typeof SHH==='function')?SHH():null; var K=(S&&S.KENKO_RITSU)||{};
+    var norm=function(x){ return String(x||'').replace(/[都道府県]$/,''); }; var exact='', nmatch='';
+    Object.keys(K).forEach(function(c){ var n=K[c]&&K[c].name; if(!n) return; if(n===nm) exact=c; else if(norm(n)===norm(nm)) nmatch=c; });
+    return exact||nmatch||''; }
+  // ★捏造禁止★ defEmp(サンプル山田太郎)の実データを継承しない。移行で写像する項目は一旦空にし、CSVにある分だけ入れる(空欄=要入力)。
+  function buildEmpFromRow(row){
+    var e=defEmp(row.name);
+    e.no=''; e.birthYmd=''; e.base=''; e.hourly=''; e.commute=''; e.residentTax=''; e.fuyou=''; e.pref=''; e.shikyu=[];
+    if(row.no) e.no=String(row.no);
+    if(row.birthYmd) e.birthYmd=row.birthYmd;
+    if(row.fuyou!=='') e.fuyou=row.fuyou;
+    if(row.hourly!=='') e.hourly=row.hourly;
+    if(row.base!=='') e.base=row.base;
+    if(row.commute!=='') e.commute=row.commute;
+    if(row.residentTax!=='') e.residentTax=row.residentTax;
+    if(row.pref){ var pc=prefToCode(row.pref); if(pc) e.pref=pc; } // 完全一致した県だけ設定(勝手に埋めない)
+    if(row.shikyu && row.shikyu.length) e.shikyu=row.shikyu.map(function(s){ return { label:s.label, value:String(s.value) }; });
+    return e;
+  }
+  function importMigration(r){
+    if(!(window.MigrateMap)){ uiAlert('移行モジュールが読み込まれていません'); return; }
+    if(!r){ uiAlert('ファイルを読み取れませんでした。'); return; }
+    if(r.warnings && r.warnings.length){ uiAlert('取り込めません:\n'+r.warnings.join('\n')); return; }
+    if(!r.rows.length){ uiAlert('データ行が見つかりません。1行目に見出し（氏名・基本給 等）が必要です。'); return; }
+    var TAGJP={ name:'氏名', no:'従業員番号', birth:'生年月日', fuyou:'扶養', pref:'都道府県', hourly:'時給', base:'基本給', commute:'通勤手当', residentTax:'住民税', prevGross:'先月総支給', prevNet:'先月差引', prevDeductTotal:'先月控除計', prevHealth:'健保', prevKaigo:'介護', prevPension:'厚年', prevEmploy:'雇用', prevTax:'所得税' };
+    var recog=[]; (r.headers||[]).forEach(function(h,i){ var tag=r.mapping&&r.mapping.tags[i]; if(tag==='allowance') recog.push(h+'→手当'); else if(tag&&TAGJP[tag]) recog.push(h+'→'+TAGJP[tag]); });
+    var withPrev=r.rows.filter(function(x){ return x.prev && x.prev.net!==''; }).length;
+    var msg='他ソフトのデータを一括取込します（'+r.rows.length+'名）。\n\n【自動で読み取った列】\n'+(recog.join('\n')||'(自動判定できた列がありません。見出しをご確認ください)')
+      +'\n\n先月の金額（差引）がある人: '+withPrev+'名'
+      +'\n\nこの内容で取り込みますか？（取込後も各自 手修正できます。氏名が既存と重複しても追加します）';
+    uiConfirm(msg,'他ソフトから移行').then(function(okc){ if(!okc) return;
+      var s=applyMigrationRows(r.rows);
+      persistSaveDebounced();
+      showScreen('scr-settings'); var eb=$('#set-seg .seg-b[data-set="emp"]'); if(eb)eb.click(); renderEmpMaster();
+      var res='移行しました：'+s.added+'名を従業員マスタに追加。';
+      if(s.match+s.mismatch+s.needInput>0){ res+='\n\n先月突合 ＝ 一致 '+s.match+'名'+(s.mismatch?('・要確認 '+s.mismatch+'名'):'')+(s.needInput?('・要入力 '+s.needInput+'名'):''); }
+      if(s.needInput) res+='\n※「要入力」＝突合には 生年月日・都道府県・住民税 が必要です（先月の金額は取り込み済み。各カードで入力すると突合できます）。';
+      if(s.mmList.length) res+='\n\n【要確認（先月と再計算が不一致）】\n'+s.mmList.join('\n')+'\n※住民税・都道府県（健保率）・社保の設定を各カードで合わせると一致します。';
+      uiAlert(res,'移行の結果');
+    });
+  }
+  // 適用ロジック(モーダル非依存=統合テストから直接呼べる)。取込＋先月突合＋履歴保存を行い集計を返す。
+  function applyMigrationRows(rows){
+    var prevYm=prevYmOf(state.month), added=0, match=0, mismatch=0, needInput=0, mmList=[];
+    (rows||[]).forEach(function(row){
+      var e=buildEmpFromRow(row); state.employees.push(e); added++;
+      if(row.prev && row.prev.net!==''){
+        var theirNet=num(row.prev.net);
+        // ★突合は再計算に必要な実データ(生年月日・都道府県・住民税)が揃った時だけ。既定値での偽の再計算はしない★
+        var canReconcile = e.birthYmd!=='' && e.pref!=='' && e.residentTax!=='';
+        if(canReconcile){
+          var ourNet=null, sm=state.month; state.month=prevYm;
+          try{ ourNet=compute(e).net; } catch(_){ ourNet=null; } finally { state.month=sm; }
+          if(ourNet!=null && ourNet===theirNet) match++;
+          else { mismatch++; if(mmList.length<8) mmList.push(e.name+'（先月 '+migYen(theirNet)+' / 再計算 '+(ourNet==null?'—':migYen(ourNet))+'）'); }
+        } else { needInput++; }
+        // 先月履歴(相手の数字をfaithfulに)。凍結も立て、後続の自動保存で消えないよう守る。
+        try{ if(window.Store&&Store.savePayslip){
+          Store.savePayslip(prevYm, e.id, { name:e.name, net:theirNet, shikyuTotal:num(row.prev.gross), kojoTotal:num(row.prev.kojoTotal), shikyu:e.shikyu.map(function(s){ return { label:s.label, value:String(s.value) }; }), kojo:(row.prev.kojo||[]).map(function(k){ return { label:k.label, value:num(k.value) }; }), confirmed:true, migrated:true }, 'monthly');
+          state.confirmed=state.confirmed||{}; (state.confirmed[prevYm]=state.confirmed[prevYm]||{})[e.id]=true;
+        } }catch(_){ }
+      }
+    });
+    return { added:added, match:match, mismatch:mismatch, needInput:needInput, mmList:mmList, prevYm:prevYm };
   }
   function renderInput(){
     var host=$('#input-list'); if(!host) return; loadPrev();
@@ -2704,6 +2775,7 @@
         if(hasManual){ uiConfirm('手入力した出勤日数がある人も含めて、全員の出勤を所定（'+sd+'日）で上書きします。よろしいですか？').then(function(ok){ if(ok)doFill(); }); } else { doFill(); }
         return; }
       if(e.target.closest('[data-csvimport]')){ var kf=$('#kintai-file'); if(kf){ kf.value=''; kf.click(); } return; }
+      if(e.target.closest('[data-migrate]')){ var mf0=$('#migrate-file'); if(mf0){ mf0.value=''; mf0.click(); } return; }
       var tg=e.target.closest('[data-toggle]');
       if(tg){ var i=+tg.dataset.toggle; var emp=state.employees[i]; state.open['I'+emp.id]=!state.open['I'+emp.id]; il.querySelector('.acc[data-i="'+i+'"]').classList.toggle('open'); return; }
       var wm=e.target.closest('.wi-mode'); if(wm){ var c1=e.target.closest('.acc'); var ci1=+c1.dataset.i; var em1=state.employees[ci1]; if(!em1.warimashi)em1.warimashi={}; em1.warimashi.mode=wm.dataset.wm; renderInput(); return; }
@@ -2788,6 +2860,26 @@
           catch(e){ try{ text=new TextDecoder('shift-jis').decode(buf); }catch(_){ text=''; } }
           importKintaiCsv(text);
         }; rd.readAsArrayBuffer(f);
+      });
+    })();
+    // 他ソフトから移行: CSV(Shift-JIS/UTF-8自動判別) または Excel(.xlsx=XLSXで読取) を1ファイルで全員取込
+    (function(){ var mf=$('#migrate-file'); if(!mf) return;
+      mf.addEventListener('change', function(ev){ var f=ev.target.files&&ev.target.files[0]; if(!f) return;
+        if(!window.MigrateMap){ uiAlert('移行モジュールが読み込まれていません'); return; }
+        var isXlsx=/\.xlsx$/i.test(f.name)||/spreadsheet/.test(f.type||'');
+        var rd=new FileReader();
+        if(isXlsx){
+          rd.onload=function(){ if(typeof XLSX==='undefined'){ uiAlert('Excelの読み込み部品が読み込めませんでした（オフライン等）。CSVでお試しください。'); return; }
+            try{ var wb=XLSX.read(rd.result,{type:'array'}); var ws=wb.Sheets[wb.SheetNames[0]]; var aoa=XLSX.utils.sheet_to_json(ws,{header:1}); importMigration(MigrateMap.parseAoa(aoa)); }
+            catch(err){ uiAlert('Excelの読み込みに失敗しました: '+err.message); }
+          }; rd.readAsArrayBuffer(f);
+        } else {
+          rd.onload=function(){ var buf=rd.result, text='';
+            try{ text=new TextDecoder('utf-8',{fatal:false}).decode(buf); if(/�/.test(text)||!/[ぁ-んァ-ヴ一-龠]/.test(text)){ text=new TextDecoder('shift-jis').decode(buf); } }
+            catch(e){ try{ text=new TextDecoder('shift-jis').decode(buf); }catch(_){ text=''; } }
+            importMigration(MigrateMap.parseCsv(text));
+          }; rd.readAsArrayBuffer(f);
+        }
       });
     })();
     // モバイルの回転/リサイズでプレビューを再フィット(再描画せず軽く)
@@ -2918,7 +3010,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, isInMinWage:isInMinWage, minWageTeate:minWageTeate, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, stType:stType, stLabel:stLabel, santeiRule:santeiRule, gekkakuTh:gekkakuTh, shahoBasisOf:shahoBasisOf, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, ymdPlus1:ymdPlus1, shikakuRows:shikakuRows, shikakuAoa:shikakuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, isInMinWage:isInMinWage, minWageTeate:minWageTeate, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, stType:stType, stLabel:stLabel, santeiRule:santeiRule, gekkakuTh:gekkakuTh, shahoBasisOf:shahoBasisOf, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, ymdPlus1:ymdPlus1, shikakuRows:shikakuRows, shikakuAoa:shikakuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc, applyMigrationRows:applyMigrationRows, buildEmpFromRow:buildEmpFromRow, prevYmOf:prevYmOf }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

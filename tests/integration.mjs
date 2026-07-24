@@ -236,5 +236,48 @@ T('警告一貫性: 表ビューの最賃⚠は「素っ気ない一言」でな
   ok(/円/.test(title), 'tooltipに金額(円)');
 });
 
+// ── 他ソフトから一括移行(CSV/Excel→従業員マスタ＋先月突合) ──
+T('移行: MigrateMapがアプリに読み込まれ、テストAPIに露出', function () {
+  ok(win.MigrateMap && typeof win.MigrateMap.parseCsv === 'function', 'window.MigrateMap.parseCsv');
+  ok(typeof A.applyMigrationRows === 'function', 'applyMigrationRows露出');
+  ok(typeof A.buildEmpFromRow === 'function', 'buildEmpFromRow露出');
+});
+T('移行: CSV1ファイルで複数名を一括追加・列自動マッピング・突合を実施', function () {
+  const before = A.state.employees.length;
+  const csv = '氏名,従業員番号,生年月日,基本給,住宅手当,通勤手当,扶養,総支給,差引支給額\n'
+    + '移行 一郎,2001,1985/4/1,240000,15000,10000,2,265000,205000\n'
+    + '移行 二郎,2002,1992/11/20,180000,0,5000,0,185000,150000';
+  const r = win.MigrateMap.parseCsv(csv);
+  eq(r.rows.length, 2, '2行パース');
+  const savedMonth = A.state.month;
+  const s = A.applyMigrationRows(r.rows);
+  eq(s.added, 2, '2名追加');
+  eq(A.state.employees.length, before + 2, 'employeesが2増える');
+  eq(A.state.month, savedMonth, '突合後も state.month が復元されている(一時swapの副作用なし)');
+  const e = A.state.employees[A.state.employees.length - 2]; // 移行 一郎
+  eq(e.name, '移行 一郎'); eq(e.no, '2001'); eq(e.birthYmd, '1985-04-01'); eq(e.fuyou, '2'); eq(e.base, '240000');
+  const labels = e.shikyu.map(x => x.label);
+  ok(labels.indexOf('基本給') >= 0 && labels.indexOf('住宅手当') >= 0 && labels.indexOf('通勤手当') >= 0, '支給行=基本給/住宅手当/通勤手当');
+  // 都道府県・住民税の列が無いCSV → 既定値での偽の突合をせず「要入力」に分類(監査(c)修正)
+  eq(s.match + s.mismatch + s.needInput, 2, '全員を 突合 or 要入力 に分類(例外なく完了)');
+  eq(s.needInput, 2, '都道府県・住民税が無いCSVは要入力(既定tokyo/12500で偽の突合をしない)');
+});
+T('移行: ★捏造禁止★ 読めない項目はサンプル値(山田太郎)を継承せず空にする', function () {
+  const e = A.buildEmpFromRow({ name: '空 太郎', no: '', birthYmd: '', fuyou: '', hourly: '', base: '', commute: '', residentTax: '', pref: '', shikyu: [] });
+  eq(e.name, '空 太郎');
+  eq(e.birthYmd, '', '生年月日は空(サンプル1980-05-15を継承しない)');
+  eq(e.base, '', '基本給は空(サンプル250000を継承しない)');
+  eq(e.pref, '', '都道府県は空(tokyoを継承しない)');
+  eq(e.residentTax, '', '住民税は空(12500を継承しない)');
+  eq(e.shikyu.length, 0, '支給行は空(サンプル基本給/住宅手当を継承しない)');
+});
+T('移行: 都道府県・住民税・生年月日が揃えば実際に突合が走る', function () {
+  const csv = '氏名,生年月日,都道府県,基本給,住民税,差引支給額\n突合 太郎,1980/1/1,東京都,250000,12500,190000';
+  const r = win.MigrateMap.parseCsv(csv);
+  const s = A.applyMigrationRows(r.rows);
+  eq(s.needInput, 0, '必要項目が揃えば要入力にならない');
+  eq(s.match + s.mismatch, 1, '実データが揃えば再計算して突合(一致 or 要確認)');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
