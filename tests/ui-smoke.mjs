@@ -664,6 +664,21 @@ T('資格取得・喪失届: 入社日=取得/退職日翌日=喪失・標準報
   ok(!/個人番号|マイナンバー/.test(aoa[3].join('|')), '★列ヘッダにマイナンバー(個人番号)欄なし★');
 });
 
+T('休業手当60%割れ警告(C): 月給kyugyoで leavePay<0.4×基本給→黄警告 / 以上→なし / 時給は対象外', function () {
+  const q = s => doc.querySelector(s), qa = s => [...doc.querySelectorAll(s)];
+  A.state.employees = [A.defEmp('休業 太郎')];
+  const e = A.state.employees[0];
+  e.payType = '月給'; e.base = '250000'; e.workStatus = 'kyugyo';
+  A.state.empFilter = 'all';                                   // 休業者は在籍中フィルタで隠れるので全員表示
+  const id0 = e.id;
+  A.state.open = {}; A.state.open[id0] = true; A.state.open['D' + id0] = true; A.state.open['DS' + id0 + 'zaiseki'] = true;
+  const render = () => { q('.bn[data-scr="scr-settings"]').click(); const seg = q('#set-seg .seg-b[data-set="emp"]'); if (seg) seg.click(); };
+  const w60 = () => qa('.cr-warn').some(x => /下回っている可能性/.test(x.textContent));
+  e.leavePay = '90000'; render(); ok(w60(), 'leavePay90000(<0.4×25万=10万)で60%割れ警告あり');
+  e.leavePay = '120000'; render(); ok(!w60(), 'leavePay120000(>10万)は警告なし(誤警告しない)');
+  e.payType = '時給'; e.hourly = '1500'; e.leavePay = '10000'; render(); ok(!w60(), '時給は対象外=警告なし');
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });
