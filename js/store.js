@@ -77,11 +77,19 @@
         //  自分が最後に把握した値と違う=別端末が後から書いた→上書きせず conflict を返す(app.js側で再読込を促す)。
         return sb.from('pay_companies').select('updated_at').eq('account_id',uid).maybeSingle().then(function(cur){
           var cloudUA = cur && cur.data && cur.data.updated_at;
-          if(lastCompanyUpdatedAt!=null && cloudUA && cloudUA!==lastCompanyUpdatedAt){
-            return { ok:false, reason:'conflict', cloudUpdatedAt:cloudUA };
+          // ★上書きせずconflictにする条件: クラウドに既存データがあり、それが「自分が最後に把握した値」と違う。
+          //  別端末が後から書いた場合だけでなく、この端末がまだクラウドを読めていない(lastUA=null)のに本番データがある場合も含む
+          //  =古い/新規端末が本番のsettings(確定・年調・会社設定)を静かに巻き戻すのを防ぐ(P0)。空クラウド(cloudUA=null)は新規保存OK。
+          if(cloudUA && cloudUA!==lastCompanyUpdatedAt){
+            // neverSynced=この端末がまだクラウドを読めていない(別端末の更新でなく"未読込")→app側で文言を分ける(誤解防止)
+            return { ok:false, reason:'conflict', cloudUpdatedAt:cloudUA, neverSynced:(lastCompanyUpdatedAt==null) };
           }
           return doSave();
-        }).catch(function(){ return doSave(); }); // 確認クエリ失敗時は従来どおり保存(可用性優先)
+        }).catch(function(){
+          // 競合確認クエリ自体が失敗: 同期実績あり(手元が本番の正と確定済み)ならブラインド保存(可用性優先)。
+          //  未同期(cloudSynced=false)なら安全側=上書きせず失敗を返す(app側はローカル保持のまま警告=データ消失しない)。
+          return cloudSynced ? doSave() : { ok:false, reason:'sync-check-failed' };
+        });
         function doSave(){
         var ops=[
           sb.from('pay_companies').upsert({ account_id:uid, data:settings, updated_at:now }),

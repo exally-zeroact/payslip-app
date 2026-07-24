@@ -380,12 +380,22 @@
       (fixW.lines||[]).forEach(function(l){ l.unit=fixW.unit; }); (pcW.lines||[]).forEach(function(l){ l.unit=pcW.unit; }); // 内訳の単価は各側の実単価(歩合側は commission が「歩合 …」とラベル済)
       return { total:(fixW.total||0)+(pcW.total||0), lines:(fixW.lines||[]).concat(pcW.lines||[]), unit:(fixW.unit||pcW.unit||0), split:true };
     }
-    var w=e.warimashi||{}, common={ base:warimashiBasis(e), annualHolidays:ah, dailyHours:num(dwh)+num(dwm)/60, rates:rates, leap:leap };
+    var w=e.warimashi||{}, dailyH=num(dwh)+num(dwm)/60;
+    var common={ base:warimashiBasis(e), annualHolidays:ah, dailyHours:dailyH, rates:rates, leap:leap };
+    // ★時給/日給の割増単価は労基則19条=時給(時給額そのもの) / 日給(日給額÷1日所定時間)。一律手当(月額)は月平均所定で時給換算して加算。
+    //  月給/カスタムは従来どおり(基礎÷月平均所定)＝common.unit未指定。日給者の残業が月給算式で過小になるsilent-wrongを根治(P0)。
+    if(e.payType==='時給'||e.payType==='日給'){
+      var stdH=Warimashi.monthlyStdHours(ah, dailyH, leap);
+      var baseShikyu=(e.shikyu||[]).filter(function(x){return /基本給/.test(x.label||'');}).reduce(function(a,x){return a+num(x.value);},0);
+      var teateMonthly=Math.max(0, warimashiBasis(e)-baseShikyu);
+      var baseHourly=(e.payType==='時給')? num(e.hourly) : (dailyH>0? num(e.base)/dailyH : 0);
+      common.unit = baseHourly + (stdH>0? teateMonthly/stdH : 0);
+    }
     if(w.mode==='detail'){
       var d=w.detail||{}; var seg={}; ['ot','otNight','over60','over60Night','night','holiday','holidayNight'].forEach(function(k){ seg[k]=dmin(d[k]); });
-      return Warimashi.detail({ base:common.base, annualHolidays:common.annualHolidays, dailyHours:common.dailyHours, rates:common.rates, leap:common.leap, seg:seg, minashiMin:minashiMin });
+      return Warimashi.detail({ base:common.base, unit:common.unit, annualHolidays:common.annualHolidays, dailyHours:common.dailyHours, rates:common.rates, leap:common.leap, seg:seg, minashiMin:minashiMin });
     }
-    return Warimashi.easy({ base:common.base, annualHolidays:common.annualHolidays, dailyHours:common.dailyHours, rates:common.rates, leap:common.leap,
+    return Warimashi.easy({ base:common.base, unit:common.unit, annualHolidays:common.annualHolidays, dailyHours:common.dailyHours, rates:common.rates, leap:common.leap,
       otH:w.otH, otM:w.otM, nightH:w.nightH, nightM:w.nightM, holidayH:w.holidayH, holidayM:w.holidayM, minashiMin:minashiMin });
   }
   function kintaiVal(e,re){ var r=(e.kintai||[]).find(function(x){return re.test(x.label||'');}); return r?num(r.value):0; }
@@ -2924,10 +2934,13 @@
       // ★クラウド保存の成否を待ってから表示(失敗を「保存済」と嘘表示しない)
       Promise.resolve().then(function(){ return Store.cloudSaveState(snap); }).then(function(r){
         // no-user=未ログイン=クラウド対象外(ローカル保存が正)→警告しない。ログイン中の実失敗のみ警告。
-        if(r&&r.ok===false&&r.reason==='conflict'){ // ★楽観ロック: 別端末が後から更新→上書きせず警告(データ消失防止)
-          setS('⚠ 別の端末で更新されました（クラウド未保存）');
+        if(r&&r.ok===false&&r.reason==='conflict'){ // ★楽観ロック: 上書きせず警告(データ消失防止)。neverSynced=別端末更新でなく"クラウド未読込"→文言を分ける
+          setS(r.neverSynced ? '⚠ クラウドに保存済みのデータがあります（未読込）' : '⚠ 別の端末で更新されました（クラウド未保存）');
           if(!state._conflictPrompted){ state._conflictPrompted=true;
-            uiConfirm('この会社の設定・従業員データが、別の端末で更新されています。\n\n最新を読み込みますか？\n・はい＝最新を読込（この端末の未保存の編集は失われます）\n・いいえ＝このまま（ローカルには残ります・クラウド保存は保留）').then(function(ok){ if(ok) location.reload(); });
+            var _cfMsg = r.neverSynced
+              ? 'クラウドにこの会社の保存済みデータがあります（まだ読み込めていません）。\n\n最新を読み込みますか？\n・はい＝クラウドの最新を読込（この端末の未保存の編集は失われます）\n・いいえ＝このまま（ローカルには残ります・クラウド保存は保留）'
+              : 'この会社の設定・従業員データが、別の端末で更新されています。\n\n最新を読み込みますか？\n・はい＝最新を読込（この端末の未保存の編集は失われます）\n・いいえ＝このまま（ローカルには残ります・クラウド保存は保留）';
+            uiConfirm(_cfMsg).then(function(ok){ if(ok) location.reload(); });
           }
         }
         else if(r&&r.ok===false&&r.reason!=='no-user'){ setS('⚠ クラウド未保存（'+(r.reason||'通信エラー')+'）'); }

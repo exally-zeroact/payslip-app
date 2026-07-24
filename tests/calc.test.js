@@ -41,6 +41,14 @@ T('calcByClass: otsu→乙・既定→甲', function () {
   eq(Densan.calcByClass(100000, 0, 'otsu'), 3063);
   eq(Densan.calcByClass(175000, 2, 'ko', { year: 2026 }), 210);
 });
+/* ★P0-① 乙欄は扶養を加味しない(甲欄の扶養数を渡しても税額不変)。従たる申告書ありの時だけ1,610円/人控除 */
+T('乙欄は扶養控除を加味しない(扶養数を渡しても税額不変)', function () {
+  var base = Densan.calcByClass(300000, 0, 'otsu', { year: 2026 });
+  eq(Densan.calcByClass(300000, 3, 'otsu', { year: 2026 }), base, '扶養3でも乙税額は不変');
+  eq(Densan.calcByClass(300000, 1, 'otsu', { year: 2026 }), base, '扶養1(既定)でも不変');
+  // 従たる給与の扶養控除等申告書ありのケースのみ 1,610×人数
+  eq(Densan.calcByClass(300000, 0, 'otsu', { year: 2026, jyuubetsuFuyou: 2 }), base - 1610 * 2, '従たる申告書ありなら控除');
+});
 T('非課税 自動判定: 出張旅費は非課税(課税対象から除外)', function () {
   var nt = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 200000 }, { label: '出張旅費', value: 30000 }], payYm: '2026-06' });
   var tx = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 200000 }, { label: '役職手当', value: 30000 }], payYm: '2026-06' });
@@ -89,6 +97,17 @@ T('han50 FP: 介護0.00795×1,030,000=8,188.5 → 8,188', function () {
 T('非課税の出張旅費20万は全額非課税(15万で切られない)', function () {
   var r = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 300000 }, { label: '出張旅費', value: 200000, hikazei: true }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0 });
   eq(r.nonTaxable, 200000);
+});
+/* ★P0-③ 実費弁償(出張/旅費/宿泊/日当の非課税)は社保・雇用保険の基礎から除外・通勤は含む */
+T('実費弁償(出張旅費)は雇用保険/社保の基礎から除外・通勤は含む', function () {
+  var jihi = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 300000 }, { label: '出張旅費', value: 60000, hikazei: true }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0 });
+  var kazei = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 300000 }, { label: '役職手当', value: 60000 }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0 });
+  var tsukin = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 300000 }, { label: '通勤手当', value: 60000, hikazei: true }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0 });
+  ok(jihi.si.employ < kazei.si.employ, '旅費は雇用保険基礎から除外(30万ベース): ' + jihi.si.employ + ' vs ' + kazei.si.employ);
+  eq(tsukin.si.employ, kazei.si.employ, '通勤は雇用保険基礎に含む(36万ベース)');
+  // 課税の日当(hikazei=false)は報酬=基礎に含む
+  var kazeiNitto = PayslipCalc.computePayslip({ shikyu: [{ label: '基本給', value: 300000 }, { label: '日当', value: 60000, hikazei: false }], birthYmd: '1990-01-01', payYm: '2026-06', fuyou: 0 });
+  eq(kazeiNitto.si.employ, kazei.si.employ, '課税の日当は基礎に含む');
 });
 
 /* ---- M-3: 健保上限は1,390,000・厚年は650,000 ---- */

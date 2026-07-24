@@ -228,6 +228,29 @@ T('みなし0/未指定は従来どおり全額(回帰)', function () {
   eq(W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, otH: 45, nightH: 2, minashiMin: 0 }).total, 90346);
   eq(W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, otH: 45, nightH: 2 }).total, 90346);
 });
+/* ★P0-② unit明示指定(時給/日給の労基則19条単価)。日給12,000/8h→単価1,500で残業が正しく計算される */
+T('easy: unit明示で単価直接指定(日給1,500円/h・残業5h=1,500×1.25×5=9,375)', function () {
+  var r = W.easy({ unit: 1500, otH: 5, otM: 0 });
+  eq(r.unit, 1500); eq(r.total, W.han50Up(1500 * 1.25 * 5));
+});
+T('easy: unit明示は月給算式(base÷月平均所定)を上書きする', function () {
+  // baseを渡してもunitがあればunit優先(=日給者がbase(月間総額)で過小にならない)
+  var r = W.easy({ unit: 1500, base: 216000, annualHolidays: 120, dailyHours: 8, otH: 5 });
+  eq(r.unit, 1500, 'unit優先(baseの216000÷163.33≈1,322にならない)');
+});
+T('easy: unit未指定は従来の月給算式(回帰ゼロ)', function () {
+  var a = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, otH: 10 });
+  var b = W.easy({ base: 260000, annualHolidays: 120, dailyHours: 8, otH: 10, unit: null });
+  eq(a.total, b.total); ok(a.unit === W.han50Up(260000 / W.monthlyStdHours(120, 8, false)), '基礎÷月平均所定');
+});
+T('detail: unit明示でも単価override(日給の詳細区分)', function () {
+  var r = W.detail({ unit: 1500, seg: { ot: 5 * 60 } });
+  eq(r.unit, 1500);
+});
+T('easy: unit明示は基発150号どおりhan50Up丸め(手当加算の端数)', function () {
+  eq(W.easy({ unit: 1500.4, otH: 5 }).unit, 1500);  // .5未満切捨
+  eq(W.easy({ unit: 1500.6, otH: 5 }).unit, 1501);  // .5以上切上
+});
 T('詳細モードでもみなしは時間外(ot)区分から控除', function () {
   var r = W.detail({ base: 260000, annualHolidays: 120, dailyHours: 8, seg: { ot: 45 * 60 }, minashiMin: 20 * 60 });
   eq(r.lines.find(function (l) { return l.key === 'ot'; }).minutes, 25 * 60);
