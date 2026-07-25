@@ -118,6 +118,7 @@
     annual:{ t:'💡 年間の休み', b:'1年間の休日数（例：120日）。\nフルタイム(1日8時間)だと法律の目安は約105日以上。少ないと「年間の労働時間が法律の目安を超える」と黄色で教えますが、残業として割増計算すれば<b>保存も計算もできます</b>（ブロックしません）。' },
     design:{ t:'💡 明細のデザイン', b:'給与明細の見た目を決めます（ここが毎月の既定）。\n\n● <b>レイアウト</b>…縦1人（1人1枚）／2カラム（1枚に2人）／横ストリップ（横向きに数人）。人数が多くても<b>自動で複数ページに分けて全員</b>出ます。\n● <b>色</b>…アクセント・罫線・文字を別々に。Excelで使える色から選べます。\n● <b>初期設定に戻す</b>…レイアウトと色を最初の状態に戻します。\n\n印刷タブで「その回だけ」変えることもできます。' },
     workstatus:{ t:'💡 就業状況（産休・育休・休職など）', b:'休んでいる人の区分です。給与計算に自動で反映します（すべて手で調整できます）。\n\n● <b>産休・育休</b>…社会保険（健保・厚年・介護）が<b>免除</b>＝自動で0に。給与は無給が一般的（入力で調整）。出産手当金・育児休業給付金は健保/雇用保険から出るお金で<b>給与には含めません</b>。\n● <b>介護休・病気休職</b>…社会保険は<b>継続</b>（無給でも本人負担が出ます）。介護休業給付金・傷病手当金は別途（給与でない）。\n● <b>休業（会社都合）</b>…<b>休業手当＝平均賃金の60%以上</b>を支給に入れます（課税・社保の対象）。\n\n※自動の社保オフは「法定控除」のチップで個別に戻せます。' },
+    emptype:{ t:'💡 雇用形態（従業員／業務委託）', b:'給与計算の大枠を決めます。\n\n● <b>従業員（正社員/パート）</b>…労働者。社会保険・源泉徴収・住民税・年末調整あり（従来どおり）。\n● <b>業務委託（個人事業主）</b>…外注先への<b>報酬</b>。<b>控除なしの報酬明細</b>（源泉・社保・住民税・年末調整なし＝支給＝支払額）。運転代行・運送などの外注はこちら。\n\n【源泉徴収】業務委託でも源泉が要るのは原稿料・デザイン・士業・モデル・ホステス等の<b>限定8区分だけ</b>。運転・運送は対象外＝源泉しません（国税庁No.2792）。\n\n【偽装請負に注意】契約が業務委託でも、<b>実態が労働者</b>なら社会保険・労働法の対象になり得ます（総合判断）。当てはまる要素が多いと「従業員の可能性」を黄色でお知らせします（ブロックはしません・最終判断は会社で）。' },
     taxclass:{ t:'💡 所得税の区分（甲・乙・丙）', b:'所得税の源泉徴収の区分です。\n\n● <b>甲欄</b>…「扶養控除等申告書」を提出している人（＝メインの勤務先）。扶養を加味して計算。通常はこちら。\n● <b>乙欄</b>…申告書を未提出の人（副業・掛け持ちの2か所目など）。税率が高め・扶養は加味しません。\n● <b>丙欄</b>…<b>日雇い</b>（日々雇い入れられる人・継続2か月以内）。日額表 丙欄×出勤日数で計算。2か月を超えたら甲/乙へ。\n\n年分（令和7/令和8）は給与の対象月から自動で正しい税額表を選びます。' },
     shahoTiming:{ t:'💡 社会保険料の当月／翌月徴収', b:'社会保険料（健保・厚年・介護）を<b>いつの給与から天引きするか</b>です。\n\n● <b>翌月徴収</b>（法律の原則・健保167条/厚年84条）…前月分の保険料を当月の給与から控除。<b>入社した月は天引きなし</b>（翌月から）、<b>月末退職の月は2か月分</b>（前月＋当月）を最終給与から控除。\n● <b>当月徴収</b>…当月分をその月の給与から控除（会社の慣行）。\n\n※このアプリの既定は<b>当月</b>（今までの計算と同じ）。翌月に切り替えると入社月・退職月の天引きが上記のとおり変わります。雇用保険はどちらも実支払額×率です。' },
     webmeisai:{ t:'💡 Web明細（従業員へ配布）', b:'給与明細を<b>従業員のスマホ/PCで閲覧</b>できるように公開します。\n\n● 「Web明細で公開」を押すと、対象月の在籍者ぶんの明細が公開され、<b>従業員ごとのリンク＋初回コード</b>ができます。\n● 従業員に<b>リンクと初回コード</b>を渡してください（LINE/メール/手渡しでOK）。従業員はリンクを開き、初回だけ<b>初回コードで自分のパスワードを設定</b>→<b>電子交付に同意</b>すると明細を見られます（所得税法の要件）。\n● 次回からは<b>パスワードだけ（その端末では省略）</b>。パスワードを忘れた/漏れたら「初回コード再発行」で再設定できます。\n● 誰が見たか（未読/開封）を一覧で確認できます。\n\n※本番運用はクラウド保存が必要です（同意するまで明細は表示されません）。' },
@@ -180,7 +181,7 @@
   function minWageTeate(e){ return (e.shikyu||[]).filter(function(x){ return isInMinWage(x.label) && num(x.value)>0; }).reduce(function(a,x){return a+num(x.value);},0); }
   // 最低賃金チェック(事業所所在地=従業員prefの地域別最賃と時間額を比較)。役員/休業中は対象外。返り{hourly,minWage,prefName,ok,teate}
   function minWageInfo(e){
-    if(!e||e.payType==='役員'||(e.workStatus&&e.workStatus!=='normal')) return null;
+    if(!e||e.payType==='役員'||e.employmentType==='contractor'||(e.workStatus&&e.workStatus!=='normal')) return null;
     var S=SAI(); if(!S||!S.getChingin) return null;
     var mw=S.getChingin(e.pref); if(!mw) return null;
     var co=state.company||{};
@@ -208,7 +209,7 @@
   // 出来高払制の保障給チェック(労基法27条)。完全歩合で保障(時給/日給の下限 or 固定給)が一切ない=27条違反の恐れ。役員/休業中は対象外。返り{ok} ok=false=無保障。
   //  ★製品方針=黄色・非ブロック(違法・グレーでもユーザーが選択/入力して使えるようにする=注意のみ)。構造判定は lib/pay-rule.js の lacksGuarantee に集約。
   function hoshoInfo(e){
-    if(!e||e.payType==='役員'||(e.workStatus&&e.workStatus!=='normal')) return null;
+    if(!e||e.payType==='役員'||e.employmentType==='contractor'||(e.workStatus&&e.workStatus!=='normal')) return null;
     if(e.payType==='歩合') return { ok: num(e.hourlyGuarantee)>0 };                 // 歩合payType=保障給の時給が未設定(0)なら無保障
     if(e.payType==='カスタム'){ if(!e.payRule||!window.PayRule||!PayRule.lacksGuarantee) return null; return { ok: !PayRule.lacksGuarantee(e.payRule) }; }
     return null;                                                                    // 月給/時給/日給=定額or時間給=保障あり(対象外)
@@ -226,7 +227,7 @@
   // 年間所定労働時間が法定(週40h)目安を超える時の黄警告(労基32条)。年間休日過少/長時間所定。役員/休業中は対象外。
   //  ★ヘルプ(annual)で「黄色で教えます」と約束している警告の実体。変形労働時間制なら適法もあり=注意のみ・非ブロック。
   function annualHoursInfo(e){
-    if(!e||e.payType==='役員'||(e.workStatus&&e.workStatus!=='normal')) return null;
+    if(!e||e.payType==='役員'||e.employmentType==='contractor'||(e.workStatus&&e.workStatus!=='normal')) return null;
     if(!window.Warimashi||!Warimashi.annualHoursCheck) return null;
     var co=state.company||{};
     var ah=(e.annualHolidays!=null&&e.annualHolidays!=='')?e.annualHolidays:co.annualHolidays;
@@ -303,7 +304,7 @@
   function prefRate(code, payYm){ var S=SHH(); if(S&&S.getKenko){ var k=S.getKenko(code,payYm); var sh=S.getShienkin?S.getShienkin(payYm):0; return k.jugyoin+sh; } var K=(S&&S.KENKO_RITSU)||{}; return (K[code]&&K[code].jugyoin)||0.04955; }
 
   function defEmp(name){
-    return { id:uid(), name:name||'山田 太郎', no:'', birthYmd:'1980-05-15', dept:'', role:'',
+    return { id:uid(), name:name||'山田 太郎', no:'', birthYmd:'1980-05-15', dept:'', role:'', employmentType:'employee',
       payType:'月給', base:'250000', hourly:'1200', commissionAmt:'', hourlyGuarantee:'', salesAmt:'', pieceCount:'', payRule:null, fuyou:'1', nenshoFuyo:'', pref:'tokyo', commute:'8400', commuteType:'public', commuteKm:'', residentTax:'12500', residentTaxMode:'monthly', residentTaxAnnual:'', residentTaxIkkatsu:false, juminCollect:'special', bank:'',
       furiBankName:'', furiBankNo:'', furiBranchName:'', furiBranchNo:'', furiYokin:'普通', furiAccount:'', furiKana:'',
       annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0', dailyEntries:[],
@@ -511,8 +512,8 @@
     var effTaxClass=(e.taxClass==='hei' && e.payType!=='日給') ? 'ko' : e.taxClass; // 丙×非日給は甲で計算
     // 甲欄のみ: 本人の人的加算(障害者/寡婦orひとり親/勤労学生)を扶養親族等の数に足す(乙/丙は対象外)
     var effFuyou=num(e.fuyou)+jintekiOf(e, effTaxClass);
-    var r=PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:effFuyou, taxClass:effTaxClass, heiTaxAmount:heiAmt, residentTax:residentTaxOf(e), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:apply, extraKojo:e.extraKojo, shahoMonth:_shMonth, shahoMult:_shMult });
-    applyNenchoAdj(e, r); // 年末調整の過不足を対象月の明細に反映(法定計算=税/社保/雇用は不変・手取りだけ調整)
+    var r=PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:effFuyou, taxClass:effTaxClass, heiTaxAmount:heiAmt, residentTax:residentTaxOf(e), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:apply, extraKojo:e.extraKojo, shahoMonth:_shMonth, shahoMult:_shMult, employmentType:e.employmentType });
+    if(e.employmentType!=='contractor') applyNenchoAdj(e, r); // 年末調整の過不足を反映(業務委託=年調なし=対象外)
     return r;
   }
   // 年末調整の過不足(還付/追徴)を、指定した対象月の給与明細に反映する。★法定計算後の純調整=税/社保/雇用/課税には影響しない★。
@@ -812,8 +813,22 @@
     var payField=(e.payType==='時給'?'hourly':e.payType==='歩合'?'hourlyGuarantee':'base');
     var amtLabel=(e.payType==='時給'?'時給単価':e.payType==='日給'?'日給額':e.payType==='役員'?'役員報酬':e.payType==='歩合'?'保障給の時給':'基本給');
     // ── 基本（常時表示）: これだけで登録と概算が成立 ──
+    var isContractor=(e.employmentType==='contractor');
     var basic=''
       +'<div class="frow"><div class="flabel">氏名</div><input class="finput m-f" data-f="name" value="'+attr(e.name)+'"></div>'
+      +'<div class="chip-row" style="margin:2px 0 8px;align-items:center"><span style="font-size:11px;color:#3D6B53;font-weight:700;margin-right:2px">雇用形態</span>'
+        +[['employee','従業員（正社員/パート）'],['contractor','業務委託（個人事業主）']].map(function(o){ var on=(e.employmentType||'employee')===o[0]; return '<span class="chip'+(on?' on':'')+'" data-emptype="'+o[0]+'">'+(on?'✓ ':'')+o[1]+'</span>'; }).join('')
+        +'<span class="help-i" data-help="emptype">💡</span></div>'
+      +(isContractor
+        ? '<div class="cr-warn" style="margin:0 2px 10px">⚠ 控除なしの<b>報酬明細</b>（源泉・社保・住民税・年末調整なし＝支給＝支払額）。<b>実態が従業員なら</b>社会保険・労働法の対象になる可能性があります（偽装請負）。'
+          +'<details style="margin-top:5px"><summary style="cursor:pointer;color:#8A5A00;font-weight:700">次のどれかに当てはまると「従業員の可能性」▾</summary>'
+          +'<ul style="margin:6px 0 0;padding-left:18px;line-height:1.8">'
+          +'<li>仕事の依頼を断る自由がない</li>'
+          +'<li>勤務時間・場所を会社が指定・管理している</li>'
+          +'<li>本人が他人に代わってもらえない（代替不可）</li>'
+          +'<li>報酬が時間・日給ベースで、欠勤控除や残業手当がある</li>'
+          +'</ul><div style="font-size:11px;color:#6E907E;margin-top:5px">補足：車両・機材が会社負担／他社の仕事ができない専属 も労働者性を強めます。最終判断は総合判断＝このアプリは<b>可能性の目安</b>で、ブロックはしません。</div></details></div>'
+        : '')
       +(e.payType==='カスタム'
         ? '<div class="frow"><div class="flabel">給与形態</div><select class="finput m-f" data-f="payType">'+PAYTYPES.map(function(p){return '<option'+(p===e.payType?' selected':'')+'>'+p+'</option>';}).join('')+'</select></div>'+payRuleEditor(e,i)
         : '<div class="frow2"><div class="frow"><div class="flabel">給与形態</div><select class="finput m-f" data-f="payType">'+PAYTYPES.map(function(p){return '<option'+(p===e.payType?' selected':'')+'>'+p+'</option>';}).join('')+'</select></div>'
@@ -901,7 +916,11 @@
       +basisBoxHTML(e)
       +'<div class="sec-lb">控除項目（法定は自動・任意分のみ）</div><div class="chip-row">'+chips(e,KOJO_POOL,'extraKojo')+'</div>'
       +'<div class="addcustom"><input class="finput ac-inp" data-g="extraKojo" list="dl-item-kojo" placeholder="自由な項目名（例：寮費）"><button class="btn-ghost ac-btn" data-g="extraKojo" style="padding:10px 12px">＋追加</button></div>';
-    var detail=subsec('zaiseki','在籍・勤務',gZaiseki)+subsec('zei','税・住民税',gZei)+subsec('shaho','社会保険',gShaho)+subsec('teate','通勤・手当・振込・控除',gTeate)
+    // 業務委託=税・社保は無関係なので節ごと差し替え(個別トグルを触らせない=固まらない・複雑化しない)。従業員は従来どおり。
+    var contractorPanel='<div class="emp-sub"><div class="emp-sub-b"><div class="ri-note" style="margin:8px 2px">業務委託（個人事業主）＝<b>控除なしの報酬明細</b>。源泉徴収・社会保険・住民税・年末調整はありません（支給＝支払額）。<br>※源泉が要るのは原稿料・士業など<b>限定8区分だけ</b>。運転代行・運送の外注は対象外＝源泉しません（国税庁No.2792）。従業員に切り替えると従来のフル控除に戻ります。</div></div></div>';
+    var detail=(isContractor
+        ? subsec('zaiseki','在籍・勤務',gZaiseki)+contractorPanel+subsec('teate','手当・振込・控除',gTeate)
+        : subsec('zaiseki','在籍・勤務',gZaiseki)+subsec('zei','税・住民税',gZei)+subsec('shaho','社会保険',gShaho)+subsec('teate','通勤・手当・振込・控除',gTeate))
       +'<div style="display:flex;justify-content:space-between;margin-top:10px">'
         +'<button class="m-retire btn-ghost" style="color:#7A6A2E;border-color:#e6dcb0;padding:8px 14px">'+(e.retired?'復帰させる':'退職にする')+'</button>'
         +'<button class="m-del-emp btn-ghost" style="color:#C0392B;border-color:#f3c9c4;padding:8px 14px">この従業員を削除</button></div>';
@@ -1589,11 +1608,15 @@
       if(_PC.isHealthTarget && !_PC.isHealthTarget(e.birthYmd,ym)){ si.health=0; si.kaigo=0; }
       si.total=num(si.health)+num(si.pension)+num(si.kaigo)+num(si.employ);
     }
+    // ★K1 業務委託=賞与でも控除ゼロの報酬(月次 calc.js と対称・単一方針)。源泉・社保なし=支給がそのまま手取り。
+    var _contractor=(e.employmentType==='contractor');
+    if(_contractor){ si={ total:0, health:0, pension:0, kaigo:0, employ:0, hyojun:si.hyojun, kenpoBase:si.kenpoBase, koseiBase:si.koseiBase }; }
     e._bonusExempt=bonusExempt;
     var tax={tax:0}, noPrev=false;
-    if(prevAfter==null) noPrev=true;
+    if(_contractor){ /* 業務委託=源泉なし */ }
+    else if(prevAfter==null) noPrev=true;
     else if(SZl) tax=SZl.calcBonusTax({ bonus:base, bonusSI:si.total, prevSalary:prevAfter, prevSI:0, fuyou:num(e.fuyou)+jintekiOf(e, e.taxClass==='otsu'?'otsu':'ko'), taxClass:e.taxClass, payYm:ym });
-    var taxAmt=noPrev?0:(tax.tax||0);
+    var taxAmt=(noPrev||_contractor)?0:(tax.tax||0);
     return { bonus:bonus, base:base, totalGross:totalGross, addShikyu:addShikyu, addKojo:addKojo, addTaxable:addTaxable, addNonTax:addNonTax, addKojoTotal:addKojoTotal,
       prevAfter:prevAfter, fromHistory:(!manualPrev&&histPrev), noPrev:noPrev, ytdVal:ytdVal, ytdAuto:(!manualYtd&&ytdVal>0), si:si, tax:tax, taxAmt:taxAmt, net:totalGross-si.total-taxAmt-addKojoTotal };
   }
@@ -2708,6 +2731,7 @@
       var shfx=ev.target.closest('[data-shfixed]'); if(shfx){ if(!emp.shaho)emp.shaho={months:[]}; emp.shaho.fixedChanged=(shfx.dataset.v==='1'); renderEmpMaster(); return; } // 固定給変動 はい/いいえ
       if(ev.target.dataset.rtik){ emp.residentTaxIkkatsu=!emp.residentTaxIkkatsu; renderEmpMaster(); return; }
       if(ev.target.dataset.taxc){ emp.taxClass=ev.target.dataset.taxc; renderEmpMaster(); return; }
+      if(ev.target.dataset.emptype){ emp.employmentType=ev.target.dataset.emptype; renderEmpMaster(); return; } // 雇用形態(従業員/業務委託)。控除はcalc.jsが単一ソースで判定=applyは不変(戻すと回帰)
       if(ev.target.dataset.jumincol){ emp.juminCollect=ev.target.dataset.jumincol; renderEmpMaster(); return; } // 住民税の徴収区分(給与支払報告書 総括表の内訳用)
       if(ev.target.dataset.honnin){ var hk=ev.target.dataset.honnin; // 本人の人的加算(甲欄+1)。寡婦↔ひとり親は排他
         if(hk==='shogai') emp.honninShogai=!emp.honninShogai;

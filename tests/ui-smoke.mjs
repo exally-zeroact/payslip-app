@@ -693,6 +693,45 @@ T('36協定 複数月80h平均警告: 履歴(state._otHist)＋当月で入力タ
   go(); ok(has80(), '履歴2ヶ月@90h＋当月90h=平均90>80で複数月80h警告あり');
 });
 
+T('K1 雇用形態: 業務委託に切替=控除ゼロ+偽装請負警告・従業員に戻すと回帰・例外0', function () {
+  const q = s => doc.querySelector(s), qa = s => [...doc.querySelectorAll(s)];
+  q('.bn[data-scr="scr-settings"]').click();
+  const empSeg = q('#set-seg .seg-b[data-set="emp"]'); if (empSeg) empSeg.click();
+  const e = A.state.employees[0];
+  e.base = '300000'; e.payType = '月給'; e.employmentType = 'employee';
+  A.state.open = A.state.open || {}; A.state.open[e.id] = true; A.state.open['D' + e.id] = true; // カード+詳細設定を開く
+  empSeg.click();
+  ok(A.compute(e).kojoTotal > 0, '従業員(既定)は法定控除あり');
+  // 業務委託チップをクリック
+  const cBtn = q('#emp-list [data-emptype="contractor"]'); ok(cBtn, '業務委託チップが存在');
+  cBtn.click();
+  ok(e.employmentType === 'contractor', 'フラグ=contractor');
+  const r = A.compute(e);
+  ok(r.kojoTotal === 0 && r.net === r.shikyuTotal, '業務委託=控除ゼロ・支給=支払額');
+  ok(qa('#emp-list .cr-warn').some(x => /偽装請負/.test(x.textContent)), '偽装請負の黄警告が出る');
+  ok(!q('#emp-list [data-dsub$=":shaho"]'), '社会保険サブセクションが消える(情報パネルに差替)');
+  // 従業員に戻すと回帰
+  const eBtn = q('#emp-list [data-emptype="employee"]'); ok(eBtn, '従業員チップが存在');
+  eBtn.click();
+  ok(e.employmentType === 'employee', 'フラグ=employee');
+  ok(A.compute(e).kojoTotal > 0, '従業員に戻すとフル控除に回帰(回帰ゼロ)');
+  ok(!qa('#emp-list .cr-warn').some(x => /偽装請負/.test(x.textContent)), '偽装請負警告が消える');
+  ok(!!q('#emp-list [data-dsub$=":shaho"]'), '社会保険サブセクションが戻る');
+});
+
+T('K1 業務委託は賞与でも控除ゼロ(社保0・源泉0=支給が手取り)', function () {
+  const e = A.state.employees[0];
+  A.state.bonus = { payYm: '2026-06', byEmp: {} };
+  A.state.bonus.byEmp[e.id] = { amount: '500000' };
+  e.employmentType = 'employee';
+  ok(A.computeBonus(e).si.total > 0, '従業員の賞与は社保あり');
+  e.employmentType = 'contractor';
+  const r = A.computeBonus(e);
+  ok(r.si.total === 0 && r.taxAmt === 0, '業務委託の賞与=社保0・源泉0');
+  ok(r.net === r.totalGross - r.addKojoTotal, '手取り=総支給(控除ゼロ)');
+  e.employmentType = 'employee'; // 後片付け
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });
