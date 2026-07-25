@@ -2490,7 +2490,7 @@
     var note=d.periodMode
       ? (d.contractor
         ? ('業務委託の報酬明細（'+esc(d.cycleLabel)+'）。控除なし＝源泉・社会保険なしで、支給がそのまま支払額です。色・書体は月給明細と統一。')
-        : ('この期間（'+esc(d.cycleLabel)+'）の支給の概算です。⚠ 社会保険・所得税は月額でまとめて計算するため、正式な控除は月次の給与明細で行います。'))
+        : ('この期間（'+esc(d.cycleLabel)+'）の支給の概算です。⚠ 社会保険・所得税は月額でまとめて計算するため、正式な控除は月次の給与明細で行います。月次の正式明細は月次の「支給項目」入力から別途作成され、日別入力は月次に自動集計されません。'))
       : (d.tax!=null)
       ? (d.cycleLabel+'＝所得税は日額表'+taxHow+'を日ごとに計算し合算。社会保険は月まとめ。色・書体は月給明細と統一。')
       : (d.cycleLabel+'＝所得税の税額表が読み込めませんでした。所得税はこの明細に含めず別途精算してください。社会保険は月まとめ。');
@@ -2521,7 +2521,7 @@
       var mLabel={half:'半月',ten:'10日締め',ndays:shimeNOf()+'日締め'}[shimeMethodOf()]||'';
       var perRows=periods.map(function(p){ var d=buildDailyData(e,p); var amt=d?d.totalAmount:0, n=d?d.count:0;
         return '<div class="dl-tot" style="display:flex;justify-content:space-between"><span>'+esc(p.label)+'（'+n+'日）</span><span>'+yen(amt)+'</span></div>'; }).join('');
-      var warn=contractor?'':'<div class="cr-warn" style="margin:6px 2px 2px">⚠ 従業員の期間明細は<b>支給の概算</b>です。社会保険・所得税は月額でまとめて計算します（正式な控除は月次の給与明細で）。</div>';
+      var warn=contractor?'':'<div class="cr-warn" style="margin:6px 2px 2px">⚠ 従業員の期間明細は<b>支給の概算</b>です。社会保険・所得税は月額でまとめて計算します（正式な控除は月次の給与明細で）。<br><b>月次の正式明細は月次の「支給項目」入力から別途</b>作成されます。日別入力は概算専用で、月次に自動集計されません。</div>';
       totHtml='<div class="dl-tot" style="font-weight:700">締め方＝'+esc(mLabel)+'（'+periods.length+'期間・期間ごとに報酬明細）</div>'+perRows+warn;
       header='日別（締め方＝期間ごとに集計）'; help='shime';
       note='その日の 日付・（労働時数）・支給額 を入れると、締め方に合わせて<b>期間ごとの報酬明細</b>に自動で振り分きます。'+(contractor?'業務委託＝控除なし。':'');
