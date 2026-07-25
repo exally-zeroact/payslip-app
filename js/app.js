@@ -827,7 +827,8 @@
           +'<li>勤務時間・場所を会社が指定・管理している</li>'
           +'<li>本人が他人に代わってもらえない（代替不可）</li>'
           +'<li>報酬が時間・日給ベースで、欠勤控除や残業手当がある</li>'
-          +'</ul><div style="font-size:11px;color:#6E907E;margin-top:5px">補足：車両・機材が会社負担／他社の仕事ができない専属 も労働者性を強めます。最終判断は総合判断＝このアプリは<b>可能性の目安</b>で、ブロックはしません。</div></details></div>'
+          +'</ul><div style="font-size:11px;color:#6E907E;margin-top:5px">補足：車両・機材が会社負担／他社の仕事ができない専属 も労働者性を強めます。最終判断は総合判断＝このアプリは<b>可能性の目安</b>で、ブロックはしません。</div>'
+          +'<div style="font-size:11px;color:#8A5A00;margin-top:5px">※ 士業・原稿料・デザイン料など<b>源泉徴収が必要な報酬</b>（所得税法204条の8区分）は「源泉なし」の対象外です（別途・K3で対応予定）。運転代行・運送の外注は源泉不要（現状のまま）。</div></details></div>'
         : '')
       +(e.payType==='カスタム'
         ? '<div class="frow"><div class="flabel">給与形態</div><select class="finput m-f" data-f="payType">'+PAYTYPES.map(function(p){return '<option'+(p===e.payType?' selected':'')+'>'+p+'</option>';}).join('')+'</select></div>'+payRuleEditor(e,i)

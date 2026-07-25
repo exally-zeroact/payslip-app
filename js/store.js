@@ -92,7 +92,8 @@
         });
         function doSave(){
         var ops=[
-          sb.from('pay_companies').upsert({ account_id:uid, data:settings, updated_at:now }),
+          // ★.select('updated_at').single()=DBが実際に保存した updated_at を受け取り、競合基準に使う(下記)。
+          sb.from('pay_companies').upsert({ account_id:uid, data:settings, updated_at:now }).select('updated_at').single(),
           emps.length? sb.from('pay_employees').upsert(emps) : Promise.resolve({ error:null })
         ];
         // ★差分削除は「同期済み(cloudSynced)かつ手元に従業員が居る」時だけ=空/古い端末が本番を消さない
@@ -101,7 +102,9 @@
         }
         return Promise.all(ops).then(function(res){
           var bad=res.filter(function(x){ return x && x.error; })[0];
-          if(!bad){ cloudSynced=true; lastCompanyUpdatedAt=now; } // 書込成功=手元が本番の正・以後の差分削除OK・自分の書いたupdated_atを基準に更新
+          // ★競合基準は必ず「DBが返した updated_at」にする。JS生成の now(…Z) はDB返却(…+00:00)と書式が違い、
+          //  文字列比較で毎回不一致=読込直後や2回目保存(スクロール等の自動保存)で誤conflictが多発する(P0根治)。
+          if(!bad){ cloudSynced=true; lastCompanyUpdatedAt=(res[0] && res[0].data && res[0].data.updated_at) || now; }
           return { ok:!bad, reason: bad?((bad.error&&bad.error.message)||'error'):null };
         }).catch(function(e){ return { ok:false, reason:(e&&e.message)||'exception' }; });
         }

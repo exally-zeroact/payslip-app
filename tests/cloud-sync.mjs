@@ -17,8 +17,16 @@ function makeMock(opts) {
   opts = opts || {};
   const calls = { companyUpsert: [], empUpsert: [], deletes: [] };
   let serverEmpIds = (opts.serverEmpIds || []).slice();
+  // dbFormatモード=実Postgres(timestamptz)を模擬: 送られたISO(…Z)を保存時に…+00:00へ書式変換し、読み戻しはその値を返す。
+  //  ＝JS生成文字列(…Z)を競合基準にすると読み戻し(…+00:00)と毎回不一致になる本番バグを再現する。
+  const dbFmt = s => (opts.dbFormat && typeof s === 'string') ? s.replace(/Z$/, '+00:00') : s;
+  let storedUA = (typeof opts.companyUpdatedAt === 'function') ? opts.companyUpdatedAt() : opts.companyUpdatedAt;
+  function curCompanyUA() {
+    if (opts.dbFormat) return storedUA; // upsertで更新された保存値を返す
+    return (typeof opts.companyUpdatedAt === 'function') ? opts.companyUpdatedAt() : opts.companyUpdatedAt;
+  }
   function query(kind) {
-    const _cua = typeof opts.companyUpdatedAt === 'function' ? opts.companyUpdatedAt() : opts.companyUpdatedAt;
+    const _cua = curCompanyUA();
     const data = kind === 'companyData' ? ((opts.companyData || _cua) ? { data: opts.companyData, updated_at: _cua } : null)
       : kind === 'empIds' ? serverEmpIds.map(id => ({ id }))
         : (opts.serverEmps || []);
@@ -28,7 +36,16 @@ function makeMock(opts) {
   }
   function from(table) {
     return {
-      upsert: (d) => { (table === 'pay_companies' ? calls.companyUpsert : calls.empUpsert).push(d); return Promise.resolve({ error: opts.failUpsert ? { message: 'upsert失敗' } : null }); },
+      upsert: (d) => {
+        (table === 'pay_companies' ? calls.companyUpsert : calls.empUpsert).push(d);
+        let retUA = null;
+        if (table === 'pay_companies' && d && d.updated_at != null) { retUA = dbFmt(d.updated_at); if (opts.dbFormat) storedUA = retUA; }
+        const res = { error: opts.failUpsert ? { message: 'upsert失敗' } : null, data: retUA != null ? { updated_at: retUA } : null };
+        // upsert(...) は Promise。さらに .select('updated_at').single() でDB保存後の updated_at を返せるようにする。
+        const p = Promise.resolve(res);
+        p.select = () => ({ single: () => Promise.resolve(res), maybeSingle: () => Promise.resolve(res), then: (f, r) => Promise.resolve(res).then(f, r) });
+        return p;
+      },
       select: (cols) => query(table === 'pay_companies' ? 'companyData' : cols === 'id' ? 'empIds' : 'emps'),
       delete: () => ({ in: (col, ids) => { calls.deletes.push(ids); return Promise.resolve({ error: null }); } }),
     };
@@ -107,6 +124,30 @@ runs.push(T('楽観ロック: 別端末が後から更新→保存は conflict �
   const r2 = await Store.cloudSaveState(SNAP);
   ok(r2.ok === false && r2.reason === 'conflict', '別端末更新後は conflict(reason=' + r2.reason + ')');
   ok(mock.__calls.companyUpsert.length === upsertsBefore, 'conflict時は pay_companies を上書きしない');
+}));
+// ★P0根治: DB書式(…+00:00)とJS生成(…Z)の差で、外部変更なしの連続保存が誤conflictしない
+runs.push(T('楽観ロック(P0): DB書式差(+00:00 vs Z)で誤conflictしない=連続保存が通る', async function () {
+  const initialUA = '2026-07-20T00:00:00.000+00:00'; // DBが返す既存値(＋00:00)
+  const mock = makeMock({ companyData: { company: { name: 'A' } }, companyUpdatedAt: initialUA, dbFormat: true });
+  const Store = loadStore(mock);
+  await Store.cloudLoadState();            // baseline = initialUA(DB書式)
+  const r1 = await Store.cloudSaveState(SNAP); ok(r1.ok === true, 'save1 ok(reason=' + r1.reason + ')');
+  // 外部変更なしの2回目(スクロール等の自動保存相当)。書式差で誤発火してはいけない。
+  const r2 = await Store.cloudSaveState(SNAP);
+  ok(r2.ok === true && r2.reason !== 'conflict', '2回目保存が誤conflictしない(reason=' + r2.reason + ')');
+  const r3 = await Store.cloudSaveState(SNAP);
+  ok(r3.ok === true && r3.reason !== 'conflict', '3回目も誤conflictしない(reason=' + r3.reason + ')');
+}));
+// 書式が違っても「本物の別端末更新」は依然 conflict で検出する(根治で検出力を落とさない)
+runs.push(T('楽観ロック(P0): 書式差対応後も、本物の別端末更新は conflict を検出する', async function () {
+  let ua = '2026-07-20T00:00:00.000+00:00';
+  const mock = makeMock({ companyData: { company: { name: 'A' } }, companyUpdatedAt: () => ua });
+  const Store = loadStore(mock);
+  await Store.cloudLoadState();
+  const r1 = await Store.cloudSaveState(SNAP); ok(r1.ok === true, 'save1 ok');
+  ua = '2026-07-20T09:00:00.000+00:00'; // 別端末が後から更新
+  const r2 = await Store.cloudSaveState(SNAP);
+  ok(r2.ok === false && r2.reason === 'conflict', '本物の別端末更新は conflict(reason=' + r2.reason + ')');
 }));
 // 初回(未load/クラウド空)は競合判定せず保存できる(新規アカウント)
 runs.push(T('楽観ロック: 初回(load前)は競合扱いにせず保存できる', async function () {
