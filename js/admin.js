@@ -14,7 +14,7 @@
     { key: 'free', label: '無料' },
     { key: 'disabled', label: '停止' }
   ];
-  var APP_LABEL = { payslip: '給料明細', invoice: '請求書', daiko: 'ダイコメ' };
+  var APP_LABEL = { payslip: '給料明細', invoice: '請求書', daiko: 'ダイコメ', suite: 'Exally' };
   var rows = [];        // 全 entitlements
   var curEmail = '';
 
@@ -90,7 +90,9 @@
       }).join('');
       var emailShow = u.email ? esc(u.email) : '（メール未取得）';
       var created = fmtDate((u.apps[0] || {}).created_at);
-      return '<div class="u"><div class="em">' + emailShow + '</div><div class="meta">登録 ' + esc(created) + ' ・ id ' + esc(String(u.account_id).slice(0, 8)) + '…</div>' + apps + '</div>';
+      var appNames = u.apps.map(function (r) { return APP_LABEL[r.app] || r.app; }).join(' ・ ');
+      var head = '<div class="app-head">登録アプリ（' + u.apps.length + '）: ' + esc(appNames) + '</div>';
+      return '<div class="u"><div class="em">' + emailShow + '</div><div class="meta">登録 ' + esc(created) + ' ・ id ' + esc(String(u.account_id).slice(0, 8)) + '…</div>' + head + apps + '</div>';
     }).join('');
 
     // プラン変更ボタン配線
@@ -166,7 +168,7 @@
     var stale = diffs.filter(function (d) { return d.status !== 'same'; });
     $('statutory-stat').textContent = stale.length
       ? ('未反映/要更新 ' + stale.length + '件 — [反映]で全国配信')
-      : 'すべて最新です（中央＝内蔵値）';
+      : 'すべて最新です（中央＝内蔵値）。法改正で差分が出ると各項目に[反映]ボタンが表示されます';
 
     $('statutory-list').innerHTML = diffs.map(function (d) {
       var label = KIND_LABEL[d.kind] || d.kind;
