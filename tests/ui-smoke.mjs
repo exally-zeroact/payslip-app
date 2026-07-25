@@ -732,6 +732,41 @@ T('K1 業務委託は賞与でも控除ゼロ(社保0・源泉0=支給が手取�
   e.employmentType = 'employee'; // 後片付け
 });
 
+T('K2 期間分割: 10日締めで3期間・各期間の報酬明細・業務委託=控除ゼロ', function () {
+  A.state.company.shimeMethod = 'ten'; A.state.month = '2026-06';
+  const e = A.state.employees[0]; e.employmentType = 'contractor';
+  e.dailyEntries = [
+    { ymd: '2026-06-05', hm: '8:00', amount: '12000' }, { ymd: '2026-06-10', hm: '8:00', amount: '10000' }, // P1=22000
+    { ymd: '2026-06-15', hm: '8:00', amount: '9000' },  // P2=9000
+    { ymd: '2026-06-25', hm: '8:00', amount: '11000' }   // P3=11000
+  ];
+  ok(A.shimeSplit(), '締め方=分割あり');
+  const ps = A.shimePeriods('2026-06'); ok(ps.length === 3, '10日締め=3期間');
+  const p1 = A.buildDailyData(e, ps[0]);
+  ok(p1.totalAmount === 22000 && p1.tax === 0 && p1.net === 22000, 'P1=控除ゼロ22000(支給=手取り)');
+  ok(p1.periodMode && p1.contractor, '期間モード・業務委託フラグ');
+  ok(A.buildDailyData(e, ps[1]).totalAmount === 9000, 'P2=9000');
+  ok(A.buildDailyData(e, ps[2]).totalAmount === 11000, 'P3=11000');
+  const doc = A.dailySlipDoc([p1, A.buildDailyData(e, ps[1]), A.buildDailyData(e, ps[2])].filter(d => d && d.days && d.days.length), '1col');
+  ok((doc.match(/class="sheet"/g) || []).length === 3, '3期間の明細シート');
+  ok(/業務委託/.test(doc) && /控除なし/.test(doc), '業務委託=控除なし表記');
+  A.state.company.shimeMethod = 'monthly'; e.dailyEntries = []; e.employmentType = 'employee';
+});
+
+T('K2 期間分割: 従業員は概算の黄警告・業務委託は警告なし', function () {
+  A.state.company.shimeMethod = 'ten'; A.state.month = '2026-06';
+  const e = A.state.employees[0];
+  e.employmentType = 'employee'; e.dailyEntries = [{ ymd: '2026-06-05', hm: '8:00', amount: '12000' }];
+  const docE = A.dailySlipDoc([A.buildDailyData(e, A.shimePeriods()[0])], '1col');
+  ok(/概算/.test(docE), '従業員=概算の注記');
+  ok(/報\s*酬\s*明\s*細（概算）/.test(docE), '従業員=タイトルに（概算）で公式給与明細と区別(誤用防止)');
+  ok(/月額でまとめて|月次/.test(docE), '社保/所得税は月次の説明');
+  e.employmentType = 'contractor';
+  const docC = A.dailySlipDoc([A.buildDailyData(e, A.shimePeriods()[0])], '1col');
+  ok(!/概算/.test(docC), '業務委託=概算表記なし(正式な報酬明細)');
+  A.state.company.shimeMethod = 'monthly'; e.dailyEntries = []; e.employmentType = 'employee';
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

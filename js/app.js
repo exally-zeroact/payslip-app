@@ -137,6 +137,7 @@
     hyojunbonus:{ t:'💡 標準賞与額とは？', b:'標準賞与額は、<b>賞与の社会保険料を計算するための金額</b>です。賞与額（税引き前）から<b>1,000円未満を切り捨て</b>た額を使います。\n\n保険料がかかる上限：\n● 健康保険＝<b>年度累計573万円</b>まで\n● 厚生年金＝<b>1回あたり150万円</b>まで\n\n※所得税のほうは別の「算出率の表」で、前月給与と扶養人数から率が決まります。' },
     toukyu:{ t:'💡 等級（標準報酬の等級）', b:'等級は、社会保険の<b>「標準報酬月額」が保険料額表の何段目か</b>を表す番号です。報酬が上がると等級も上がります（健康保険は50等級・厚生年金は32等級）。\n\n<b>随時改定（月額変更届）</b>では、固定給が変わってから3か月の平均が、<b>従前と2等級以上ちがう</b>と届出が必要かを判断します。差が1等級以内なら対象外です。' },
     shimebi:{ t:'💡 締め日・支給日', b:'給与の対象期間と支払日を決めます（会社の給与規程どおりに）。\n\n● <b>締め日</b>＝計算の対象期間の区切り（例：<b>末日締め</b>＝その月の1日〜末日ぶんを計算）。\n● <b>支給日</b>＝その給与を実際に払う日（例：<b>翌月25日</b>＝当月ぶんを翌月25日に支払う）。\n\n「当月／翌月」＋「◯日」で、対象月からいつ払うかを指定します。※この設定は明細の表示と社保の当月／翌月徴収の目安に使い、税額そのものは変わりません。' },
+    shime:{ t:'💡 締め方（期間で分ける）', b:'1か月を<b>期間で分けて、期間ごとに報酬明細</b>を出せます（代行の 1〜10／11〜20／21〜末＝月3回 など）。\n\n● <b>月まとめ</b>…従来どおり月1枚。\n● <b>半月</b>…1〜15／16〜末の2期間。\n● <b>10日締め</b>…1〜10／11〜20／21〜末の3期間（月3回）。\n● <b>任意N日</b>…N日ごとに区切ります。\n\n入力タブで<b>日付・金額</b>を入れると、締め方に合わせて期間ごとの明細に自動で振り分きます。\n\n【業務委託】控除なしの報酬明細がそのまま期間ごとに出ます。\n【従業員】社会保険・所得税は<b>月額でまとめて</b>計算するため、期間明細は<b>支給額の概算</b>です（正式な控除は月次明細で。黄色でお知らせします）。' },
     daily:{ t:'💡 日払い・週払い（日別入力）', b:'支給サイクルが<b>日払い・週払い</b>のとき、日ごとに<b>日付・労働時間・支給額</b>を入れます。\n\n● 所得税は税区分ごとに<b>日額表</b>で日ごとに計算します（甲＝扶養反映／乙／丙＝日雇い）。\n● <b>丙欄（日雇い）</b>は継続2か月以内が対象。2か月を超えたら甲／乙へ。\n\n明細には日別の内訳が出ます。' }
   };
   function openHelp(k){ var h=HELP[k]; if(!h)return; var t=document.getElementById('help-t'),b=document.getElementById('help-b'); t.textContent=h.t; b.innerHTML=h.b; document.getElementById('help-ov').classList.add('on'); }
@@ -320,7 +321,7 @@
   var WDAYS=['日','月','火','水','木','金','土'];
   var RULE_ITEMS=[['teikyu','休みの日'],['companyHol','会社独自の休日'],['shotei','1日の働く時間'],['annual','年間の休み'],['warimashiRate','割増の率'],['koyoGyoshu','雇用保険の業種'],['paymentDays','支払基礎日数の数え方'],['shahoTiming','社保の当月／翌月徴収'],['kekkin','欠勤控除の計算'],['minashi','固定残業（みなし）'],['daikyu','代休・振替休日'],['shoyo','賞与の有無']];
   // 会社の既定値(毎回新規オブジェクト=共有参照事故防止)。ロード時はこれにマージ=古い保存で欠けた項目がundefinedにならない。
-  function defCompany(){ return { name:'株式会社 ゼロアクト',addr:'',close:'末日',paydayRel:'next',paydayDay:'25', payCycle:'monthly',
+  function defCompany(){ return { name:'株式会社 ゼロアクト',addr:'',close:'末日',paydayRel:'next',paydayDay:'25', payCycle:'monthly', shimeMethod:'monthly', shimeN:'10',
       holidays:[0], dailyWorkH:'8', dailyWorkM:'0', annualHolidays:'120',
       ruleOn:{teikyu:true,shotei:true,annual:true,warimashiRate:true,koyoGyoshu:true},
       rateOt:'', rateHoliday:'', rateNight:'', rateOver60:'', gyoshu:'ippan', rousaiRate:'',
@@ -536,6 +537,17 @@
   function payCycleNote(){ var el=$('#paycycle-note'); if(!el)return; var c=(state.company&&state.company.payCycle)||'monthly';
     var m={ monthly:'月に1回まとめて支給。', semimonthly:'月に2回に分けて支給。明細に区分を表示します。', weekly:'毎週支給。明細に「週払い」を表示します。', daily:'1日ごとに支給。<b>所得税は日額表</b>で日ごとに計算します（従業員ごとの税区分：甲＝扶養反映／乙／丙＝日雇い）。' };
     el.innerHTML=(m[c]||'')+'<br><span style="color:#6E907E">※月の社会保険・所得税の計算方式は変わりません（本設定は明細の表示と税区分の目安）。任意期間で締め直す本格計算は対象外。</span>'; }
+  // K2 締め方(期間分割)。会社設定 shimeMethod/shimeN。Periods libで期間を算出。
+  function shimeMethodOf(){ return (state.company&&state.company.shimeMethod)||'monthly'; }
+  function shimeNOf(){ return num((state.company&&state.company.shimeN))||10; }
+  // 期間分割が有効か。日払/週払(payCycle)は独自の日別スリップ経路を持つので相互排他=そちら優先(入力/印刷の分岐を一致させる)。
+  function shimeSplit(){ var cyc=(state.company&&state.company.payCycle)||'monthly'; if(cyc==='daily'||cyc==='weekly') return false; return !!(window.Periods&&Periods.hasSplit(shimeMethodOf())); }
+  function shimePeriods(ym){ return (window.Periods?Periods.buildPeriods(ym||state.month, shimeMethodOf(), shimeNOf()):[]); }
+  function shimeNote(){ var el=$('#shime-note'); if(!el)return; var row=$('#c-shimen-row'); if(row) row.style.display=(shimeMethodOf()==='ndays')?'':'none';
+    if(!shimeSplit()){ el.innerHTML='月1枚の明細（従来どおり）。'; return; }
+    var ps=shimePeriods(); var labels=ps.map(function(p){return p.label;}).join('／');
+    el.innerHTML='当月（'+esc(state.month)+'）は <b>'+ps.length+'期間</b>：'+esc(labels)+'。入力タブで<b>日付・金額</b>を入れると期間ごとの明細に振り分きます。'
+      +'<br><span style="color:#6E907E">業務委託＝控除なしの報酬明細。従業員＝社保/所得税は月額基準のため期間明細は<b>概算</b>（黄色でお知らせ）。</span>'; }
   function monthLabel(){ var y=Number((state.month||'2026-06').slice(0,4)), m=Number((state.month||'2026-06').slice(5,7)); var k=['','一','二','三','四','五','六','七','八','九','十','十一','十二']; return '令 和 '+(y-2018)+' 年 '+k[m]+' 月 分'; }
 
   /* ---------- ナビ ---------- */
@@ -602,7 +614,7 @@
   var A11Y_TOGGLE_SEL='.mco-hd,.emp-dtgl,.emp-sub-h,.sh-mode,.imode,.pmode,.dls,.chip,.help-i,.ef-b,.sh-seg b';
 
   /* ---------- 設定: 会社情報 ---------- */
-  function fillCompany(){ $('#c-name').value=state.company.name||''; $('#c-addr').value=state.company.addr||''; $('#c-close').value=state.company.close||''; $('#c-payrel').value=state.company.paydayRel||'next'; $('#c-payday-day').value=state.company.paydayDay||''; var pc=$('#c-paycycle'); if(pc)pc.value=state.company.payCycle||'monthly'; updatePaydayPreview(); payCycleNote(); renderRuleChips(); renderCompanyRules(); renderDesign(); }
+  function fillCompany(){ $('#c-name').value=state.company.name||''; $('#c-addr').value=state.company.addr||''; $('#c-close').value=state.company.close||''; $('#c-payrel').value=state.company.paydayRel||'next'; $('#c-payday-day').value=state.company.paydayDay||''; var pc=$('#c-paycycle'); if(pc)pc.value=state.company.payCycle||'monthly'; var sm=$('#c-shime'); if(sm)sm.value=state.company.shimeMethod||'monthly'; var sn=$('#c-shimen'); if(sn)sn.value=state.company.shimeN||'10'; updatePaydayPreview(); payCycleNote(); shimeNote(); renderRuleChips(); renderCompanyRules(); renderDesign(); }
   // 初回オンボーディング(4ステップ案内・×で閉じたら二度と出ない)。"すぐ分かる"を底上げ。
   // はじめかたガイドの各ステップの達成判定(freee/MF流のライブToDo)。全完了で自動的に消える。
   function onboardSteps(){
@@ -2394,26 +2406,42 @@
   function periodLabelOf(days){ if(!days.length) return ''; var ys=days.map(function(x){return x.ymd;}).filter(Boolean).sort(); if(!ys.length) return ''; var a=ys[0],b=ys[ys.length-1]; function jp(y){ var p=y.split('-'); return '令和'+(+p[0]-2018)+'年'+(+p[1])+'月'+(+p[2])+'日'; } return a===b?jp(a):(jp(a)+' 〜 '+(+b.split('-')[1])+'月'+(+b.split('-')[2])+'日'); }
   // 従業員の日別入力→スリップ用データ。丙欄は日別税、甲乙は日額表未収録で税null(注記)。
   function hmToMin(s){ s=String(s==null?'':s).trim(); if(!s)return 0; if(/:/.test(s)){ var p=s.split(':'); return num(p[0])*60+num(p[1]); } return Math.round(num(s)*60); }
-  function buildDailyData(e){
+  // period(K2締め期間)を渡すと、その期間の日別だけを抜き出した「期間の報酬明細」を作る。
+  //  ★期間モードでは日税を計算しない=控除ゼロ(社保/所得税は月額基準=月次明細で正式に計算)。業務委託/従業員でnoteを分岐。
+  function buildDailyData(e, period){
     var dp=DP(); if(!dp) return null;
-    var entries=(e.dailyEntries||[]).map(function(d){ return { ymd:d.ymd, min:hmToMin(d.hm), amount:num(d.amount), count:num(d.count), hikazei:!!d.hikazei }; });
+    var periodMode=!!(period && period.from); // ★期間オブジェクト(from/to有)の時だけ期間モード。.map(fn)がindexを渡す誤発火を防ぐ。
+    var allEntries=(e.dailyEntries||[]).map(function(d){ return { ymd:d.ymd, min:hmToMin(d.hm), amount:num(d.amount), count:num(d.count), hikazei:!!d.hikazei }; });
+    var entries=(periodMode&&window.Periods)?Periods.entriesInPeriod(allEntries, period):allEntries;
+    var contractor=(e.employmentType==='contractor');
     var year=parseInt(String(state.month||'').slice(0,4),10)||2026;
     var cls=e.taxClass||'ko';
-    // その日の課税額→所得税(日ごと)。丙=日雇い日額表丙欄 / 甲・乙=日額表 甲乙欄(継続雇用の日払週払)。
+    // その日の課税額→所得税(日ごと)。丙=日雇い日額表丙欄 / 甲・乙=日額表 甲乙欄(継続雇用の日払週払)。★期間モードは計算しない。
     var hei=HEI(), nichi=NICHI(), fuyou=num(e.fuyou), dayTaxFn=null, taxLabel='';
-    if(cls==='hei'){ if(hei){ dayTaxFn=function(t){ return hei.heiTax(t,{year:year}); }; taxLabel='丙欄'; } }
-    else if(cls==='otsu'){ if(nichi){ dayTaxFn=function(t){ return nichi.nichiTax(t,{taxClass:'otsu',year:year}); }; taxLabel='乙欄'; } }
-    else { var depsK=fuyou+jintekiOf(e,'ko'); if(nichi){ dayTaxFn=function(t){ return nichi.nichiTax(t,{taxClass:'ko',deps:depsK,year:year}); }; taxLabel='甲欄'; } } // 甲=本人の人的加算を扶養数に反映(月次と整合)
+    if(!periodMode){
+      if(cls==='hei'){ if(hei){ dayTaxFn=function(t){ return hei.heiTax(t,{year:year}); }; taxLabel='丙欄'; } }
+      else if(cls==='otsu'){ if(nichi){ dayTaxFn=function(t){ return nichi.nichiTax(t,{taxClass:'otsu',year:year}); }; taxLabel='乙欄'; } }
+      else { var depsK=fuyou+jintekiOf(e,'ko'); if(nichi){ dayTaxFn=function(t){ return nichi.nichiTax(t,{taxClass:'ko',deps:depsK,year:year}); }; taxLabel='甲欄'; } } // 甲=本人の人的加算を扶養数に反映(月次と整合)
+    }
     var dd=dp.computeDaily(entries, { taxClass:cls, year:year, dayTaxFn:dayTaxFn });
     var cyc=(state.company&&state.company.payCycle)||'monthly';
     var days=dd.days.map(function(d){ return { dateLabel:dateLabel(d.ymd), ymd:d.ymd, hhmm:dp.hhmm(d.min), amount:d.amount }; });
-    var tax=dd.tax; // 日ごとに計算し合算(甲/乙/丙)。libが未ロードならnull
+    var tax=periodMode?0:dd.tax; // 期間モード=控除0(支給=手取り)。日払/週払=日ごと合算(甲/乙/丙)。
     var net=dd.totalAmount-(tax||0);
+    var title, heroLabel, cycleLabel, periodLabel, payDate;
+    if(periodMode){
+      // ★誤用防止: 従業員の期間明細は「概算」を明記=正式な給与明細(月次)と見分けられるように。業務委託は正式な報酬明細。
+      title=contractor?'報 酬 明 細':'報 酬 明 細（概算）'; heroLabel='支 給 額'; cycleLabel=period.label;
+      periodLabel=periodLabelOf(days)||('令和'+(year-2018)+'年 '+period.label); payDate=period.label;
+    } else {
+      title=cyc==='weekly'?'週 払 給 与 明 細':'日 払 給 与 明 細'; heroLabel=cyc==='weekly'?'今 週 支 給 額':'本 日 支 給 額';
+      cycleLabel=cyc==='weekly'?'週払い':'日払い'; periodLabel=periodLabelOf(days); payDate=(state.company.paydayDay?('毎回 '+state.company.paydayDay+'日ごろ'):periodLabelOf(days));
+    }
     return { company:(state.company.name||''), name:(e.name||''), cycle:cyc, days:days, taxLabel:taxLabel, taxClass:cls,
-      cycleLabel:cyc==='weekly'?'週払い':'日払い', title:cyc==='weekly'?'週 払 給 与 明 細':'日 払 給 与 明 細',
-      heroLabel:cyc==='weekly'?'今 週 支 給 額':'本 日 支 給 額', payDate:(state.company.paydayDay?('毎回 '+state.company.paydayDay+'日ごろ'):periodLabelOf(days)),
-      periodLabel:periodLabelOf(days), count:dd.count, totalMin:dd.totalMin, totalMinLabel:dp.hhmm(dd.totalMin), totalCount:dd.totalCount,
-      totalAmount:dd.totalAmount, tax:tax, isHei:dd.isHei, net:net, single:(cyc==='daily'||dd.count<=1) };
+      cycleLabel:cycleLabel, title:title, heroLabel:heroLabel, payDate:payDate,
+      periodLabel:periodLabel, count:dd.count, totalMin:dd.totalMin, totalMinLabel:dp.hhmm(dd.totalMin), totalCount:dd.totalCount,
+      totalAmount:dd.totalAmount, tax:tax, isHei:dd.isHei, net:net, single:(!periodMode&&(cyc==='daily'||dd.count<=1)),
+      periodMode:periodMode, contractor:contractor, periodKey:(period&&period.key)||'' };
   }
   var DAILY_CSS=':root{--ink:#23261f;--ink2:#6a6d62;--ink3:#7d7f72;--hair-lt:#ece7dc;--hair2:#cfc9b8;--accent:#6f5a3e;--accent-soft:#b6a06d;}*{box-sizing:border-box;margin:0;padding:0;}'
     +'body{font-family:"Yu Mincho","YuMincho","Hiragino Mincho ProN","MS Mincho",serif;color:var(--ink);background:#fff;}'
@@ -2436,7 +2464,11 @@
   function yenR(n){ return '<span class="yen">¥</span>'+fmtN(n); }
   // 1人分のスリップ(内側 .sheet)。複数人はこれを並べる(M2: 全員印刷が1人だけだったバグ修正)
   function dailySlipSheet(d, layout){
-    var taxRow = (d.tax!=null)
+    var taxRow = d.periodMode
+      ? (d.contractor
+        ? '<div class="r"><span class="l">控除</span><span class="v" style="font-size:11px;color:#3B7A5A">なし（業務委託）</span></div><div class="r sum"><span class="l">控除計</span><span class="v">0</span></div>'
+        : '<div class="r"><span class="l">社保・所得税</span><span class="v" style="font-size:10px;color:#8a7a4e">月次でまとめて</span></div><div class="r sum"><span class="l">控除計（この期間）</span><span class="v">0</span></div>')
+      : (d.tax!=null)
       ? '<div class="r"><span class="l">所得税（'+(d.taxLabel||'日額表')+'）</span><span class="v">'+fmtN(d.tax)+'</span></div><div class="r sum"><span class="l">控除計</span><span class="v">'+fmtN(d.tax)+'</span></div>'
       : '<div class="r"><span class="l">所得税</span><span class="v" style="font-size:10px;color:#8a7a4e">別途</span></div><div class="r sum"><span class="l">控除計</span><span class="v">0</span></div>';
     var dhead='<div class="dhead"><span>日付</span><span class="c">労働時数</span><span class="c">支給額</span></div>';
@@ -2455,7 +2487,11 @@
       body=hero1+kin+(d.single?'':'<div class="st">日 別 支 給</div>'+dhead+dRows)+'<div class="st">控 除</div>'+taxRow;
     }
     var taxHow=(d.taxClass==='hei')?'「丙欄」（日雇い）':(d.taxClass==='otsu')?'「乙欄」（申告書なし）':'「甲欄」（扶養人数を反映）';
-    var note=(d.tax!=null)
+    var note=d.periodMode
+      ? (d.contractor
+        ? ('業務委託の報酬明細（'+esc(d.cycleLabel)+'）。控除なし＝源泉・社会保険なしで、支給がそのまま支払額です。色・書体は月給明細と統一。')
+        : ('この期間（'+esc(d.cycleLabel)+'）の支給の概算です。⚠ 社会保険・所得税は月額でまとめて計算するため、正式な控除は月次の給与明細で行います。'))
+      : (d.tax!=null)
       ? (d.cycleLabel+'＝所得税は日額表'+taxHow+'を日ごとに計算し合算。社会保険は月まとめ。色・書体は月給明細と統一。')
       : (d.cycleLabel+'＝所得税の税額表が読み込めませんでした。所得税はこの明細に含めず別途精算してください。社会保険は月まとめ。');
     return '<div class="sheet">'+top+body+'<div class="note">'+note+'</div></div>';
@@ -2471,19 +2507,34 @@
   // 日別入力(入力タブ・支給サイクルが日/週のとき)。各日=日付/労働時数(時:分)/支給額
   function dailyInputHTML(e,i){
     var cyc=(state.company&&state.company.payCycle)||'monthly';
-    if(cyc!=='daily'&&cyc!=='weekly') return '';
+    var isDaily=(cyc==='daily'||cyc==='weekly'), isPeriod=shimeSplit();
+    if(!isDaily && !isPeriod) return ''; // 月まとめ且つ日払/週払でない=日別UIは出さない(回帰ゼロ)
     var entries=e.dailyEntries||[];
     var rows=entries.map(function(d,idx){ return '<div class="dl-row">'
       +'<input class="finput dl-f" data-dl="'+i+':'+idx+':ymd" type="date" value="'+attr(d.ymd||'')+'">'
       +'<input class="finput dl-f dl-hm" data-dl="'+i+':'+idx+':hm" value="'+attr(d.hm||'')+'" placeholder="時:分">'
       +'<input class="finput num dl-f dl-amt" data-dl="'+i+':'+idx+':amount" inputmode="numeric" value="'+attr(fmtN(d.amount))+'" placeholder="金額">'
       +'<button class="btn-ghost dl-del" data-dldel="'+i+':'+idx+'" aria-label="この日を削除">×</button></div>'; }).join('');
-    var dv=buildDailyData(e);
-    var tot=dv?('<div class="dl-tot">合計 '+(dv.count)+'日 ・ '+esc(dv.totalMinLabel)+' ・ '+yen(dv.totalAmount)+(dv.tax!=null?'（所得税 '+esc(dv.taxLabel||'日額表')+' '+yen(dv.tax)+'）':'')+'</div>'):'';
-    return '<div class="grp"><div class="grp-h">日別（'+(cyc==='weekly'?'週払い':'日払い')+'）<span class="help-i" data-help="daily">💡</span></div>'
-      +'<div class="wi-note2">その日の 日付・労働時数（時:分）・支給額 を入れると、日払い/週払いの明細に日別で出ます。所得税は税区分（甲=扶養反映／乙／丙=日雇い）ごとに<b>日額表</b>で日ごとに計算します。</div>'
+    var totHtml, header, note, help;
+    if(isPeriod){ // K2 締め方=期間ごとに集計して見せる
+      var periods=shimePeriods(), contractor=(e.employmentType==='contractor');
+      var mLabel={half:'半月',ten:'10日締め',ndays:shimeNOf()+'日締め'}[shimeMethodOf()]||'';
+      var perRows=periods.map(function(p){ var d=buildDailyData(e,p); var amt=d?d.totalAmount:0, n=d?d.count:0;
+        return '<div class="dl-tot" style="display:flex;justify-content:space-between"><span>'+esc(p.label)+'（'+n+'日）</span><span>'+yen(amt)+'</span></div>'; }).join('');
+      var warn=contractor?'':'<div class="cr-warn" style="margin:6px 2px 2px">⚠ 従業員の期間明細は<b>支給の概算</b>です。社会保険・所得税は月額でまとめて計算します（正式な控除は月次の給与明細で）。</div>';
+      totHtml='<div class="dl-tot" style="font-weight:700">締め方＝'+esc(mLabel)+'（'+periods.length+'期間・期間ごとに報酬明細）</div>'+perRows+warn;
+      header='日別（締め方＝期間ごとに集計）'; help='shime';
+      note='その日の 日付・（労働時数）・支給額 を入れると、締め方に合わせて<b>期間ごとの報酬明細</b>に自動で振り分きます。'+(contractor?'業務委託＝控除なし。':'');
+    } else {
+      var dv=buildDailyData(e);
+      totHtml=dv?('<div class="dl-tot">合計 '+(dv.count)+'日 ・ '+esc(dv.totalMinLabel)+' ・ '+yen(dv.totalAmount)+(dv.tax!=null?'（所得税 '+esc(dv.taxLabel||'日額表')+' '+yen(dv.tax)+'）':'')+'</div>'):'';
+      header='日別（'+(cyc==='weekly'?'週払い':'日払い')+'）'; help='daily';
+      note='その日の 日付・労働時数（時:分）・支給額 を入れると、日払い/週払いの明細に日別で出ます。所得税は税区分（甲=扶養反映／乙／丙=日雇い）ごとに<b>日額表</b>で日ごとに計算します。';
+    }
+    return '<div class="grp"><div class="grp-h">'+header+'<span class="help-i" data-help="'+help+'">💡</span></div>'
+      +'<div class="wi-note2">'+note+'</div>'
       +'<div class="dl-head"><span>日付</span><span>労働時数</span><span>支給額</span><span></span></div>'
-      +rows+tot
+      +rows+totHtml
       +'<div class="addcustom"><button class="btn-ghost" data-dladd="'+i+'" style="padding:8px 12px">＋日を追加</button></div></div>';
   }
   // 賞与明細用: 月次明細と同じテンプレ/テーマ(ユーザー選択)で 勤怠なし・支給=賞与/控除=賞与社保+源泉
@@ -2609,6 +2660,14 @@
       fr.style.width='794px'; fr.style.height='1123px'; fr.style.transformOrigin='top left'; fr.dataset.pw=794; fr.dataset.ph=1123;
       fitPreview(); return;
     }
+    if(!isBonus && shimeSplit()){ // K2 締め方=期間分割。期間×従業員 の報酬明細を並べる(期間の若い順→従業員順)
+      var periods=shimePeriods(), pList=[];
+      periods.forEach(function(p){ emps.forEach(function(e){ var d=buildDailyData(e, p); if(d && d.days && d.days.length) pList.push(d); }); });
+      var frp=$('#frame');
+      frp.srcdoc=dailySlipDoc(pList, state.dailySlipLayout||'1col');
+      frp.style.width='794px'; frp.style.height='1123px'; frp.style.transformOrigin='top left'; frp.dataset.pw=794; frp.dataset.ph=1123;
+      fitPreview(); return;
+    }
     var people=isBonus?buildBonusPeople(emps):buildPeople(emps);
     var doc=isBonus?{month:bonusMonthLabel(),kind:'bonus'}:{month:monthLabel()};
     var out=Render.build(people, doc, state.prefer, state.theme);
@@ -2688,6 +2747,8 @@
     var pr=$('#c-payrel'); if(pr) pr.addEventListener('change',function(){ state.company.paydayRel=this.value; updatePaydayPreview(); });
     var pd=$('#c-payday-day'); if(pd) pd.addEventListener('input',function(){ state.company.paydayDay=this.value.replace(/[^0-9末]/g,''); updatePaydayPreview(); });
     var pcy=$('#c-paycycle'); if(pcy) pcy.addEventListener('change',function(){ state.company.payCycle=this.value; payCycleNote(); if(window.persistSaveDebounced)persistSaveDebounced(); });
+    var shm=$('#c-shime'); if(shm) shm.addEventListener('change',function(){ state.company.shimeMethod=this.value; shimeNote(); if(state.employees)renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); });
+    var shn=$('#c-shimen'); if(shn) shn.addEventListener('input',function(){ state.company.shimeN=this.value; shimeNote(); if(state.employees)renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); });
     // 会社の決まり：項目チップ
     $('#rule-chips').addEventListener('click',function(ev){
       var ch=ev.target.closest('[data-rule]'); if(ch){ var k=ch.dataset.rule; if(!state.company.ruleOn)state.company.ruleOn={}; state.company.ruleOn[k]=!state.company.ruleOn[k]; renderRuleChips(); renderCompanyRules(); return; }
@@ -3051,7 +3112,7 @@
 
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
-    window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc,
+    window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc, shimePeriods:shimePeriods, shimeSplit:shimeSplit,
       saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, isInMinWage:isInMinWage, minWageTeate:minWageTeate, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, stType:stType, stLabel:stLabel, santeiRule:santeiRule, gekkakuTh:gekkakuTh, shahoBasisOf:shahoBasisOf, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, ymdPlus1:ymdPlus1, shikakuRows:shikakuRows, shikakuAoa:shikakuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc, applyMigrationRows:applyMigrationRows, buildEmpFromRow:buildEmpFromRow, prevYmOf:prevYmOf }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
