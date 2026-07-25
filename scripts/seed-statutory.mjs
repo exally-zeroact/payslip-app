@@ -14,33 +14,12 @@ const NI = require('../lib/shotokuzei-nichi.js');
 const SZ = require('../lib/shoyo-zei.js');
 const N = require('../lib/nenmatsu.js');
 const WM = require('../lib/warimashi.js');
+const { buildStatutoryRows } = require('../lib/statutory-rows.js');
 
 const c = new pg.Client({ host: 'db.tnfwipbgfgjaymlszeid.supabase.co', port: 5432, user: 'postgres', password: process.env.SUPA_DB_PW, database: 'postgres', ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 15000 });
 
-// 社保: 各年度を1行に束ねる(健保47県total/介護total/支援金total/厚年total)
-function shakaihokenRow(year) {
-  const kenko = year >= 2026 ? SHH.KENKO_2026 : Object.fromEntries(Object.keys(SHH.KENKO_RITSU).map(k => [k, SHH.KENKO_RITSU[k].total]));
-  const ym = year + '-06';
-  return { kenko_total: kenko, kaigo_total: SHH.getKaigo(ym).total, shienkin_total: (year >= 2026 ? SHH.SHIENKIN_TOTAL_FROM_2026_04 : 0), kosei_total: SHH.KOSEI_NENKIN_RITSU_TOTAL };
-}
-const heiTable = (H.HEI_BY_YEAR && H.HEI_BY_YEAR[2026]) || H.HEI_R8;
-const nichiTable = (NI.tableFor && NI.tableFor(2026)) || NI.TABLE_R8;
-
-const rows = [
-  { kind: 'saitei_chingin', year: 2025, data: { todofuken: SAI.todofuken, zenkoku_heikin: SAI.ZENKOKU_HEIKIN, nendo: SAI.NENDO }, source_url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/roudoukijun/minimumichiran/' },
-  { kind: 'shakaihoken', year: 2025, data: shakaihokenRow(2025), source_url: 'https://www.kyoukaikenpo.or.jp/g7/cat330/' },
-  { kind: 'shakaihoken', year: 2026, data: shakaihokenRow(2026), source_url: 'https://www.kyoukaikenpo.or.jp/g7/cat330/' },
-  { kind: 'koyo', year: 2025, data: KOYO.RATES[2025], source_url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyouhoken_ryouritsu.html' },
-  { kind: 'koyo', year: 2026, data: KOYO.RATES[2026], source_url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyouhoken_ryouritsu.html' },
-  { kind: 'shotokuzei_densan', year: 2025, data: { fuyouKojo: D.PARAMS[2025].fuyouKojo, kyuyo: D.PARAMS[2025].kyuyo, kiso: D.PARAMS[2025].kiso }, source_url: 'https://www.nta.go.jp/users/gensen/' },
-  { kind: 'shotokuzei_densan', year: 2026, data: { fuyouKojo: D.PARAMS[2026].fuyouKojo, kyuyo: D.PARAMS[2026].kyuyo, kiso: D.PARAMS[2026].kiso, zeiKo: D.ZEI_KO, zeiOtsu: D.ZEI_OTSU }, source_url: 'https://www.nta.go.jp/users/gensen/2026kaisei/index.htm' },
-  { kind: 'shotokuzei_hei', year: 2026, data: { start: heiTable.start, step: heiTable.step, arr: heiTable.arr }, source_url: 'https://www.nta.go.jp/publication/pamph/gensen/zeigakuhyo2026/02.htm' },
-  { kind: 'shotokuzei_nichi', year: 2026, data: { start: nichiTable.start, step: nichiTable.step, ko: nichiTable.ko, otsu: nichiTable.otsu, koOver: nichiTable.koOver, otsuLowRate: nichiTable.otsuLowRate, otsuOver: nichiTable.otsuOver }, source_url: 'https://www.nta.go.jp/publication/pamph/gensen/zeigakuhyo2026/data/08-14.pdf' },
-  { kind: 'shoyo', year: 2026, data: { rates: SZ.RATES, kou: SZ.KOU_BY_YEAR[2026], otsu: SZ.OTSU_BY_YEAR[2026], kenpo_year_cap: SZ.KENPO_YEAR_CAP, kosei_per_cap: SZ.KOSEI_PER_CAP, kosei_ritsu_jugyoin: SZ.KOSEI_RITSU_JUGYOIN }, source_url: 'https://www.nta.go.jp/publication/pamph/gensen/zeigakuhyo2026/03.htm' },
-  { kind: 'nenmatsu', year: 2026, data: N.P, source_url: 'https://www.nta.go.jp/users/gensen/2026kaisei/index.htm' },
-  { kind: 'warimashi', year: 2023, data: WM.RATE, source_url: 'https://www.mhlw.go.jp/hourei/doc/kouji/K060000-A5.pdf' },
-  { kind: 'shouhizei', year: 2019, data: { hyojun: 0.10, keigen: 0.08 }, source_url: 'https://www.nta.go.jp/taxes/shiraberu/taxanswer/shohi/6101.htm' }, // 2019-10〜(国税庁 消費税率)
-];
+// ★行生成は lib/statutory-rows.js に集約(seedとadmin.htmlで単一ソース・二重持ち禁止)★
+const rows = buildStatutoryRows({ SHH, SAI, KOYO, D, H, NI, SZ, N, WM });
 
 const run = async () => {
   await c.connect();

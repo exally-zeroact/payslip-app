@@ -295,6 +295,28 @@ update exally_entitlements e set email = u.email from auth.users u where u.id = 
 -- ★司さんを管理者に登録(自分のログインメールに置き換えて実行)★
 -- insert into exally_admins (account_id) select id from auth.users where email = 'ここに司さんのログインメール';
 
+-- ── 中央 statutory を admin.html の[反映]から更新する安全パス(詳細/貼付版は supabase/statutory-admin.sql) ──
+--   SECURITY DEFINER=内部はpostgres権限で書くが、呼び出しは is_exally_admin() のみ。service_roleキーをWebに出さない。
+create or replace function statutory_upsert(p_kind text, p_year int, p_data jsonb, p_source_url text)
+  returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not is_exally_admin() then raise exception '権限がありません(管理者のみ更新できます)'; end if;
+  if p_kind is null or p_kind not in (
+    'saitei_chingin','shakaihoken','koyo','shotokuzei_densan','shotokuzei_hei',
+    'shotokuzei_nichi','shoyo','nenmatsu','warimashi','shouhizei') then
+    raise exception '不正なkindです: %', p_kind; end if;
+  if p_year is null or p_year < 2000 or p_year > 2100 then raise exception '不正なyearです: %', p_year; end if;
+  if p_data is null or jsonb_typeof(p_data) <> 'object' then raise exception 'dataがオブジェクトではありません'; end if;
+  insert into statutory(kind, year, data, source_url, verified_at, updated_at)
+  values (p_kind, p_year, p_data, p_source_url, now(), now())
+  on conflict (kind, year) do update
+    set data = excluded.data, source_url = excluded.source_url, verified_at = now(), updated_at = now()
+  where statutory.data is distinct from excluded.data or statutory.source_url is distinct from excluded.source_url;
+end; $$;
+revoke all on function statutory_upsert(text, int, jsonb, text) from public;
+revoke all on function statutory_upsert(text, int, jsonb, text) from anon;
+grant execute on function statutory_upsert(text, int, jsonb, text) to authenticated;
+
 -- ════════════════════════════════════════════════════════════════════════
 -- 年末調整 従業員セルフ申告(Web明細から本人がスマホで入力) ★step2・2026-07-18★
 --   ★DDL/RPCの本体と説明は supabase/nencho-decl.sql に集約(貼り付け用)。ここは同一内容を再掲。★

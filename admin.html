@@ -52,6 +52,25 @@
   .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1a4a2e;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;}
   .toast.show{opacity:1;}
   .hide{display:none;}
+  /* タブ */
+  .tabs{display:flex;gap:6px;margin-bottom:14px;}
+  .tab{padding:9px 16px;border:1.5px solid var(--line);border-radius:999px;background:#fff;color:var(--muted);font-weight:700;font-size:13px;cursor:pointer;}
+  .tab.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+  /* 法定データ */
+  .note{font-size:12px;color:var(--muted);line-height:1.7;margin:0 2px 12px;}
+  .st{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:9px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .st.stale{border-color:#E5A100;background:#FFFBF0;}
+  .st .nm{font-weight:700;font-size:14px;flex:1;min-width:150px;}
+  .st .yr{font-size:12px;color:var(--muted);}
+  .st .badge{font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;}
+  .st .badge.ok{background:#E6F5EC;color:#1E7B45;}
+  .st .badge.warn{background:#FBE5C0;color:#8A5A00;}
+  .st .apply{padding:8px 16px;border:none;border-radius:999px;background:var(--accent);color:#fff;font-weight:700;font-size:13px;cursor:pointer;}
+  .st .apply:disabled{opacity:.5;cursor:default;}
+  .st a.src{font-size:11px;color:#3B7A5A;}
+  .bulk{display:flex;justify-content:flex-end;margin:14px 2px 0;}
+  .bulk button{padding:11px 20px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-weight:800;font-size:14px;cursor:pointer;}
+  .bulk button:disabled{opacity:.5;cursor:default;}
 </style>
 </head>
 <body>
@@ -72,18 +91,48 @@
 
   <!-- 一覧 -->
   <div id="panel" class="wrap hide">
-    <div class="tools">
-      <input id="q" placeholder="メールで絞り込み">
-      <button class="refresh" id="refresh">更新</button>
+    <div class="tabs">
+      <button class="tab on" id="tab-users">ユーザー</button>
+      <button class="tab" id="tab-statutory">法定データ</button>
     </div>
-    <div class="stat" id="stat"></div>
-    <div id="list"></div>
+
+    <!-- ユーザー -->
+    <div id="sec-users">
+      <div class="tools">
+        <input id="q" placeholder="メールで絞り込み">
+        <button class="refresh" id="refresh">更新</button>
+      </div>
+      <div class="stat" id="stat"></div>
+      <div id="list"></div>
+    </div>
+
+    <!-- 法定データ(全国共通・中央配信) -->
+    <div id="sec-statutory" class="hide">
+      <p class="note">このアプリが使う法定数値（最低賃金・社会保険・所得税など）の<b>中央</b>と、最新の内蔵値との差分です。<br>差分があれば <b>[反映]</b> で中央を更新＝全国ユーザーへ自動配信されます。値は検証済みの内蔵 libから流し込む（捏造なし）。</p>
+      <div class="tools">
+        <div class="stat" id="statutory-stat" style="flex:1;min-width:160px;"></div>
+        <button class="refresh" id="statutory-refresh">更新</button>
+      </div>
+      <div id="statutory-list"></div>
+      <div class="bulk" id="statutory-bulk"></div>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supa-config.js"></script>
+  <!-- 法定データlib(admin法定データ画面が中央へ投入する「あるべき値」の生成に使用) -->
+  <script src="lib/shakaihoken-hyo.js"></script>
+  <script src="lib/koyo-hoken.js"></script>
+  <script src="lib/shotokuzei-densan.js"></script>
+  <script src="lib/shotokuzei-hei.js"></script>
+  <script src="lib/shotokuzei-nichi.js"></script>
+  <script src="lib/shoyo-zei.js"></script>
+  <script src="lib/warimashi.js"></script>
+  <script src="lib/saitei-chingin.js"></script>
+  <script src="lib/nenmatsu.js"></script>
+  <script src="lib/statutory-rows.js"></script>
   <script src="js/admin.js"></script>
   <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script>
 </body>

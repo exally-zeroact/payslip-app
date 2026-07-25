@@ -114,6 +114,109 @@
       });
   }
 
+  // ══════════════════════════════════════════════════════════════
+  // 法定データ(中央 statutory)タブ — 差分を見て[反映]で全国配信
+  // ══════════════════════════════════════════════════════════════
+  var KIND_LABEL = {
+    saitei_chingin: '最低賃金（都道府県別）', shakaihoken: '社会保険料率', koyo: '雇用保険料率',
+    shotokuzei_densan: '所得税（源泉・電算）', shotokuzei_hei: '所得税（月額表）', shotokuzei_nichi: '所得税（日額表）',
+    shoyo: '賞与の源泉徴収', nenmatsu: '年末調整', warimashi: '割増賃金率', shouhizei: '消費税率'
+  };
+  var statLoaded = false;
+
+  // タブ切替
+  $('tab-users').onclick = function () { switchTab('users'); };
+  $('tab-statutory').onclick = function () { switchTab('statutory'); };
+  function switchTab(t) {
+    $('tab-users').classList.toggle('on', t === 'users');
+    $('tab-statutory').classList.toggle('on', t === 'statutory');
+    $('sec-users').classList.toggle('hide', t !== 'users');
+    $('sec-statutory').classList.toggle('hide', t !== 'statutory');
+    if (t === 'statutory' && !statLoaded) { statLoaded = true; loadStatutory(); }
+  }
+  $('statutory-refresh').onclick = function () { loadStatutory(); };
+
+  // libの実体を解決(admin.htmlで先に読込済み。saitei/shakaihokenはconstグローバル=bare参照、他はwindow)
+  function resolveLibs() {
+    return {
+      SHH: (typeof SHAKAIHOKEN_HYO !== 'undefined') ? SHAKAIHOKEN_HYO : window.SHAKAIHOKEN_HYO,
+      SAI: (typeof SAITEI_CHINGIN !== 'undefined') ? SAITEI_CHINGIN : window.SAITEI_CHINGIN,
+      KOYO: window.KoyoHoken, D: window.ShotokuzeiDensan, H: window.ShotokuzeiHei,
+      NI: window.ShotokuzeiNichi, SZ: window.ShoyoZei, N: window.Nenmatsu, WM: window.Warimashi
+    };
+  }
+
+  function loadStatutory() {
+    $('statutory-stat').textContent = '読み込み中…';
+    $('statutory-list').innerHTML = '';
+    $('statutory-bulk').innerHTML = '';
+    var SR = window.StatutoryRows;
+    if (!SR) { $('statutory-stat').textContent = '法定lib(statutory-rows.js)が読めません'; return; }
+    var desired;
+    try { desired = SR.buildStatutoryRows(resolveLibs()); }
+    catch (e) { $('statutory-stat').textContent = '内蔵値の生成に失敗: ' + e.message; return; }
+    sb.from('statutory').select('kind,year,data').then(function (r) {
+      if (r.error) { $('statutory-stat').textContent = '中央の読み込みエラー: ' + r.error.message; return; }
+      var diffs = SR.diffRows(desired, r.data || []);
+      renderStatutory(diffs);
+    });
+  }
+
+  function renderStatutory(diffs) {
+    var stale = diffs.filter(function (d) { return d.status !== 'same'; });
+    $('statutory-stat').textContent = stale.length
+      ? ('未反映/要更新 ' + stale.length + '件 — [反映]で全国配信')
+      : 'すべて最新です（中央＝内蔵値）';
+
+    $('statutory-list').innerHTML = diffs.map(function (d) {
+      var label = KIND_LABEL[d.kind] || d.kind;
+      var isStale = d.status !== 'same';
+      var badge = d.status === 'same'
+        ? '<span class="badge ok">✓ 最新</span>'
+        : (d.status === 'new'
+          ? '<span class="badge warn">⚠ 中央に未収録</span>'
+          : '<span class="badge warn">⚠ 値が更新されています</span>');
+      var applyBtn = isStale
+        ? '<button class="apply" data-apply="' + attr(d.kind) + '|' + attr(String(d.year)) + '">反映</button>'
+        : '';
+      var src = d.source_url ? '<a class="src" href="' + attr(d.source_url) + '" target="_blank" rel="noopener">出典</a>' : '';
+      return '<div class="st' + (isStale ? ' stale' : '') + '"><span class="nm">' + esc(label)
+        + ' <span class="yr">' + esc(String(d.year)) + '</span></span>' + badge + src + applyBtn + '</div>';
+    }).join('');
+
+    // 一括反映
+    if (stale.length) {
+      $('statutory-bulk').innerHTML = '<button id="statutory-apply-all">差分をすべて反映（' + stale.length + '件）</button>';
+      $('statutory-apply-all').onclick = function () { reflect(stale); };
+    } else {
+      $('statutory-bulk').innerHTML = '';
+    }
+
+    // 個別反映(該当行のdesiredを引く)
+    Array.prototype.forEach.call($('statutory-list').querySelectorAll('button[data-apply]'), function (btn) {
+      btn.onclick = function () {
+        var p = btn.getAttribute('data-apply').split('|'); // kind|year
+        var row = diffs.filter(function (d) { return d.kind === p[0] && String(d.year) === p[1]; })[0];
+        if (row) reflect([row]);
+      };
+    });
+  }
+
+  // RPC statutory_upsert で中央へ書込(管理者のみ・RLSはサーバ側で強制)
+  function reflect(list) {
+    Array.prototype.forEach.call(document.querySelectorAll('#sec-statutory button'), function (b) { b.disabled = true; });
+    var done = 0, errs = [];
+    var jobs = list.map(function (d) {
+      return sb.rpc('statutory_upsert', { p_kind: d.kind, p_year: d.year, p_data: d.data, p_source_url: d.source_url || null })
+        .then(function (r) { if (r.error) errs.push((KIND_LABEL[d.kind] || d.kind) + ': ' + r.error.message); else done++; });
+    });
+    Promise.all(jobs).then(function () {
+      if (errs.length) toast('反映エラー: ' + errs[0]);
+      else toast(done + '件を中央に反映しました（全国配信）');
+      loadStatutory(); // 再取得で状態更新(ボタンも復帰)
+    });
+  }
+
   // 初期表示
   sb.auth.getSession().then(function (r) { if (r.data && r.data.session) boot(); else show('login'); });
 })();
