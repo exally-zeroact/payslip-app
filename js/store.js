@@ -54,13 +54,14 @@
     // ★iOSホーム画面PWA(standalone)等でSupabase内蔵ストレージが起動間に失われる場合の保険:
     //   セッション(refresh_token)を独自キーにもバックアップし、起動時にgetSessionが空なら復元する。
     var BK = 'kyually-session-backup';
-    function backupSession(s){
-      try{
-        if(s && s.refresh_token){ localStorage.setItem(BK, JSON.stringify({ a:s.access_token, r:s.refresh_token })); }
-        else { localStorage.removeItem(BK); }
-      }catch(e){}
-    }
-    try{ if(sb.auth && typeof sb.auth.onAuthStateChange==='function'){ sb.auth.onAuthStateChange(function(_e,s){ backupSession(s); }); } }catch(e){}
+    try{ if(sb.auth && typeof sb.auth.onAuthStateChange==='function'){
+      sb.auth.onAuthStateChange(function(ev, s){
+        // ★消すのは「明示的サインアウト」時だけ。起動時のINITIAL_SESSION(null)では消さない
+        //   =内蔵ストレージが空でも独自バックアップから復元できるようにする(iOS standalone対策の要)。
+        if(ev === 'SIGNED_OUT'){ try{ localStorage.removeItem(BK); }catch(e){} return; }
+        if(s && s.refresh_token){ try{ localStorage.setItem(BK, JSON.stringify({ a:s.access_token, r:s.refresh_token })); }catch(e){} }
+      });
+    } }catch(e){}
 
     Store.auth = {
       session: function(){
