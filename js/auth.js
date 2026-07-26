@@ -72,6 +72,8 @@
   $('auth-pw').addEventListener('keydown',function(ev){ if(ev.key==='Enter') $('auth-login').click(); });
 
   // 起動時: セッションがあればそのまま、無ければログイン画面
-  A.session().then(function(s){ if(s){ var em=(s.user&&s.user.email)||''; afterLogin(em); } else { show(); } });
-  A.onChange(function(s){ if(!s){ show(); } });
+  // ★初回のセッション復元(setSessionを含む)が終わるまで onChange の null で早まってログイン画面を出さない。
+  var _authChecked = false;
+  A.session().then(function(s){ _authChecked = true; if(s){ var em=(s.user&&s.user.email)||''; afterLogin(em); } else { show(); } });
+  A.onChange(function(s){ if(_authChecked && !s){ show(); } });
 })();
