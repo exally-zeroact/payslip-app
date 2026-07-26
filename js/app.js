@@ -3040,13 +3040,19 @@
         +(it.initCode?'<div class="qi">初回コード：<b>'+esc(it.initCode)+'</b></div>':'<div class="qi" style="color:#2E7D54">設定済み</div>')
         +'<div class="qh">スマホのカメラでこのQRを読み取り→初回だけ「初回コード」で自分のパスワードを設定してください。</div>'
         +'<div class="qu">'+esc(it.url)+'</div></div>'; }).join('');
-    var w=window.open('','_blank'); if(!w){ uiAlert('印刷ウィンドウを開けませんでした（ブラウザのポップアップ許可が必要です）。'); return; }
-    w.document.write('<!doctype html><html lang="ja"><head><meta charset="UTF-8"><title>Web明細 QRコード</title><style>'
-      +'body{font-family:sans-serif;margin:14px;color:#1a4a2e}h1{font-size:15px;margin:0 0 10px}'
-      +'.grid{display:flex;flex-wrap:wrap;gap:12px}.qc{border:1px dashed #9ac3ad;border-radius:10px;padding:12px;width:250px;text-align:center;page-break-inside:avoid}'
-      +'.qc svg{width:190px;height:190px}.qn{font-weight:700;font-size:14px;margin:6px 0 2px}.qi{font-size:12px;margin:2px 0}.qh{font-size:10px;color:#5C7E6C;margin:6px 0 4px;line-height:1.5}.qu{font-size:8.5px;color:#8aa89a;word-break:break-all}'
-      +'@media print{.qc{border-color:#bbb}}</style></head><body><h1>Web給与明細 アクセス用QRコード</h1><div class="grid">'+cards+'</div></body></html>');
-    w.document.close(); w.focus(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 350);
+    // ★新窓(window.open)は使わない=スマホ/ホーム画面アプリで開けず「戻れない」ため。アプリ内オーバーレイで表示＋任意で印刷。
+    var css='.qc{border:1px dashed #9ac3ad;border-radius:10px;padding:12px;width:230px;max-width:100%;text-align:center;page-break-inside:avoid;box-sizing:border-box}.qc svg{width:180px;height:180px}.qn{font-weight:700;font-size:14px;margin:6px 0 2px}.qi{font-size:12px;margin:2px 0}.qh{font-size:10px;color:#5C7E6C;margin:6px 0 4px;line-height:1.5}.qu{font-size:8.5px;color:#8aa89a;word-break:break-all}';
+    uiModal({ title:'Web給与明細 アクセス用QRコード（従業員に配布）',
+      html:'<style>'+css+'</style><div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;max-height:62vh;overflow:auto;padding:2px">'+cards+'</div>',
+      buttons:[{label:'閉じる',val:false},{label:'印刷する',val:true,primary:true}]
+    }).then(function(v){ if(!v) return;
+      var st=document.createElement('style'); st.id='qrprint-style';
+      st.textContent='@media print{body>*{visibility:hidden!important}#qrprint-print,#qrprint-print *{visibility:visible!important}#qrprint-print{position:absolute;left:0;top:0;width:100%;padding:14px;box-sizing:border-box}'+css+'}';
+      var pc=document.createElement('div'); pc.id='qrprint-print';
+      pc.innerHTML='<h1 style="font-size:15px;margin:0 0 10px;color:#1a4a2e">Web給与明細 アクセス用QRコード</h1><div style="display:flex;flex-wrap:wrap;gap:12px">'+cards+'</div>';
+      document.head.appendChild(st); document.body.appendChild(pc);
+      setTimeout(function(){ try{ window.print(); }catch(e){} setTimeout(function(){ pc.remove(); st.remove(); }, 800); }, 120);
+    });
   }
   // Web明細: 公開状況(従業員リンク＋同意＋未読/開封)を印刷タブに表示
   function renderWebMeisai(){
