@@ -109,14 +109,32 @@
     if(d.openedAt==null){ Store.markMeisaiOpened(d.id, token, cred).then(function(){ d.openedAt=new Date().toISOString(); }); }
     window.scrollTo(0,0);
   }
+  var _zoomed=false;
   function fitFrame(){
     var f=$('frame'), wrap=document.querySelector('.preview-wrap'); if(!f||!wrap||!f.dataset.pw) return;
-    var pw=+f.dataset.pw, ph=+f.dataset.ph, avail=wrap.clientWidth-24;
-    var s = avail>0 ? Math.min(1, avail/pw) : 1; if(!(s>0.05)) s=Math.max(0.05, s||1);
-    f.style.transform='scale('+s+')'; f.style.marginRight=(-(pw*(1-s)))+'px'; f.style.marginBottom=(-(ph*(1-s)))+'px';
+    var pw=+f.dataset.pw, ph=+f.dataset.ph;
+    if(_zoomed){ // ★原寸表示=スマホでも字が読める(preview-wrapを指でスクロールして読む)
+      f.style.transform='none'; f.style.marginRight='0'; f.style.marginBottom='0';
+    } else {
+      var avail=wrap.clientWidth-24;
+      var s = avail>0 ? Math.min(1, avail/pw) : 1; if(!(s>0.05)) s=Math.max(0.05, s||1);
+      f.style.transform='scale('+s+')'; f.style.marginRight=(-(pw*(1-s)))+'px'; f.style.marginBottom=(-(ph*(1-s)))+'px';
+    }
   }
   $('v-back').addEventListener('click', function(){ renderList(); show('sc-list'); });
-  $('v-pdf').addEventListener('click', function(){ var f=$('frame'); try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){ window.print(); } });
+  // ★見にくい対策: 「拡大」で原寸(読める大きさ)⇔「全体表示」を切替
+  var _zb=$('v-zoom'); if(_zb) _zb.addEventListener('click', function(){ _zoomed=!_zoomed; this.textContent=_zoomed?'全体表示':'拡大'; fitFrame(); var w=document.querySelector('.preview-wrap'); if(w){ w.scrollTop=0; w.scrollLeft=0; } });
+  // ★PDF/印刷: iframe.contentWindow.print()はiOSで無効=無反応の原因。明細だけを原寸で印刷する@media print方式に変更
+  //   (iPhone Safariでも「共有→プリント/PDFで保存」が効く。従業員はリンク=Safariタブで開くので有効)。
+  $('v-pdf').addEventListener('click', function(){
+    var f=$('frame'); if(!f){ try{ window.print(); }catch(e){} return; }
+    var st=document.getElementById('meisai-print-style');
+    if(!st){ st=document.createElement('style'); st.id='meisai-print-style';
+      st.textContent='@media print{body *{visibility:hidden!important}.preview-wrap,.preview-wrap *{visibility:visible!important}.preview-wrap{position:absolute!important;left:0;top:0;width:auto!important;height:auto!important;overflow:visible!important;background:#fff!important;padding:0!important;display:block!important}#frame{transform:none!important;margin:0!important}}';
+      document.head.appendChild(st);
+    }
+    setTimeout(function(){ try{ window.print(); }catch(e){} }, 150);
+  });
   window.addEventListener('resize', function(){ if($('sc-view').classList.contains('hidden'))return; fitFrame(); });
 
   // ⑥ 年末調整 従業員セルフ申告(平易な質問→保存。会社が取り込む)
