@@ -147,13 +147,18 @@ body{font-family:'Noto Sans JP',sans-serif;color:#1a4a2e;background:#F0FAF4;-web
       <button class="btn ghost" id="v-back" style="flex:1">← 一覧へ</button>
       <button class="btn" id="v-pdf" style="flex:1">PDFで保存 / 印刷</button>
     </div>
-    <div class="preview-wrap"><iframe id="frame" title="給与明細"></iframe></div>
+    <p class="hint" style="margin:6px 2px 0;text-align:center">指で広げると拡大して読めます。「PDFで保存 / 印刷」で本物のPDFを保存できます。</p>
+    <div class="preview-wrap"><img id="ps-img" alt="給与明細" style="width:100%;height:auto;display:block;background:#fff"><div id="ps-loading" class="hint" style="padding:40px 0">明細を読み込み中…</div></div>
+    <iframe id="frame" title="描画用" aria-hidden="true" style="position:absolute;left:-10000px;top:0;width:794px;height:1123px;border:0;background:#fff"></iframe>
   </div>
 
 </div>
 
 <script src="js/render.js"></script>
 <script src="lib/nencho-declaration.js"></script>
+<!-- PDF生成(shuri-appと同じ実機検証済方式=明細を画像化→jsPDFでA4 PDF) -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <!-- 本番はSupabase(RPC)。window.SUPA/supabase未読込ならstore.jsはlocalStorage層にフォールバック。 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supa-config.js"></script>
