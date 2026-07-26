@@ -87,37 +87,59 @@
     });
   }
 
-  // ⑤ 明細ビュー
+  // ⑤ 明細ビュー = 明細を画像化して<img>で表示(fit幅・指でピンチズーム可・iOSで確実に出る)。
+  //   保存/印刷は jsPDF で本物のA4 PDF を生成(shuri-app 実機検証済方式)→iOSは標準ビューアで開く=拡大/印刷が全部効く。
+  var _pdfCanvas=null, _isLand=false;
   function openDoc(i){
     var d=docs[i]; if(!d) return; var data=d.data||{};
+    if(d.openedAt==null){ Store.markMeisaiOpened(d.id, token, cred).then(function(){ d.openedAt=new Date().toISOString(); }); }
+    var pw=794, ph=1123, html; _isLand=false;
     try{
-      var f=$('frame'), pw, ph;
-      if(d.kind==='gensen'){ // 源泉徴収票=会社が作った単独HTMLをそのまま表示(render.js非経由)
-        f.srcdoc=data.gensenHtml||'<p style="padding:16px">源泉徴収票を表示できませんでした。</p>';
-        pw=794; ph=1123; // A4縦
-      } else {
+      if(d.kind==='gensen'){ html=data.gensenHtml||'<!doctype html><html><head><meta charset="UTF-8"></head><body><p style="padding:16px">源泉徴収票を表示できませんでした。</p></body></html>'; }
+      else {
         var people=[data.person||{}], doc=data.doc||{month:ymLabel(d.ym,d.kind), kind:d.kind};
         var out=window.Render.build(people, doc, data.prefer, data.theme);
-        f.srcdoc=out.html;
-        pw=out.orientation==='landscape'?1123:794; ph=out.orientation==='landscape'?794:1123;
+        html=out.html; if(out.orientation==='landscape'){ pw=1123; ph=794; _isLand=true; }
       }
-      f.style.width=pw+'px'; f.style.height=ph+'px'; f.style.transformOrigin='top left';
-      f.dataset.pw=pw; f.dataset.ph=ph;
-      show('sc-view'); // 先に表示してからフィット(隠れてると幅0で負scaleになる)
-      fitFrame(); requestAnimationFrame(fitFrame);
-    }catch(e){ show('sc-view'); }
-    if(d.openedAt==null){ Store.markMeisaiOpened(d.id, token, cred).then(function(){ d.openedAt=new Date().toISOString(); }); }
+    }catch(e){ return; }
+    show('sc-view');
+    renderPayslip(html, pw, ph);
     window.scrollTo(0,0);
   }
-  function fitFrame(){
-    var f=$('frame'), wrap=document.querySelector('.preview-wrap'); if(!f||!wrap||!f.dataset.pw) return;
-    var pw=+f.dataset.pw, ph=+f.dataset.ph, avail=wrap.clientWidth-24;
-    var s = avail>0 ? Math.min(1, avail/pw) : 1; if(!(s>0.05)) s=Math.max(0.05, s||1);
-    f.style.transform='scale('+s+')'; f.style.marginRight=(-(pw*(1-s)))+'px'; f.style.marginBottom=(-(ph*(1-s)))+'px';
+  // 描画用iframe(非表示・原寸)に明細を出す→html2canvasで画像化→<img>表示＆PDF用canvas保持
+  function renderPayslip(html, pw, ph){
+    var f=$('frame'), img=$('ps-img'), load=$('ps-loading');
+    _pdfCanvas=null; if(img){ img.removeAttribute('src'); img.style.display='none'; } if(load){ load.style.display=''; load.textContent='明細を読み込み中…'; }
+    f.style.width=pw+'px'; f.style.height=ph+'px';
+    f.onload=function(){
+      setTimeout(function(){
+        try{
+          var idoc=f.contentDocument||f.contentWindow.document;
+          var target=idoc.querySelector('.sheet,.page')||idoc.body;
+          if(!(window.html2canvas)) throw new Error('html2canvas未読込');
+          window.html2canvas(target, { scale:2, backgroundColor:'#ffffff', width:pw, height:ph, windowWidth:pw, windowHeight:ph, useCORS:true }).then(function(canvas){
+            _pdfCanvas=canvas;
+            if(img){ img.src=canvas.toDataURL('image/jpeg',0.95); img.style.display='block'; }
+            if(load){ load.style.display='none'; }
+          }).catch(function(){ if(load){ load.textContent='表示に失敗しました。もう一度お試しください。'; } });
+        }catch(e){ if(load){ load.textContent='表示に失敗しました。もう一度お試しください。'; } }
+      }, 180);
+    };
+    f.srcdoc=html;
   }
   $('v-back').addEventListener('click', function(){ renderList(); show('sc-list'); });
-  $('v-pdf').addEventListener('click', function(){ var f=$('frame'); try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){ window.print(); } });
-  window.addEventListener('resize', function(){ if($('sc-view').classList.contains('hidden'))return; fitFrame(); });
+  // PDFで保存/印刷 = 本物のA4 PDFを生成(shuri-app方式)。
+  $('v-pdf').addEventListener('click', function(){
+    var load=$('ps-loading');
+    if(!_pdfCanvas || !(window.jspdf&&window.jspdf.jsPDF)){ if(load){ load.style.display=''; load.textContent='準備中です。数秒待ってからもう一度押してください。'; setTimeout(function(){ if(_pdfCanvas&&load) load.style.display='none'; },1500); } return; }
+    try{
+      var jsPDF=window.jspdf.jsPDF;
+      var pw=_isLand?842:595, ph=_isLand?595:842; // A4 pt
+      var doc=new jsPDF({ orientation:_isLand?'landscape':'portrait', unit:'pt', format:[pw,ph] });
+      doc.addImage(_pdfCanvas.toDataURL('image/jpeg',0.95), 'JPEG', 0, 0, pw, ph);
+      doc.save('給与明細.pdf');
+    }catch(e){}
+  });
 
   // ⑥ 年末調整 従業員セルフ申告(平易な質問→保存。会社が取り込む)
   // 年末調整の対象年: 通常11〜12月に実施。1〜3月に開くのは「前年分」の年調(会社は対象月=前年12月=前年で読む)なので前年に合わせる=年跨ぎでも会社側と一致

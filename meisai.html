@@ -17,7 +17,7 @@
 body{font-family:'Noto Sans JP',sans-serif;color:#1a4a2e;background:#F0FAF4;-webkit-text-size-adjust:100%;min-height:100vh;}
 .mhead{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;height:50px;padding:0 16px;background:#fff;border-bottom:1px solid #e3ede8;}
 .mhead .logo{font-family:'DM Mono',monospace;font-size:18px;color:#52B788;}
-.mhead .sub{font-size:11px;letter-spacing:.14em;color:#4e7460;}
+.mhead .sub{font-size:10px;letter-spacing:.16em;color:#7aa08c;}
 .wrap{max-width:760px;margin:0 auto;padding:18px 14px 60px;}
 .card{background:#fff;border:1px solid #d4eae0;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 1px 4px rgba(30,80,46,.06);}
 .card h2{font-size:15px;color:#2E7D54;margin-bottom:10px;}
@@ -31,24 +31,24 @@ body{font-family:'Noto Sans JP',sans-serif;color:#1a4a2e;background:#F0FAF4;-web
 .consent-box{background:#F0FAF4;border:1.5px solid #C8ECD8;border-radius:10px;padding:12px;font-size:12px;color:#3D6B53;line-height:1.75;margin:10px 0;}
 .dlist .drow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border:1px solid #d4eae0;border-radius:12px;background:#fff;margin-bottom:8px;cursor:pointer;}
 .dlist .drow .dl{font-size:13px;font-weight:700;color:#1a4a2e;}
-.dlist .drow .ds{font-size:12px;color:#4e7460;}
+.dlist .drow .ds{font-size:11px;color:#7aa08c;}
 .dlist .drow .dv{font-family:'DM Mono',monospace;font-weight:700;color:#2E7D54;white-space:nowrap;}
-.badge-new{display:inline-block;font-size:10px;background:#2E9E63;color:#fff;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
+.badge-new{display:inline-block;font-size:9px;background:#52B788;color:#fff;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
 .preview-wrap{overflow:auto;background:#cfcabd;border-radius:12px;padding:12px;display:flex;justify-content:center;}
 #frame{border:none;background:#fff;box-shadow:0 8px 32px rgba(30,60,40,.16);}
 .topbar{display:flex;gap:8px;margin-bottom:10px;}
 .topbar .btn{margin-top:0;}
 .hidden{display:none;}
-.hint{font-size:12px;color:#4e7460;margin-top:8px;line-height:1.6;}
+.hint{font-size:11px;color:#7aa08c;margin-top:8px;line-height:1.6;}
 /* 年末調整の申告ウィザード(app.cssのnw-*と同じ見た目) */
 .nw-group{margin:6px 0 12px;}
 .nw-gt{font-size:12px;font-weight:700;color:#2E7D54;margin:10px 0 4px;}
 .nw-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px dashed #eaf3ee;}
 .nw-q{font-size:13px;color:#274b38;line-height:1.5;flex:1;}
-.nw-help{font-size:12px;color:#4e7460;margin-top:2px;line-height:1.55;}
+.nw-help{font-size:10.5px;color:#8aa89a;margin-top:2px;line-height:1.5;}
 .nw-in{flex:0 0 auto;display:flex;align-items:center;gap:4px;}
 .nw-in .finput{width:auto;min-width:96px;padding:8px 10px;font-size:14px;}
-.nw-unit{font-size:12px;color:#4e7460;}
+.nw-unit{font-size:11px;color:#7aa08c;}
 .nw-yn{display:inline-flex;border:1.5px solid #d4eae0;border-radius:9px;overflow:hidden;}
 .nw-yn .ynb{padding:7px 15px;font-size:13px;font-weight:700;color:#5C7E6C;background:#fff;cursor:pointer;min-width:46px;text-align:center;user-select:none;}
 .nw-yn .ynb+.ynb{border-left:1.5px solid #d4eae0;}
@@ -147,13 +147,18 @@ body{font-family:'Noto Sans JP',sans-serif;color:#1a4a2e;background:#F0FAF4;-web
       <button class="btn ghost" id="v-back" style="flex:1">← 一覧へ</button>
       <button class="btn" id="v-pdf" style="flex:1">PDFで保存 / 印刷</button>
     </div>
-    <div class="preview-wrap"><iframe id="frame" title="給与明細"></iframe></div>
+    <p class="hint" style="margin:6px 2px 0;text-align:center">指で広げると拡大して読めます。「PDFで保存 / 印刷」で本物のPDFを保存できます。</p>
+    <div class="preview-wrap"><img id="ps-img" alt="給与明細" style="width:100%;height:auto;display:block;background:#fff"><div id="ps-loading" class="hint" style="padding:40px 0">明細を読み込み中…</div></div>
+    <iframe id="frame" title="描画用" aria-hidden="true" style="position:absolute;left:-10000px;top:0;width:794px;height:1123px;border:0;background:#fff"></iframe>
   </div>
 
 </div>
 
 <script src="js/render.js"></script>
 <script src="lib/nencho-declaration.js"></script>
+<!-- PDF生成(shuri-appと同じ実機検証済方式=明細を画像化→jsPDFでA4 PDF) -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <!-- 本番はSupabase(RPC)。window.SUPA/supabase未読込ならstore.jsはlocalStorage層にフォールバック。 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supa-config.js"></script>
