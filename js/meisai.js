@@ -87,59 +87,35 @@
     });
   }
 
-  // ⑤ 明細ビュー
-  var _psHtml='';
-  // ★明細HTMLにviewportを注入=スマホで幅にフィット＋指でピンチズームできる(freee方式=PDFと同じ体験)。
-  function injectViewport(html, pw){
-    var vp='<meta name="viewport" content="width='+pw+', initial-scale=1, minimum-scale=0.2, maximum-scale=6, user-scalable=yes">';
-    return /<head[^>]*>/i.test(html) ? html.replace(/<head([^>]*)>/i,'<head$1>'+vp) : ('<!doctype html><html><head>'+vp+'</head><body>'+html+'</body></html>');
-  }
+  // ⑤ 明細ビュー = 明細を「本物の1ページ」としてそのまま開く。
+  //   ★iOSはこの形なら標準で「幅にフィット＋指でピンチズーム＋共有→A4でPDF保存/印刷」が全部効く(freee方式)。
+  //   iframe+scaleは iOSで小さい/真っ白/印刷余白になるため使わない。
   function openDoc(i){
     var d=docs[i]; if(!d) return; var data=d.data||{};
+    if(d.openedAt==null){ Store.markMeisaiOpened(d.id, token, cred).then(function(){ d.openedAt=new Date().toISOString(); }); } // 開封記録(遷移前)
+    var pw=794, html;
     try{
-      var f=$('frame'), pw, ph, html;
-      if(d.kind==='gensen'){ // 源泉徴収票=会社が作った単独HTMLをそのまま表示(render.js非経由)
-        html=data.gensenHtml||'<!doctype html><html><head><meta charset="UTF-8"></head><body><p style="padding:16px">源泉徴収票を表示できませんでした。</p></body></html>';
-        pw=794; ph=1123; // A4縦
-      } else {
+      if(d.kind==='gensen'){ html=data.gensenHtml||'<!doctype html><html><head><meta charset="UTF-8"></head><body><p style="padding:16px">源泉徴収票を表示できませんでした。</p></body></html>'; pw=794; }
+      else {
         var people=[data.person||{}], doc=data.doc||{month:ymLabel(d.ym,d.kind), kind:d.kind};
         var out=window.Render.build(people, doc, data.prefer, data.theme);
-        html=out.html; pw=out.orientation==='landscape'?1123:794; ph=out.orientation==='landscape'?794:1123;
+        html=out.html; pw=out.orientation==='landscape'?1123:794;
       }
-      _psHtml=html; // 印刷用に原本(原寸)を保持
-      f.srcdoc=injectViewport(html, pw);
-      f.dataset.pw=pw; f.dataset.ph=ph;
-      show('sc-view'); // 先に表示してからサイズ確定(隠れてると幅0になる)
-      sizeFrame(); requestAnimationFrame(sizeFrame);
-    }catch(e){ show('sc-view'); }
-    if(d.openedAt==null){ Store.markMeisaiOpened(d.id, token, cred).then(function(){ d.openedAt=new Date().toISOString(); }); }
-    window.scrollTo(0,0);
+    }catch(e){ return; }
+    openPayslipPage(html, pw);
   }
-  // iframeを"表示したい幅"にする。中身のviewport(=pw)がその幅にフィット→縮小scaleは使わない=指でピンチズームして読める。
-  function sizeFrame(){
-    var f=$('frame'), wrap=document.querySelector('.preview-wrap'); if(!f||!wrap||!f.dataset.pw) return;
-    var pw=+f.dataset.pw, ph=+f.dataset.ph;
-    var avail=wrap.clientWidth-24; if(!(avail>0)) avail=pw;
-    f.style.transform='none'; f.style.margin='0'; f.style.width=avail+'px'; f.style.height=Math.round(avail*ph/pw)+'px';
+  // 明細HTMLに viewport(=pwで幅にフィット＋ピンチズーム) と 上部バー(戻る/PDF・印刷) を差し込み、同じタブでフルページ表示。
+  function openPayslipPage(html, pw){
+    var vp='<meta name="viewport" content="width='+pw+', initial-scale=1, minimum-scale=0.25, maximum-scale=6, user-scalable=yes">';
+    var barCss='<style>#mbar{position:fixed;top:0;left:0;right:0;z-index:99999;display:flex;gap:10px;padding:14px 16px;background:#F0FAF4;border-bottom:1px solid #d4eae0;font-family:"Noto Sans JP",system-ui,sans-serif;box-sizing:border-box}'
+      +'#mbar button{flex:1;padding:20px 12px;border-radius:12px;border:2px solid #d4eae0;background:#fff;color:#3D6B53;font-size:26px;font-weight:700;line-height:1.1;cursor:pointer}'
+      +'#mbar button.pri{background:#3D9E72;color:#fff;border:none}'
+      +'body>.sheet,body>.page,body>.pgbreak+.sheet,body>.pgbreak+.page{margin-top:96px}'
+      +'@media print{#mbar{display:none!important}body>.sheet,body>.page{margin-top:0!important}}</style>';
+    var bar='<div id="mbar"><button type="button" onclick="history.back()">← 一覧へ</button><button type="button" class="pri" onclick="window.print()">PDFで保存 / 印刷</button></div>';
+    var full=html.replace(/<head([^>]*)>/i,'<head$1>'+vp+barCss).replace(/<body([^>]*)>/i,'<body$1>'+bar);
+    try{ location.href=URL.createObjectURL(new Blob([full],{type:'text/html;charset=utf-8'})); }catch(e){}
   }
-  var fitFrame=sizeFrame; // 後方互換
-  $('v-back').addEventListener('click', function(){ renderList(); show('sc-list'); });
-  // ★PDF/印刷: iframe.contentWindow.print()はiOSで無効=無反応の原因。明細(原寸794px=A4幅)を本体に一時展開し
-  //   window.print→A4正寸で印刷/PDF保存(iPhone Safariの共有→プリント/PDFが効く。@page A4は明細CSS側が持つ)。
-  $('v-pdf').addEventListener('click', function(){
-    var html=_psHtml; if(!html){ try{ window.print(); }catch(e){} return; }
-    var pdoc=null; try{ pdoc=new DOMParser().parseFromString(html,'text/html'); }catch(e){}
-    var styleTxt=''; if(pdoc){ [].forEach.call(pdoc.querySelectorAll('style'),function(s){ styleTxt+=s.textContent+'\n'; }); }
-    var bodyHtml=(pdoc&&pdoc.body)?pdoc.body.innerHTML:html;
-    var old=document.getElementById('ps-print'); if(old) old.remove();
-    var wrap=document.createElement('div'); wrap.id='ps-print';
-    // 画面には出さない(display:none)。印刷時のみ: 他を全部隠し、明細CSSを適用して原寸表示。
-    wrap.innerHTML='<style>#ps-print{display:none}@media print{body>*:not(#ps-print){display:none!important}}</style>'
-      +'<style media="print">'+styleTxt+'#ps-print{display:block!important}</style>'+bodyHtml;
-    document.body.appendChild(wrap);
-    setTimeout(function(){ try{ window.print(); }catch(e){} setTimeout(function(){ wrap.remove(); }, 1200); }, 150);
-  });
-  window.addEventListener('resize', function(){ if($('sc-view').classList.contains('hidden'))return; sizeFrame(); });
 
   // ⑥ 年末調整 従業員セルフ申告(平易な質問→保存。会社が取り込む)
   // 年末調整の対象年: 通常11〜12月に実施。1〜3月に開くのは「前年分」の年調(会社は対象月=前年12月=前年で読む)なので前年に合わせる=年跨ぎでも会社側と一致
