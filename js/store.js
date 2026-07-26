@@ -6,7 +6,10 @@
   'use strict';
   var LS_KEY = 'payslip_batches_v1';
   var hasSupa = !!(global.SUPA && global.SUPA.url && global.SUPA.key && global.supabase);
-  var sb = hasSupa ? global.supabase.createClient(global.SUPA.url, global.SUPA.key) : null;
+  var sb = hasSupa ? global.supabase.createClient(global.SUPA.url, global.SUPA.key, {
+    // ログイン状態を端末に保持(iOSホーム画面PWA等でも維持を狙う)。detectSessionInUrl=false(メール+パスのみ・URL解析不要)。
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+  }) : null;
 
   function lsAll(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch(e){ return []; } }
   function lsWrite(arr){ localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
@@ -48,12 +51,37 @@
 
   // ── 認証(メール+パスワード) ──
   if(hasSupa){
+    // ★iOSホーム画面PWA(standalone)等でSupabase内蔵ストレージが起動間に失われる場合の保険:
+    //   セッション(refresh_token)を独自キーにもバックアップし、起動時にgetSessionが空なら復元する。
+    var BK = 'kyually-session-backup';
+    try{ if(sb.auth && typeof sb.auth.onAuthStateChange==='function'){
+      sb.auth.onAuthStateChange(function(ev, s){
+        // ★消すのは「明示的サインアウト」時だけ。起動時のINITIAL_SESSION(null)では消さない
+        //   =内蔵ストレージが空でも独自バックアップから復元できるようにする(iOS standalone対策の要)。
+        if(ev === 'SIGNED_OUT'){ try{ localStorage.removeItem(BK); }catch(e){} return; }
+        if(s && s.refresh_token){ try{ localStorage.setItem(BK, JSON.stringify({ a:s.access_token, r:s.refresh_token })); }catch(e){} }
+      });
+    } }catch(e){}
+
     Store.auth = {
-      session: function(){ return sb.auth.getSession().then(function(r){ return r.data && r.data.session; }); },
+      session: function(){
+        return sb.auth.getSession().then(function(r){
+          var s = r.data && r.data.session;
+          if(s) return s;
+          // 内蔵ストレージが空でも、独自バックアップから復元を試みる(standalone対策)
+          var raw=null; try{ raw = localStorage.getItem(BK); }catch(e){}
+          if(!raw) return null;
+          var b=null; try{ b = JSON.parse(raw); }catch(e){}
+          if(!b || !b.r) return null;
+          return sb.auth.setSession({ access_token:b.a, refresh_token:b.r })
+            .then(function(rr){ return (rr.data && rr.data.session) || null; })
+            .catch(function(){ return null; });
+        });
+      },
       user:    function(){ return sb.auth.getUser().then(function(r){ return r.data && r.data.user; }); },
       signIn:  function(email,pw){ return sb.auth.signInWithPassword({email:email,password:pw}); },
       signUp:  function(email,pw){ return sb.auth.signUp({email:email,password:pw}); },
-      signOut: function(){ return sb.auth.signOut(); },
+      signOut: function(){ try{ localStorage.removeItem(BK); }catch(e){} return sb.auth.signOut(); },
       onChange:function(cb){ sb.auth.onAuthStateChange(function(_e,s){ cb(s); }); }
     };
   }
