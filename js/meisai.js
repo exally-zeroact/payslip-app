@@ -88,58 +88,36 @@
   }
 
   // ⑤ 明細ビュー
-  var _psHtml='';
-  // ★明細HTMLにviewportを注入=スマホで幅にフィット＋指でピンチズームできる(freee方式=PDFと同じ体験)。
-  function injectViewport(html, pw){
-    var vp='<meta name="viewport" content="width='+pw+', initial-scale=1, minimum-scale=0.2, maximum-scale=6, user-scalable=yes">';
-    return /<head[^>]*>/i.test(html) ? html.replace(/<head([^>]*)>/i,'<head$1>'+vp) : ('<!doctype html><html><head>'+vp+'</head><body>'+html+'</body></html>');
-  }
   function openDoc(i){
     var d=docs[i]; if(!d) return; var data=d.data||{};
     try{
-      var f=$('frame'), pw, ph, html;
+      var f=$('frame'), pw, ph;
       if(d.kind==='gensen'){ // 源泉徴収票=会社が作った単独HTMLをそのまま表示(render.js非経由)
-        html=data.gensenHtml||'<!doctype html><html><head><meta charset="UTF-8"></head><body><p style="padding:16px">源泉徴収票を表示できませんでした。</p></body></html>';
+        f.srcdoc=data.gensenHtml||'<p style="padding:16px">源泉徴収票を表示できませんでした。</p>';
         pw=794; ph=1123; // A4縦
       } else {
         var people=[data.person||{}], doc=data.doc||{month:ymLabel(d.ym,d.kind), kind:d.kind};
         var out=window.Render.build(people, doc, data.prefer, data.theme);
-        html=out.html; pw=out.orientation==='landscape'?1123:794; ph=out.orientation==='landscape'?794:1123;
+        f.srcdoc=out.html;
+        pw=out.orientation==='landscape'?1123:794; ph=out.orientation==='landscape'?794:1123;
       }
-      _psHtml=html; // 印刷用に原本(原寸)を保持
-      f.srcdoc=injectViewport(html, pw);
+      f.style.width=pw+'px'; f.style.height=ph+'px'; f.style.transformOrigin='top left';
       f.dataset.pw=pw; f.dataset.ph=ph;
-      show('sc-view'); // 先に表示してからサイズ確定(隠れてると幅0になる)
-      sizeFrame(); requestAnimationFrame(sizeFrame);
+      show('sc-view'); // 先に表示してからフィット(隠れてると幅0で負scaleになる)
+      fitFrame(); requestAnimationFrame(fitFrame);
     }catch(e){ show('sc-view'); }
     if(d.openedAt==null){ Store.markMeisaiOpened(d.id, token, cred).then(function(){ d.openedAt=new Date().toISOString(); }); }
     window.scrollTo(0,0);
   }
-  // iframeを"表示したい幅"にする。中身のviewport(=pw)がその幅にフィット→縮小scaleは使わない=指でピンチズームして読める。
-  function sizeFrame(){
+  function fitFrame(){
     var f=$('frame'), wrap=document.querySelector('.preview-wrap'); if(!f||!wrap||!f.dataset.pw) return;
-    var pw=+f.dataset.pw, ph=+f.dataset.ph;
-    var avail=wrap.clientWidth-24; if(!(avail>0)) avail=pw;
-    f.style.transform='none'; f.style.margin='0'; f.style.width=avail+'px'; f.style.height=Math.round(avail*ph/pw)+'px';
+    var pw=+f.dataset.pw, ph=+f.dataset.ph, avail=wrap.clientWidth-24;
+    var s = avail>0 ? Math.min(1, avail/pw) : 1; if(!(s>0.05)) s=Math.max(0.05, s||1);
+    f.style.transform='scale('+s+')'; f.style.marginRight=(-(pw*(1-s)))+'px'; f.style.marginBottom=(-(ph*(1-s)))+'px';
   }
-  var fitFrame=sizeFrame; // 後方互換
   $('v-back').addEventListener('click', function(){ renderList(); show('sc-list'); });
-  // ★PDF/印刷: iframe.contentWindow.print()はiOSで無効=無反応の原因。明細(原寸794px=A4幅)を本体に一時展開し
-  //   window.print→A4正寸で印刷/PDF保存(iPhone Safariの共有→プリント/PDFが効く。@page A4は明細CSS側が持つ)。
-  $('v-pdf').addEventListener('click', function(){
-    var html=_psHtml; if(!html){ try{ window.print(); }catch(e){} return; }
-    var pdoc=null; try{ pdoc=new DOMParser().parseFromString(html,'text/html'); }catch(e){}
-    var styleTxt=''; if(pdoc){ [].forEach.call(pdoc.querySelectorAll('style'),function(s){ styleTxt+=s.textContent+'\n'; }); }
-    var bodyHtml=(pdoc&&pdoc.body)?pdoc.body.innerHTML:html;
-    var old=document.getElementById('ps-print'); if(old) old.remove();
-    var wrap=document.createElement('div'); wrap.id='ps-print';
-    // 画面には出さない(display:none)。印刷時のみ: 他を全部隠し、明細CSSを適用して原寸表示。
-    wrap.innerHTML='<style>#ps-print{display:none}@media print{body>*:not(#ps-print){display:none!important}}</style>'
-      +'<style media="print">'+styleTxt+'#ps-print{display:block!important}</style>'+bodyHtml;
-    document.body.appendChild(wrap);
-    setTimeout(function(){ try{ window.print(); }catch(e){} setTimeout(function(){ wrap.remove(); }, 1200); }, 150);
-  });
-  window.addEventListener('resize', function(){ if($('sc-view').classList.contains('hidden'))return; sizeFrame(); });
+  $('v-pdf').addEventListener('click', function(){ var f=$('frame'); try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){ window.print(); } });
+  window.addEventListener('resize', function(){ if($('sc-view').classList.contains('hidden'))return; fitFrame(); });
 
   // ⑥ 年末調整 従業員セルフ申告(平易な質問→保存。会社が取り込む)
   // 年末調整の対象年: 通常11〜12月に実施。1〜3月に開くのは「前年分」の年調(会社は対象月=前年12月=前年で読む)なので前年に合わせる=年跨ぎでも会社側と一致
