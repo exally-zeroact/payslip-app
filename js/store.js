@@ -60,7 +60,7 @@
         else { localStorage.removeItem(BK); }
       }catch(e){}
     }
-    sb.auth.onAuthStateChange(function(_e,s){ backupSession(s); });
+    try{ if(sb.auth && typeof sb.auth.onAuthStateChange==='function'){ sb.auth.onAuthStateChange(function(_e,s){ backupSession(s); }); } }catch(e){}
 
     Store.auth = {
       session: function(){
