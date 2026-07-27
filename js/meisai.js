@@ -142,11 +142,25 @@
   }
   window.addEventListener('resize', function(){ var v=$('sc-view'); if(v && !v.classList.contains('hidden')) fitFrame(); });
   $('v-back').addEventListener('click', function(){ renderList(); show('sc-list'); });
-  // PDFで保存/印刷 = ★新しい窓を開かず、アプリ内でそのまま印刷する(スマホ/ホーム画面アプリでも「戻れない」にならない)。
-  //   @media print で明細だけを原寸(A4)表示し、window.print() でiOS標準の印刷/PDF保存を開く。
-  //   @page{margin:0} でブラウザのURL/日付/ページ番号フッターも出さない。印刷後はそのまま明細画面に戻る。
+  // PDFで保存 = ★jsPDFで自前生成(A4ぴったり1ページ・ブラウザのURL/日付フッター無し)。
+  //   iOSのwebページ印刷(window.print)はURL/日付フッターが必ず付き、その余白ぶんで2ページ目(空白)が出るため不使用。
+  //   明細をhtml2canvasで高精細(scale3=約288dpi)に焼き、A4 1枚に載せる→doc.save。iOSは標準PDFビューアで開く(戻れる)。
   $('v-pdf').addEventListener('click', function(){
-    try{ window.print(); }catch(e){}
+    var load=$('ps-loading');
+    var f=$('frame'), idoc=f&&(f.contentDocument||f.contentWindow.document);
+    var target=idoc&&idoc.querySelector('.sheet,.page');
+    if(!target || !(window.html2canvas) || !(window.jspdf&&window.jspdf.jsPDF)){ try{ window.print(); }catch(e){} return; } // 保険=ライブラリ未読込ならブラウザ印刷
+    if(load){ load.style.display=''; load.textContent='PDFを作成中…'; }
+    window.html2canvas(target, { scale:3, backgroundColor:'#ffffff', useCORS:true, width:_psW, windowWidth:_psW }).then(function(canvas){
+      try{
+        var jsPDF=window.jspdf.jsPDF;
+        var pw=_isLand?842:595, ph=_isLand?595:842; // A4 pt
+        var doc=new jsPDF({ orientation:_isLand?'landscape':'portrait', unit:'pt', format:[pw,ph] });
+        doc.addImage(canvas.toDataURL('image/jpeg',0.92), 'JPEG', 0, 0, pw, ph);
+        doc.save('給与明細.pdf');
+        if(load){ load.style.display='none'; }
+      }catch(e){ if(load){ load.textContent='PDFの作成に失敗しました。時間をおいて再度お試しください。'; setTimeout(function(){ if(load)load.style.display='none'; },2200); } }
+    }).catch(function(){ if(load){ load.textContent='PDFの作成に失敗しました。時間をおいて再度お試しください。'; setTimeout(function(){ if(load)load.style.display='none'; },2200); } });
   });
 
   // ⑥ 年末調整 従業員セルフ申告(平易な質問→保存。会社が取り込む)
