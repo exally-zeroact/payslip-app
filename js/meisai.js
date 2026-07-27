@@ -87,9 +87,10 @@
     });
   }
 
-  // ⑤ 明細ビュー = 明細を画像化して<img>で表示(fit幅・指でピンチズーム可・iOSで確実に出る)。
-  //   保存/印刷は jsPDF で本物のA4 PDF を生成(shuri-app 実機検証済方式)→iOSは標準ビューアで開く=拡大/印刷が全部効く。
-  var _pdfCanvas=null, _isLand=false;
+  // ⑤ 明細ビュー = 明細を原寸(794px)でiframe描画し、CSS transformで画面幅にフィット。
+  //   ベクター描画なのでピンチズームで鮮明。iframeは確実に描画される(html2canvasの画像化はiOSで不安定なため不使用)。
+  //   保存/印刷は代行請求書アプリと同じ「新窓に明細HTMLを書いて window.print」方式(A4いっぱいにくっきり)。
+  var _isLand=false, _psHtml='', _psW=794, _psH=1123;
   function openDoc(i){
     var d=docs[i]; if(!d) return; var data=d.data||{};
     if(d.openedAt==null){ Store.markMeisaiOpened(d.id, token, cred).then(function(){ d.openedAt=new Date().toISOString(); }); }
@@ -102,43 +103,55 @@
         html=out.html; if(out.orientation==='landscape'){ pw=1123; ph=794; _isLand=true; }
       }
     }catch(e){ return; }
+    _psHtml=html;
     show('sc-view');
     renderPayslip(html, pw, ph);
     window.scrollTo(0,0);
   }
-  // 描画用iframe(非表示・原寸)に明細を出す→html2canvasで画像化→<img>表示＆PDF用canvas保持
+  // 原寸iframeに明細を描画→実際の高さを測り→画面幅にフィットするようtransform:scale。
   function renderPayslip(html, pw, ph){
-    var f=$('frame'), img=$('ps-img'), load=$('ps-loading');
-    _pdfCanvas=null; if(img){ img.removeAttribute('src'); img.style.display='none'; } if(load){ load.style.display=''; load.textContent='明細を読み込み中…'; }
-    f.style.width=pw+'px'; f.style.height=ph+'px';
+    var f=$('frame'), load=$('ps-loading');
+    _psW=pw; _psH=ph;
+    if(load){ load.style.display=''; load.textContent='明細を読み込み中…'; }
+    f.style.width=pw+'px'; f.style.height=ph+'px'; f.style.transform='none';
     f.onload=function(){
       setTimeout(function(){
         try{
           var idoc=f.contentDocument||f.contentWindow.document;
-          var target=idoc.querySelector('.sheet,.page')||idoc.body;
-          if(!(window.html2canvas)) throw new Error('html2canvas未読込');
-          window.html2canvas(target, { scale:2, backgroundColor:'#ffffff', width:pw, height:ph, windowWidth:pw, windowHeight:ph, useCORS:true }).then(function(canvas){
-            _pdfCanvas=canvas;
-            if(img){ img.src=canvas.toDataURL('image/jpeg',0.95); img.style.display='block'; }
-            if(load){ load.style.display='none'; }
-          }).catch(function(){ if(load){ load.textContent='表示に失敗しました。もう一度お試しください。'; } });
-        }catch(e){ if(load){ load.textContent='表示に失敗しました。もう一度お試しください。'; } }
-      }, 180);
+          var sheet=idoc.querySelector('.sheet,.page');
+          var natH=Math.max(ph, sheet?sheet.scrollHeight:ph);
+          _psH=natH; f.style.height=natH+'px';
+          fitFrame();
+          if(load){ load.style.display='none'; }
+        }catch(e){ fitFrame(); if(load){ load.style.display='none'; } }
+      }, 120);
     };
     f.srcdoc=html;
   }
+  // iframe(原寸_psW×_psH)を preview-wrap の内幅にフィットさせる
+  function fitFrame(){
+    var f=$('frame'); if(!f) return;
+    var wrap=f.parentNode; if(!wrap) return;
+    var avail=wrap.clientWidth - 24; // padding 12+12
+    if(avail<=0) return;
+    var scale=Math.min(1, avail/_psW);
+    f.style.transform='scale('+scale+')';
+    wrap.style.height=(_psH*scale + 24)+'px';
+  }
+  window.addEventListener('resize', function(){ var v=$('sc-view'); if(v && !v.classList.contains('hidden')) fitFrame(); });
   $('v-back').addEventListener('click', function(){ renderList(); show('sc-list'); });
-  // PDFで保存/印刷 = 本物のA4 PDFを生成(shuri-app方式)。
+  // PDFで保存/印刷 = 代行請求書アプリと同じ実機検証済方式。
+  //   新しい窓に明細HTML(@page A4・原寸)をそのまま書き出して window.print()。
+  //   → 拡大なしのベクター描画=A4いっぱいにくっきり印刷/PDF保存できる(iOSは印刷ダイアログで「PDFとして保存」)。
   $('v-pdf').addEventListener('click', function(){
-    var load=$('ps-loading');
-    if(!_pdfCanvas || !(window.jspdf&&window.jspdf.jsPDF)){ if(load){ load.style.display=''; load.textContent='準備中です。数秒待ってからもう一度押してください。'; setTimeout(function(){ if(_pdfCanvas&&load) load.style.display='none'; },1500); } return; }
-    try{
-      var jsPDF=window.jspdf.jsPDF;
-      var pw=_isLand?842:595, ph=_isLand?595:842; // A4 pt
-      var doc=new jsPDF({ orientation:_isLand?'landscape':'portrait', unit:'pt', format:[pw,ph] });
-      doc.addImage(_pdfCanvas.toDataURL('image/jpeg',0.95), 'JPEG', 0, 0, pw, ph);
-      doc.save('給与明細.pdf');
-    }catch(e){}
+    if(!_psHtml){ return; }
+    var w=window.open('', '_blank');
+    if(!w){ var load=$('ps-loading'); if(load){ load.style.display=''; load.textContent='⚠️ ポップアップを許可すると、PDF保存/印刷ができます。'; setTimeout(function(){ if(load) load.style.display='none'; },2500); } return; }
+    // 明細HTMLに、モバイルで原寸フィット表示するためのviewportを差し込む(@pageはそのままA4印刷)。
+    var vp='<meta name="viewport" content="width='+(_isLand?1123:794)+'">';
+    var full=_psHtml.replace(/<head([^>]*)>/i, '<head$1>'+vp);
+    w.document.open(); w.document.write(full); w.document.close(); w.focus();
+    setTimeout(function(){ try{ w.print(); }catch(e){} }, 700);
   });
 
   // ⑥ 年末調整 従業員セルフ申告(平易な質問→保存。会社が取り込む)
