@@ -3016,7 +3016,7 @@
       var qb=e.target.closest('.wm-qr'); if(qb){ showMeisaiQR(qb.dataset.qrName, qb.dataset.qrUrl); return; } // 個人のQR表示/印刷
       if(e.target.closest('.wm-qrall')){ // 全員のQRを印刷(リンク+初回コード同梱)
         Store.listMeisaiPub().then(function(list){ var origin=(location.origin&&location.origin.indexOf('http')===0)?location.origin+location.pathname.replace(/[^\/]*$/,''):'';
-          printQRCards((list||[]).map(function(p){ return { name:p.name, url:origin+p.link, initCode:(!p.hasPassword?p.initCode:'') }; })); });
+          printQRCards((list||[]).map(function(p){ var code=(!p.hasPassword?p.initCode:''); return { name:p.name, url:origin+p.link+(code?('&c='+encodeURIComponent(code)):''), initCode:code }; })); }); // QRに初回コードを埋め込む=スキャンで自動入力
         return; }
       var ri=e.target.closest('.wm-reissue'); if(ri){ var tok=ri.dataset.token; uiConfirm('初回コードを再発行しますか？\n現在のパスワードと端末の記憶は無効になり、従業員は新しい初回コードで再設定します。').then(function(ok){ if(!ok)return;
         Store.reissueMeisaiInit(tok).then(function(){ renderWebMeisai(); toast('初回コードを再発行しました'); }); }); return; }
@@ -3092,9 +3092,11 @@
           var codeRow = (!p.hasPassword && p.initCode)
             ? '<div style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:#3D6B53;min-width:52px">初回コード</span><input class="finput num" readonly value="'+attr(p.initCode)+'" style="flex:1;font-size:13px;letter-spacing:.12em;padding:7px 9px" onclick="this.select()"><button class="btn-ghost wm-copy" data-link="'+attr(p.initCode)+'" style="padding:7px 10px;font-size:11px">コピー</button></div>'
             : '<div style="font-size:10.5px;color:#5C7E6C;margin-top:5px">初回コードは設定後に非表示（忘れた/漏れたら「再発行」）<button class="btn-ghost wm-reissue" data-token="'+attr(p.token)+'" style="padding:4px 8px;font-size:10.5px;margin-left:6px">初回コード再発行</button></div>';
+          // 配布用URL: パスワード未設定の間は初回コードを ?c= で埋め込む→従業員はスキャン/リンクを開くだけでコード自動入力→パスワードを決めるだけ(手間最小)。設定後はコード不要なので付けない。
+          var handoutUrl = origin+p.link + ((!p.hasPassword && p.initCode) ? ('&c='+encodeURIComponent(p.initCode)) : '');
           return '<div style="border:1px solid #d4eae0;border-radius:10px;padding:9px 11px;margin-bottom:7px">'
             +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:13px">'+esc(p.name||'(氏名未取得)')+'</b><span>'+pwState+consentState+'</span></div>'
-            +'<div style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:#3D6B53;min-width:52px">リンク</span><input class="finput" readonly value="'+attr(origin+p.link)+'" style="flex:1;font-size:11px;padding:7px 9px" onclick="this.select()"><button class="btn-ghost wm-copy" data-link="'+attr(origin+p.link)+'" style="padding:7px 10px;font-size:11px">コピー</button><button class="btn-ghost wm-qr" data-qr-url="'+attr(origin+p.link)+'" data-qr-name="'+attr(p.name||'')+'" style="padding:7px 10px;font-size:11px">QR</button></div>'
+            +'<div style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:#3D6B53;min-width:52px">リンク</span><input class="finput" readonly value="'+attr(handoutUrl)+'" style="flex:1;font-size:11px;padding:7px 9px" onclick="this.select()"><button class="btn-ghost wm-copy" data-link="'+attr(handoutUrl)+'" style="padding:7px 10px;font-size:11px">コピー</button><button class="btn-ghost wm-qr" data-qr-url="'+attr(handoutUrl)+'" data-qr-name="'+attr(p.name||'')+'" style="padding:7px 10px;font-size:11px">QR</button></div>'
             +codeRow
             +'<div style="font-size:10.5px;color:#5C7E6C;margin-top:5px">公開: '+openedTxt+'</div></div>';
         }).join('');

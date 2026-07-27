@@ -11,6 +11,8 @@
   function ymLabel(ym, kind){ var y=(ym||'').slice(0,4), m=parseInt((ym||'').slice(5,7),10)||0; if(kind==='gensen') return '令和'+(y-2018)+'年 源泉徴収票'; return '令和'+(y-2018)+'年'+m+'月'+(kind==='bonus'?'（賞与）':'分'); }
 
   var token=(function(){ try{ return new URLSearchParams(location.search).get('t'); }catch(e){ return null; } })();
+  // QR/リンクに初回コードを埋め込む(?c=)と、初回パスワード設定画面で自動入力=従業員はコード入力不要でパスワードを決めるだけ。
+  var initFromUrl=(function(){ try{ return (new URLSearchParams(location.search).get('c')||'').trim(); }catch(e){ return ''; } })();
   var DEVKEY='meisai_dev_'+token;                 // この端末に記憶したdeviceToken
   var cred=null, docs=[];                          // 認証後の資格情報(deviceToken or password)
 
@@ -21,7 +23,7 @@
   Store.meisaiAuth(token, savedDev).then(function(r){
     if(!r || !r.found){ show('sc-bad'); return; }
     if(r.remembered){ cred={ deviceToken:savedDev }; afterAuth(r.name); return; }   // 記憶済→パスワード省略
-    if(!r.hasPassword){ show('sc-setup'); return; }                                  // 初回=パスワード設定
+    if(!r.hasPassword){ if(initFromUrl){ var sc=$('setup-code'); if(sc) sc.value=initFromUrl; } show('sc-setup'); return; } // 初回=パスワード設定(コードはURLから自動入力)
     show('sc-login');                                                                // 2回目以降=パスワード
   });
 
