@@ -53,7 +53,11 @@
   if(hasSupa){
     // ★iOSホーム画面PWA(standalone)等でSupabase内蔵ストレージが起動間に失われる場合の保険:
     //   セッション(refresh_token)を独自キーにもバックアップし、起動時にgetSessionが空なら復元する。
-    var BK = 'kyually-session-backup';
+    // ★保険キーはSupabaseプロジェクト別にする。本番(payslip-app)とテスト(payslip-app-test)は
+    //   同一オリジン(exally-zeroact.github.io)でlocalStorageを共有するため、共通キーだと互いの
+    //   セッションを上書きし合い、主トークンが飛んだ時に別プロジェクトのトークンで復元失敗→毎回ログインになる。
+    var _projRef=(function(){ try{ return (global.SUPA.url.match(/\/\/([^.]+)\./)||[])[1]||''; }catch(e){ return ''; } })();
+    var BK = 'kyually-session-backup' + (_projRef ? ('-'+_projRef) : '');
     try{ if(sb.auth && typeof sb.auth.onAuthStateChange==='function'){
       sb.auth.onAuthStateChange(function(ev, s){
         // ★消すのは「明示的サインアウト」時だけ。起動時のINITIAL_SESSION(null)では消さない
