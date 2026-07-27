@@ -373,7 +373,8 @@ input[type="date"].finput:not(.finput-sm),input[type="month"].finput:not(.finput
 
 /* preview */
 .preview-wrap{margin-top:14px;overflow:auto;background:#cfcabd;border-radius:12px;padding:16px;display:flex;justify-content:center;}
-#frame{border:none;background:#fff;box-shadow:0 8px 32px rgba(30,60,40,.16);}
+/* プレビューは見るだけ=タッチをページに通してスクロールを妨げない(iframeが指を捕まえるスクロール不能バグ対策) */
+#frame{border:none;background:#fff;box-shadow:0 8px 32px rgba(30,60,40,.16);pointer-events:none;}
 
 /* ---- bottom nav ---- */
 .botnav{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;background:#fff;border-top:1px solid #e3ede8;padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -2px 10px rgba(30,60,40,.06);}

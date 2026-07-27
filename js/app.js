@@ -1479,7 +1479,7 @@
     // 「今月を確定」ボタン(表/カード両ビューで共通)。★以前は表ビューで未定義=「undefined」表示+確定不可だった★
     var confirmBtn='<div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px"><button class="btn-primary" data-confirm-month style="flex:0 0 auto;padding:11px 18px;font-size:14px">今月を確定（台帳・年調に反映）</button>'
       +(cnt.need>0?'<span style="font-size:11px;color:#92500A;font-weight:700">未確認 '+cnt.need+'名</span>':'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 確認済</span>')
-      +'<span style="font-size:10px;color:#5C7E6C"><b>保存は自動</b>です。「確定」は全員を確認済みにし、<b>賃金台帳・年末調整の集計対象</b>として今月を記録します（あとで直せます）。</span></div>';
+      +'<span style="font-size:10px;color:#5C7E6C"><b>保存は自動</b>です。「確定」は全員を確認済みにし、<b>賃金台帳・年末調整の集計対象</b>として今月を記録し、<b>従業員のWeb明細に自動公開</b>します（従業員はいつでも閲覧可・あとで直せます）。</span></div>';
     if(view==='table' && activeCount>1){ host.innerHTML=statutoryStaleWarn()+calHTML+progHTML+viewToggle+renderInputTableHTML(reviewOnly)+confirmBtn; return; }
     var cards=state.employees.map(function(e,i){
       if(!isActiveInMonth(e,state.month)) return '';
@@ -2712,7 +2712,8 @@
     function bxParse(v, arr){ if(!v)return null; var p=String(v).split(':'); var e=bonusById(p[0]); if(!e)return null; return { en:bonusEntry(e), idx:+p[1], arr:bonusEntry(e)[arr] }; }
     if(inScr){
       inScr.addEventListener('click',function(ev){
-        if(ev.target.closest('[data-confirm-bonus]')){ try{ saveBonusPayslips(); }catch(_){} persistSave(); toast('賞与を確定しました（年調・台帳に反映）'); return; }
+        if(ev.target.closest('[data-confirm-bonus]')){ try{ saveBonusPayslips(); }catch(_){} persistSave();
+          publishMeisaiNow(true,{silent:true}).then(function(n){ toast('賞与を確定しました（年調・台帳に反映'+(n?'・従業員のWeb明細に公開）':'）')); }, function(){ toast('賞与を確定しました（年調・台帳に反映）'); }); return; }
         if(ev.target.closest('[data-bonus-harau]')){ try{ downloadBonusHarau(); }catch(_){} return; } // 賞与支払届 Excel出力
         var addS=ev.target.closest('[data-bsadd]'); if(addS){ var es=bonusById(addS.dataset.bsadd); if(es){ var i1=inScr.querySelector('[data-bsaddl="'+addS.dataset.bsadd+'"]'); var l1=(i1&&i1.value||'').trim()||'特別賞与'; bonusEntry(es).addShikyu.push({label:l1,value:'',hikazei:false}); renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); } return; }
         var addK=ev.target.closest('[data-bkadd]'); if(addK){ var ek=bonusById(addK.dataset.bkadd); if(ek){ var i2=inScr.querySelector('[data-bkaddl="'+addK.dataset.bkadd+'"]'); var l2=(i2&&i2.value||'').trim()||'控除'; bonusEntry(ek).addKojo.push({label:l2,value:''}); renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); } return; }
@@ -2870,7 +2871,9 @@
       if(e.target.dataset.reviewonly!=null){ state._reviewOnly=e.target.checked; renderInput(); return; }
       var ivw=e.target.closest('[data-ivw]'); if(ivw){ state.inputView=ivw.dataset.ivw==='table'?'table':'card'; renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
       var cmb=e.target.closest('[data-confirm-month]');
-      if(cmb){ state.employees.forEach(function(emp){ if(isActiveInMonth(emp,state.month)) setConfirm(emp.id,true); }); try{ saveMonthlyPayslips(true); }catch(_){} persistSave(); renderInput(); toast('今月を確定しました'); return; }
+      if(cmb){ state.employees.forEach(function(emp){ if(isActiveInMonth(emp,state.month)) setConfirm(emp.id,true); }); try{ saveMonthlyPayslips(true); }catch(_){} persistSave(); renderInput();
+        // ★確定した月は自動で従業員のWeb明細に公開(会社が「Web明細で公開」を押さなくても、従業員はいつでもどの月でも閲覧可)
+        publishMeisaiNow(false,{silent:true}).then(function(n){ toast('今月を確定しました'+(n?'（従業員のWeb明細に公開）':'')); }, function(){ toast('今月を確定しました'); }); return; }
       var fs=e.target.closest('[data-fillsche]');
       if(fs){ var sd=fs.dataset.fillsche;
         var hasManual=state.employees.some(function(emp){ if(!isActiveInMonth(emp,state.month))return false; var mi=kinIdx(emp,/出勤/); return mi>=0 && emp.kintai[mi].value!=='' && emp.kintai[mi].value!=null && String(emp.kintai[mi].value)!==String(sd); });
@@ -2948,7 +2951,20 @@
       var tg=e.target.closest('.cp-toggle:not(.cp-reset)'); if(tg){ state._oc=(state._oc===tg.dataset.cpk)?null:tg.dataset.cpk; renderDesign(); return; }
       var w=e.target.closest('.cw'); if(w){ state.theme[w.dataset.ck]=w.dataset.col; state._oc=null; afterDesign(); } });
     function markOutput(){ if(!state.onboardOutput){ state.onboardOutput=true; if(window.persistSaveDebounced)persistSaveDebounced(); } } // はじめかたガイド④の達成
-    $('#b-print').addEventListener('click',function(){ markOutput(); var f=$('#frame'); try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} });
+    // 印刷/PDF保存 = 代行請求書アプリと同じ実機検証済方式。
+    //   プレビューは画面フィットで縮小(transform)しているので、その縮小iframeをprintするとA4で極小になる。
+    //   → 新しい窓に明細HTML(@page A4・原寸)をそのまま書き出して window.print。拡大なしのベクター=A4いっぱいにくっきり。
+    $('#b-print').addEventListener('click',function(){ markOutput();
+      var f=$('#frame'), html=f&&f.srcdoc;
+      if(!html){ try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} return; }
+      var pw=+(f.dataset.pw||794);
+      var w=window.open('','_blank');
+      if(!w){ try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} return; } // ポップアップ不可時は従来動作にフォールバック
+      var vp='<meta name="viewport" content="width='+pw+'">';
+      var full=html.replace(/<head([^>]*)>/i,'<head$1>'+vp);
+      w.document.open(); w.document.write(full); w.document.close(); w.focus();
+      setTimeout(function(){ try{ w.print(); }catch(e){} }, 700);
+    });
     // 総合振込データ(委託者入力の保存 + 全銀/Excel ダウンロード)。#furi-boxは静的なので委譲で1回だけ配線。
     (function(){ var fb=$('#furi-box'); if(!fb) return;
       function setFc(ev){ var el=ev.target.closest&&ev.target.closest('[data-fc]'); if(el){ state.company[el.getAttribute('data-fc')]=el.value; persistSaveDebounced(); } }
@@ -2994,23 +3010,13 @@
       var fn=isBonus?('賞与明細_'+bonusYmOf()+'.xlsx'):('給与明細_'+state.month+'.xlsx');
       PayslipXlsx.download(people, {company:state.company.name, monthLabel:lbl, filename:fn}); });
     // Web明細で公開(従業員向け配布・アクセスコード方式)
-    $('#b-webpub').addEventListener('click',function(){
-      markOutput();
-      if(!(window.Store&&Store.publishMeisai)) return;
-      var isBonus=state.printMode==='bonus';
-      var emps=state.employees.filter(function(e){return isActiveInMonth(e,isBonus?bonusYmOf():state.month);});
-      var ym=isBonus?bonusYmOf():state.month, kind=isBonus?'bonus':'monthly';
-      var items=emps.map(function(e){ var person=(isBonus?buildBonusPeople([e]):buildPeople([e]))[0];
-        return { employeeId:e.id, name:e.name, ym:ym, kind:kind,
-          data:{ person:person, doc:isBonus?{month:bonusMonthLabel(),kind:'bonus'}:{month:monthLabel()}, prefer:state.prefer, theme:state.theme } }; });
-      Store.publishMeisai(items).then(function(){ renderWebMeisai(); toast(emps.length+'名の'+(isBonus?'賞与':'給与')+'明細をWeb公開しました'); });
-    });
+    $('#b-webpub').addEventListener('click',function(){ markOutput(); publishMeisaiNow(state.printMode==='bonus'); });
     $('#webmeisai-card').addEventListener('click',function(e){
       var cp=e.target.closest('.wm-copy'); if(cp){ try{ navigator.clipboard.writeText(cp.dataset.link); toast('コピーしました'); }catch(err){} return; }
       var qb=e.target.closest('.wm-qr'); if(qb){ showMeisaiQR(qb.dataset.qrName, qb.dataset.qrUrl); return; } // 個人のQR表示/印刷
       if(e.target.closest('.wm-qrall')){ // 全員のQRを印刷(リンク+初回コード同梱)
         Store.listMeisaiPub().then(function(list){ var origin=(location.origin&&location.origin.indexOf('http')===0)?location.origin+location.pathname.replace(/[^\/]*$/,''):'';
-          printQRCards((list||[]).map(function(p){ return { name:p.name, url:origin+p.link, initCode:(!p.hasPassword?p.initCode:'') }; })); });
+          printQRCards((list||[]).map(function(p){ var code=(!p.hasPassword?p.initCode:''); return { name:p.name, url:origin+p.link+(code?('&c='+encodeURIComponent(code)):''), initCode:code }; })); }); // QRに初回コードを埋め込む=スキャンで自動入力
         return; }
       var ri=e.target.closest('.wm-reissue'); if(ri){ var tok=ri.dataset.token; uiConfirm('初回コードを再発行しますか？\n現在のパスワードと端末の記憶は無効になり、従業員は新しい初回コードで再設定します。').then(function(ok){ if(!ok)return;
         Store.reissueMeisaiInit(tok).then(function(){ renderWebMeisai(); toast('初回コードを再発行しました'); }); }); return; }
@@ -3037,8 +3043,7 @@
     items=(items||[]).filter(function(it){ return it&&it.url; }); if(!items.length){ uiAlert('公開中のWeb明細がありません。'); return; }
     var cards=items.map(function(it){ var svg=qrSvg(it.url,190);
       return '<div class="qc">'+svg+'<div class="qn">'+esc(it.name||'')+'</div>'
-        +(it.initCode?'<div class="qi">初回コード：<b>'+esc(it.initCode)+'</b></div>':'<div class="qi" style="color:#2E7D54">設定済み</div>')
-        +'<div class="qh">スマホのカメラでこのQRを読み取り→初回だけ「初回コード」で自分のパスワードを設定してください。</div>'
+        +'<div class="qh">スマホのカメラでこのQRを読み取り→初回だけ自分のパスワードを決めてください（次回からはパスワードだけ）。</div>'
         +'<div class="qu">'+esc(it.url)+'</div></div>'; }).join('');
     // ★新窓(window.open)は使わない=スマホ/ホーム画面アプリで開けず「戻れない」ため。アプリ内オーバーレイで表示＋任意で印刷。
     var css='.qc{border:1px dashed #9ac3ad;border-radius:10px;padding:12px;width:230px;max-width:100%;text-align:center;page-break-inside:avoid;box-sizing:border-box}.qc svg{width:180px;height:180px}.qn{font-weight:700;font-size:14px;margin:6px 0 2px}.qi{font-size:12px;margin:2px 0}.qh{font-size:10px;color:#5C7E6C;margin:6px 0 4px;line-height:1.5}.qu{font-size:8.5px;color:#8aa89a;word-break:break-all}';
@@ -3054,6 +3059,21 @@
       setTimeout(function(){ try{ window.print(); }catch(e){} setTimeout(function(){ pc.remove(); st.remove(); }, 800); }, 120);
     });
   }
+  // 明細をWeb明細(従業員配布)に公開。★確定時に自動で呼ぶ→会社が「Web明細で公開」を押さなくても、
+  //   確定した月は従業員のリンクに自動で並ぶ(従業員はいつでもどの月でも閲覧可)。手動ボタンからも呼ぶ。
+  //   token/初回コード/パスワード/同意は保持(publishMeisaiが冪等upsert)。返り=公開した人数(0=対象なし/未対応)。
+  function publishMeisaiNow(isBonus, opts){
+    opts=opts||{};
+    if(!(window.Store&&Store.publishMeisai)) return Promise.resolve(0);
+    var ym=isBonus?bonusYmOf():state.month; if(!ym) return Promise.resolve(0);
+    var emps=state.employees.filter(function(e){return isActiveInMonth(e,ym);});
+    if(!emps.length) return Promise.resolve(0);
+    var kind=isBonus?'bonus':'monthly';
+    var items=emps.map(function(e){ var person=(isBonus?buildBonusPeople([e]):buildPeople([e]))[0];
+      return { employeeId:e.id, name:e.name, ym:ym, kind:kind,
+        data:{ person:person, doc:isBonus?{month:bonusMonthLabel(),kind:'bonus'}:{month:monthLabel()}, prefer:state.prefer, theme:state.theme } }; });
+    return Store.publishMeisai(items).then(function(){ renderWebMeisai(); if(!opts.silent) toast(emps.length+'名の'+(isBonus?'賞与':'給与')+'明細をWeb公開しました'); return emps.length; }).catch(function(){ return 0; });
+  }
   // Web明細: 公開状況(従業員リンク＋同意＋未読/開封)を印刷タブに表示
   function renderWebMeisai(){
     var card=$('#webmeisai-card'), host=$('#webmeisai-body'); if(!card||!host||!(window.Store&&Store.listMeisaiPub))return;
@@ -3061,19 +3081,22 @@
       card.style.display=list.length?'':'none'; if(!list.length){ host.innerHTML=''; return; }
       var unread=0; list.forEach(function(p){ (p.docs||[]).forEach(function(d){ if(!d.openedAt)unread++; }); });
       var origin=(location.origin&&location.origin.indexOf('http')===0)?location.origin+location.pathname.replace(/[^\/]*$/,''):'';
-      host.innerHTML='<p class="hint" style="margin:-4px 0 10px">従業員に<b>リンク（QR）＋初回コード</b>を渡してください（LINE/メール/手渡し）。初回だけコードで自分のパスワードを設定→以後はパスワードだけ。'+(unread?'<b style="color:#92500A"> 未読 '+unread+'件</b>':' <b style="color:#2E7D54">全員が閲覧済み</b>')+'</p>'
+      host.innerHTML='<p class="hint" style="margin:-4px 0 10px">従業員に<b>リンク（QR）</b>を最初に一度だけ渡してください（LINE/メール/手渡し）。<b>リンクが鍵</b>なので本人にだけ。従業員は開いて<b>自分のパスワードを決めるだけ</b>→以後はパスワードだけ。<b>「今月を確定」すると、その月は自動でここに公開</b>され、従業員はいつでもどの月でも見られます（毎回「Web明細で公開」を押す必要はありません）。'+(unread?'<b style="color:#92500A"> 未読 '+unread+'件</b>':' <b style="color:#2E7D54">全員が閲覧済み</b>')+'</p>'
         +'<div style="margin:0 0 10px"><button class="btn-ghost wm-qrall" style="padding:8px 12px;font-size:12px">全員のQRコードを印刷</button></div>'
         +list.map(function(p){
           var ds=(p.docs||[]).slice().sort(function(a,b){return (b.ym||'').localeCompare(a.ym||'');});
           var openedTxt=ds.map(function(d){ return esc(d.ym)+(d.kind==='bonus'?'賞':'')+(d.openedAt?'✓':'<span style="color:#C0392B">未</span>'); }).join(' ');
           var pwState=p.hasPassword?'<span style="font-size:10.5px;color:#2E7D54">パスワード設定済</span>':'<span style="font-size:10.5px;color:#92500A">パスワード未設定</span>';
           var consentState=p.consentAt?'<span style="font-size:10.5px;color:#2E7D54">・同意済</span>':'<span style="font-size:10.5px;color:#92500A">・未同意</span>';
-          var codeRow = (!p.hasPassword && p.initCode)
-            ? '<div style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:#3D6B53;min-width:52px">初回コード</span><input class="finput num" readonly value="'+attr(p.initCode)+'" style="flex:1;font-size:13px;letter-spacing:.12em;padding:7px 9px" onclick="this.select()"><button class="btn-ghost wm-copy" data-link="'+attr(p.initCode)+'" style="padding:7px 10px;font-size:11px">コピー</button></div>'
-            : '<div style="font-size:10.5px;color:#5C7E6C;margin-top:5px">初回コードは設定後に非表示（忘れた/漏れたら「再発行」）<button class="btn-ghost wm-reissue" data-token="'+attr(p.token)+'" style="padding:4px 8px;font-size:10.5px;margin-left:6px">初回コード再発行</button></div>';
+          // 初回コードはリンク(?c=)に内包=従業員は入力不要。会社は「リンク(QR)を本人に渡す」だけ。漏れたら「リンク再発行」で旧リンクを無効化。
+          var codeRow = '<div style="font-size:10.5px;color:#5C7E6C;margin-top:5px">'
+            +(p.hasPassword ? 'パスワード設定済み。' : 'このリンク（QR）を開くと本人がパスワードを設定します。')
+            +'<b>リンクは本人にだけ渡してください</b>（リンクが鍵）。<button class="btn-ghost wm-reissue" data-token="'+attr(p.token)+'" style="padding:4px 8px;font-size:10.5px;margin-left:6px">リンク再発行（前のを無効化）</button></div>';
+          // 配布用URL: パスワード未設定の間は初回コードを ?c= で埋め込む→従業員はスキャン/リンクを開くだけでコード自動入力→パスワードを決めるだけ(手間最小)。設定後はコード不要なので付けない。
+          var handoutUrl = origin+p.link + ((!p.hasPassword && p.initCode) ? ('&c='+encodeURIComponent(p.initCode)) : '');
           return '<div style="border:1px solid #d4eae0;border-radius:10px;padding:9px 11px;margin-bottom:7px">'
             +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:13px">'+esc(p.name||'(氏名未取得)')+'</b><span>'+pwState+consentState+'</span></div>'
-            +'<div style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:#3D6B53;min-width:52px">リンク</span><input class="finput" readonly value="'+attr(origin+p.link)+'" style="flex:1;font-size:11px;padding:7px 9px" onclick="this.select()"><button class="btn-ghost wm-copy" data-link="'+attr(origin+p.link)+'" style="padding:7px 10px;font-size:11px">コピー</button><button class="btn-ghost wm-qr" data-qr-url="'+attr(origin+p.link)+'" data-qr-name="'+attr(p.name||'')+'" style="padding:7px 10px;font-size:11px">QR</button></div>'
+            +'<div style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:#3D6B53;min-width:52px">リンク</span><input class="finput" readonly value="'+attr(handoutUrl)+'" style="flex:1;font-size:11px;padding:7px 9px" onclick="this.select()"><button class="btn-ghost wm-copy" data-link="'+attr(handoutUrl)+'" style="padding:7px 10px;font-size:11px">コピー</button><button class="btn-ghost wm-qr" data-qr-url="'+attr(handoutUrl)+'" data-qr-name="'+attr(p.name||'')+'" style="padding:7px 10px;font-size:11px">QR</button></div>'
             +codeRow
             +'<div style="font-size:10.5px;color:#5C7E6C;margin-top:5px">公開: '+openedTxt+'</div></div>';
         }).join('');

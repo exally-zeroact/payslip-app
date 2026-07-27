@@ -11,6 +11,8 @@
   function ymLabel(ym, kind){ var y=(ym||'').slice(0,4), m=parseInt((ym||'').slice(5,7),10)||0; if(kind==='gensen') return '令和'+(y-2018)+'年 源泉徴収票'; return '令和'+(y-2018)+'年'+m+'月'+(kind==='bonus'?'（賞与）':'分'); }
 
   var token=(function(){ try{ return new URLSearchParams(location.search).get('t'); }catch(e){ return null; } })();
+  // QR/リンクに初回コードを埋め込む(?c=)と、初回パスワード設定画面で自動入力=従業員はコード入力不要でパスワードを決めるだけ。
+  var initFromUrl=(function(){ try{ return (new URLSearchParams(location.search).get('c')||'').trim(); }catch(e){ return ''; } })();
   var DEVKEY='meisai_dev_'+token;                 // この端末に記憶したdeviceToken
   var cred=null, docs=[];                          // 認証後の資格情報(deviceToken or password)
 
@@ -21,7 +23,7 @@
   Store.meisaiAuth(token, savedDev).then(function(r){
     if(!r || !r.found){ show('sc-bad'); return; }
     if(r.remembered){ cred={ deviceToken:savedDev }; afterAuth(r.name); return; }   // 記憶済→パスワード省略
-    if(!r.hasPassword){ show('sc-setup'); return; }                                  // 初回=パスワード設定
+    if(!r.hasPassword){ show('sc-setup'); return; }                                  // 初回=パスワード設定(コードはリンクに内包・従業員は入力不要)
     show('sc-login');                                                                // 2回目以降=パスワード
   });
 
@@ -34,15 +36,15 @@
     });
   }
 
-  // ① 初回パスワード設定(会社発行の初回コード＋新パスワード)
+  // ① 初回パスワード設定(コードはリンク(?c=)に内包=従業員はパスワードを決めるだけ)
   $('setup-go').addEventListener('click', function(){
-    var code=($('setup-code').value||'').trim(), pw=$('setup-pw').value||'', pw2=$('setup-pw2').value||'';
+    var code=initFromUrl, pw=$('setup-pw').value||'', pw2=$('setup-pw2').value||'';
     $('setup-err').textContent='';
-    if(!code){ $('setup-err').textContent='会社から渡された初回コードを入力してください。'; return; }
+    if(!code){ $('setup-err').textContent='このリンクが正しくありません。会社から届いた最新のリンク（QR）をそのまま開いてください。'; return; }
     if(pw.length<8){ $('setup-err').textContent='パスワードは8文字以上にしてください。'; return; }
     if(pw!==pw2){ $('setup-err').textContent='パスワード(確認)が一致しません。'; return; }
     Store.meisaiSetPassword(token, code, pw).then(function(r){
-      if(!r || !r.ok){ $('setup-err').textContent = (r&&r.locked)?'初回コードを何度も間違えたため、しばらくロックされています。時間をおいて再度お試しください。':(r&&r.weak)?'パスワードは8文字以上にしてください。':(r&&r.badInit)?('初回コードが違います。'+(r.remaining!=null?'（あと'+r.remaining+'回でロックされます）':'')):(r&&r.alreadySet)?'すでにパスワードが設定済みです。ログインしてください。':'設定できませんでした。'; if(r&&r.alreadySet)show('sc-login'); return; }
+      if(!r || !r.ok){ $('setup-err').textContent = (r&&r.locked)?'しばらくロックされています。時間をおいて再度お試しください。':(r&&r.weak)?'パスワードは8文字以上にしてください。':(r&&r.badInit)?'このリンクが正しくありません。会社から届いた最新のリンク（QR）をそのまま開いてください。':(r&&r.alreadySet)?'すでにパスワードが設定済みです。ログインしてください。':'設定できませんでした。'; if(r&&r.alreadySet)show('sc-login'); return; }
       // 設定できたらそのままパスワードでログイン→端末記憶
       loginWith(pw);
     });
@@ -87,9 +89,10 @@
     });
   }
 
-  // ⑤ 明細ビュー = 明細を画像化して<img>で表示(fit幅・指でピンチズーム可・iOSで確実に出る)。
-  //   保存/印刷は jsPDF で本物のA4 PDF を生成(shuri-app 実機検証済方式)→iOSは標準ビューアで開く=拡大/印刷が全部効く。
-  var _pdfCanvas=null, _isLand=false;
+  // ⑤ 明細ビュー = 明細を原寸(794px)でiframe描画し、CSS transformで画面幅にフィット。
+  //   ベクター描画なのでピンチズームで鮮明。iframeは確実に描画される(html2canvasの画像化はiOSで不安定なため不使用)。
+  //   保存/印刷は代行請求書アプリと同じ「新窓に明細HTMLを書いて window.print」方式(A4いっぱいにくっきり)。
+  var _isLand=false, _psHtml='', _psW=794, _psH=1123;
   function openDoc(i){
     var d=docs[i]; if(!d) return; var data=d.data||{};
     if(d.openedAt==null){ Store.markMeisaiOpened(d.id, token, cred).then(function(){ d.openedAt=new Date().toISOString(); }); }
@@ -102,43 +105,48 @@
         html=out.html; if(out.orientation==='landscape'){ pw=1123; ph=794; _isLand=true; }
       }
     }catch(e){ return; }
+    _psHtml=html;
     show('sc-view');
     renderPayslip(html, pw, ph);
     window.scrollTo(0,0);
   }
-  // 描画用iframe(非表示・原寸)に明細を出す→html2canvasで画像化→<img>表示＆PDF用canvas保持
+  // 原寸iframeに明細を描画→実際の高さを測り→画面幅にフィットするようtransform:scale。
   function renderPayslip(html, pw, ph){
-    var f=$('frame'), img=$('ps-img'), load=$('ps-loading');
-    _pdfCanvas=null; if(img){ img.removeAttribute('src'); img.style.display='none'; } if(load){ load.style.display=''; load.textContent='明細を読み込み中…'; }
-    f.style.width=pw+'px'; f.style.height=ph+'px';
+    var f=$('frame'), load=$('ps-loading');
+    _psW=pw; _psH=ph;
+    if(load){ load.style.display=''; load.textContent='明細を読み込み中…'; }
+    f.style.width=pw+'px'; f.style.height=ph+'px'; f.style.transform='none';
     f.onload=function(){
       setTimeout(function(){
         try{
           var idoc=f.contentDocument||f.contentWindow.document;
-          var target=idoc.querySelector('.sheet,.page')||idoc.body;
-          if(!(window.html2canvas)) throw new Error('html2canvas未読込');
-          window.html2canvas(target, { scale:2, backgroundColor:'#ffffff', width:pw, height:ph, windowWidth:pw, windowHeight:ph, useCORS:true }).then(function(canvas){
-            _pdfCanvas=canvas;
-            if(img){ img.src=canvas.toDataURL('image/jpeg',0.95); img.style.display='block'; }
-            if(load){ load.style.display='none'; }
-          }).catch(function(){ if(load){ load.textContent='表示に失敗しました。もう一度お試しください。'; } });
-        }catch(e){ if(load){ load.textContent='表示に失敗しました。もう一度お試しください。'; } }
-      }, 180);
+          var sheet=idoc.querySelector('.sheet,.page');
+          var natH=Math.max(ph, sheet?sheet.scrollHeight:ph);
+          _psH=natH; f.style.height=natH+'px';
+          fitFrame();
+          if(load){ load.style.display='none'; }
+        }catch(e){ fitFrame(); if(load){ load.style.display='none'; } }
+      }, 120);
     };
     f.srcdoc=html;
   }
+  // iframe(原寸_psW×_psH)を preview-wrap の内幅にフィットさせる
+  function fitFrame(){
+    var f=$('frame'); if(!f) return;
+    var wrap=f.parentNode; if(!wrap) return;
+    var avail=wrap.clientWidth - 24; // padding 12+12
+    if(avail<=0) return;
+    var scale=Math.min(1, avail/_psW);
+    f.style.transform='scale('+scale+')';
+    wrap.style.height=(_psH*scale + 24)+'px';
+  }
+  window.addEventListener('resize', function(){ var v=$('sc-view'); if(v && !v.classList.contains('hidden')) fitFrame(); });
   $('v-back').addEventListener('click', function(){ renderList(); show('sc-list'); });
-  // PDFで保存/印刷 = 本物のA4 PDFを生成(shuri-app方式)。
+  // PDFで保存/印刷 = ★新しい窓を開かず、アプリ内でそのまま印刷する(スマホ/ホーム画面アプリでも「戻れない」にならない)。
+  //   @media print で明細だけを原寸(A4)表示し、window.print() でiOS標準の印刷/PDF保存を開く。
+  //   @page{margin:0} でブラウザのURL/日付/ページ番号フッターも出さない。印刷後はそのまま明細画面に戻る。
   $('v-pdf').addEventListener('click', function(){
-    var load=$('ps-loading');
-    if(!_pdfCanvas || !(window.jspdf&&window.jspdf.jsPDF)){ if(load){ load.style.display=''; load.textContent='準備中です。数秒待ってからもう一度押してください。'; setTimeout(function(){ if(_pdfCanvas&&load) load.style.display='none'; },1500); } return; }
-    try{
-      var jsPDF=window.jspdf.jsPDF;
-      var pw=_isLand?842:595, ph=_isLand?595:842; // A4 pt
-      var doc=new jsPDF({ orientation:_isLand?'landscape':'portrait', unit:'pt', format:[pw,ph] });
-      doc.addImage(_pdfCanvas.toDataURL('image/jpeg',0.95), 'JPEG', 0, 0, pw, ph);
-      doc.save('給与明細.pdf');
-    }catch(e){}
+    try{ window.print(); }catch(e){}
   });
 
   // ⑥ 年末調整 従業員セルフ申告(平易な質問→保存。会社が取り込む)
