@@ -2948,7 +2948,20 @@
       var tg=e.target.closest('.cp-toggle:not(.cp-reset)'); if(tg){ state._oc=(state._oc===tg.dataset.cpk)?null:tg.dataset.cpk; renderDesign(); return; }
       var w=e.target.closest('.cw'); if(w){ state.theme[w.dataset.ck]=w.dataset.col; state._oc=null; afterDesign(); } });
     function markOutput(){ if(!state.onboardOutput){ state.onboardOutput=true; if(window.persistSaveDebounced)persistSaveDebounced(); } } // はじめかたガイド④の達成
-    $('#b-print').addEventListener('click',function(){ markOutput(); var f=$('#frame'); try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} });
+    // 印刷/PDF保存 = 代行請求書アプリと同じ実機検証済方式。
+    //   プレビューは画面フィットで縮小(transform)しているので、その縮小iframeをprintするとA4で極小になる。
+    //   → 新しい窓に明細HTML(@page A4・原寸)をそのまま書き出して window.print。拡大なしのベクター=A4いっぱいにくっきり。
+    $('#b-print').addEventListener('click',function(){ markOutput();
+      var f=$('#frame'), html=f&&f.srcdoc;
+      if(!html){ try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} return; }
+      var pw=+(f.dataset.pw||794);
+      var w=window.open('','_blank');
+      if(!w){ try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} return; } // ポップアップ不可時は従来動作にフォールバック
+      var vp='<meta name="viewport" content="width='+pw+'">';
+      var full=html.replace(/<head([^>]*)>/i,'<head$1>'+vp);
+      w.document.open(); w.document.write(full); w.document.close(); w.focus();
+      setTimeout(function(){ try{ w.print(); }catch(e){} }, 700);
+    });
     // 総合振込データ(委託者入力の保存 + 全銀/Excel ダウンロード)。#furi-boxは静的なので委譲で1回だけ配線。
     (function(){ var fb=$('#furi-box'); if(!fb) return;
       function setFc(ev){ var el=ev.target.closest&&ev.target.closest('[data-fc]'); if(el){ state.company[el.getAttribute('data-fc')]=el.value; persistSaveDebounced(); } }
