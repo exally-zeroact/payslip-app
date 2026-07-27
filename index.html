@@ -188,6 +188,6 @@
 <script src="js/store.js"></script>
 <script src="js/app.js"></script>
 <script src="js/auth.js"></script>
-<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script>
+<!-- ★Service Workerは登録しない=キャッシュで古い版が居座り更新が反映されない問題(既知)を根絶。開くたびに既存SWを登録解除+全キャッシュ削除して常に最新にする。 --><script>try{if('serviceWorker'in navigator){navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();});});}if(window.caches){caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k);});});}}catch(e){}</script>
 </body>
 </html>
