@@ -11,7 +11,8 @@ self.addEventListener('activate', function (e) {
     try { await self.registration.unregister(); } catch (_e) {}
     try {
       var cs = await self.clients.matchAll({ type: 'window' });
-      cs.forEach(function (c) { try { c.navigate(c.url); } catch (_e) {} }); // 最新を取り直させる
+      // ★http(s)の画面だけ再読込。blob:等(PDF表示中)を再読込するとWebKitBlobResourceエラーになるため除外。
+      cs.forEach(function (c) { try { if (/^https?:\/\//i.test(c.url)) c.navigate(c.url); } catch (_e) {} });
     } catch (_e) {}
   })());
 });

@@ -2969,7 +2969,11 @@
       try{ toast('PDFを作成中…'); }catch(e){}
       var i=0;
       (function next(){
-        if(i>=pages.length){ try{ doc.save('給与明細.pdf'); }catch(e){} return; }
+        if(i>=pages.length){
+          // ★blobを新しいタブで開く(代行請求書と同じ・iOSのWebKitBlobResourceエラー回避)。ポップアップ不可時のみsave。
+          try{ var url=URL.createObjectURL(doc.output('blob')); var w=window.open(url,'_blank'); if(!w){ doc.save('給与明細.pdf'); } setTimeout(function(){ try{URL.revokeObjectURL(url);}catch(_){} },60000); }catch(e){ try{ doc.save('給与明細.pdf'); }catch(_){} }
+          return;
+        }
         window.html2canvas(pages[i], { scale:3, backgroundColor:'#ffffff', useCORS:true, width:CW, height:CH, windowWidth:CW, windowHeight:CH }).then(function(canvas){
           if(i>0){ doc.addPage([pw,ph], isLand?'landscape':'portrait'); }
           // ★A4ページのまま横幅いっぱい(比率維持=潰さない・左右余白ゼロ)。縦長でも幅いっぱいで載せ下端の空白はA4で自然に収まる
