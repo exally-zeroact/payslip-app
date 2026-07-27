@@ -2951,19 +2951,30 @@
       var tg=e.target.closest('.cp-toggle:not(.cp-reset)'); if(tg){ state._oc=(state._oc===tg.dataset.cpk)?null:tg.dataset.cpk; renderDesign(); return; }
       var w=e.target.closest('.cw'); if(w){ state.theme[w.dataset.ck]=w.dataset.col; state._oc=null; afterDesign(); } });
     function markOutput(){ if(!state.onboardOutput){ state.onboardOutput=true; if(window.persistSaveDebounced)persistSaveDebounced(); } } // はじめかたガイド④の達成
-    // 印刷/PDF保存 = 代行請求書アプリと同じ実機検証済方式。
-    //   プレビューは画面フィットで縮小(transform)しているので、その縮小iframeをprintするとA4で極小になる。
-    //   → 新しい窓に明細HTML(@page A4・原寸)をそのまま書き出して window.print。拡大なしのベクター=A4いっぱいにくっきり。
+    // 印刷/PDF保存 = ★jsPDFで自前生成(A4ぴったり・iOSのURL/日付フッター無し・新窓を開かないので戻れる)。
+    //   iOSのwebページ印刷(window.print/window.open)はフッターが必ず付き余白で2ページ化+戻れないため不採用。
+    //   プレビューiframe内の各ページ(.sheet/.page)をhtml2canvasでA4寸法固定(潰れ防止)で焼き、複数人=複数ページに対応。
     $('#b-print').addEventListener('click',function(){ markOutput();
-      var f=$('#frame'), html=f&&f.srcdoc;
-      if(!html){ try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} return; }
-      var pw=+(f.dataset.pw||794);
-      var w=window.open('','_blank');
-      if(!w){ try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} return; } // ポップアップ不可時は従来動作にフォールバック
-      var vp='<meta name="viewport" content="width='+pw+'">';
-      var full=html.replace(/<head([^>]*)>/i,'<head$1>'+vp);
-      w.document.open(); w.document.write(full); w.document.close(); w.focus();
-      setTimeout(function(){ try{ w.print(); }catch(e){} }, 700);
+      var f=$('#frame'), idoc=f&&(f.contentDocument||f.contentWindow.document);
+      var pages=idoc?idoc.querySelectorAll('.sheet,.page'):null;
+      if(!pages||!pages.length||!(window.html2canvas)||!(window.jspdf&&window.jspdf.jsPDF)){
+        try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} return; // 保険=ライブラリ未読込ならブラウザ印刷
+      }
+      var isLand=(+(f.dataset.pw||794))>900; // pw=1123→A4横
+      var CW=isLand?1123:794, CH=isLand?794:1123, pw=isLand?842:595, ph=isLand?595:842;
+      var doc=new window.jspdf.jsPDF({ orientation:isLand?'landscape':'portrait', unit:'pt', format:[pw,ph] });
+      try{ toast('PDFを作成中…'); }catch(e){}
+      var i=0;
+      (function next(){
+        if(i>=pages.length){ try{ doc.save('給与明細.pdf'); }catch(e){} return; }
+        window.html2canvas(pages[i], { scale:3, backgroundColor:'#ffffff', useCORS:true, width:CW, height:CH, windowWidth:CW, windowHeight:CH }).then(function(canvas){
+          if(i>0){ doc.addPage([pw,ph], isLand?'landscape':'portrait'); }
+          var iw=canvas.width, ih=canvas.height, r=Math.min(pw/iw, ph/ih); // アスペクト保持(潰れ防止)
+          var w=iw*r, h=ih*r, ox=(pw-w)/2;
+          doc.addImage(canvas.toDataURL('image/jpeg',0.92), 'JPEG', ox, 0, w, h);
+          i++; next();
+        }).catch(function(){ i++; next(); });
+      })();
     });
     // 総合振込データ(委託者入力の保存 + 全銀/Excel ダウンロード)。#furi-boxは静的なので委譲で1回だけ配線。
     (function(){ var fb=$('#furi-box'); if(!fb) return;
