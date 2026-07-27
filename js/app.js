@@ -1479,7 +1479,7 @@
     // 「今月を確定」ボタン(表/カード両ビューで共通)。★以前は表ビューで未定義=「undefined」表示+確定不可だった★
     var confirmBtn='<div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px"><button class="btn-primary" data-confirm-month style="flex:0 0 auto;padding:11px 18px;font-size:14px">今月を確定（台帳・年調に反映）</button>'
       +(cnt.need>0?'<span style="font-size:11px;color:#92500A;font-weight:700">未確認 '+cnt.need+'名</span>':'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 確認済</span>')
-      +'<span style="font-size:10px;color:#5C7E6C"><b>保存は自動</b>です。「確定」は全員を確認済みにし、<b>賃金台帳・年末調整の集計対象</b>として今月を記録します（あとで直せます）。</span></div>';
+      +'<span style="font-size:10px;color:#5C7E6C"><b>保存は自動</b>です。「確定」は全員を確認済みにし、<b>賃金台帳・年末調整の集計対象</b>として今月を記録し、<b>従業員のWeb明細に自動公開</b>します（従業員はいつでも閲覧可・あとで直せます）。</span></div>';
     if(view==='table' && activeCount>1){ host.innerHTML=statutoryStaleWarn()+calHTML+progHTML+viewToggle+renderInputTableHTML(reviewOnly)+confirmBtn; return; }
     var cards=state.employees.map(function(e,i){
       if(!isActiveInMonth(e,state.month)) return '';
@@ -2712,7 +2712,8 @@
     function bxParse(v, arr){ if(!v)return null; var p=String(v).split(':'); var e=bonusById(p[0]); if(!e)return null; return { en:bonusEntry(e), idx:+p[1], arr:bonusEntry(e)[arr] }; }
     if(inScr){
       inScr.addEventListener('click',function(ev){
-        if(ev.target.closest('[data-confirm-bonus]')){ try{ saveBonusPayslips(); }catch(_){} persistSave(); toast('賞与を確定しました（年調・台帳に反映）'); return; }
+        if(ev.target.closest('[data-confirm-bonus]')){ try{ saveBonusPayslips(); }catch(_){} persistSave();
+          publishMeisaiNow(true,{silent:true}).then(function(n){ toast('賞与を確定しました（年調・台帳に反映'+(n?'・従業員のWeb明細に公開）':'）')); }, function(){ toast('賞与を確定しました（年調・台帳に反映）'); }); return; }
         if(ev.target.closest('[data-bonus-harau]')){ try{ downloadBonusHarau(); }catch(_){} return; } // 賞与支払届 Excel出力
         var addS=ev.target.closest('[data-bsadd]'); if(addS){ var es=bonusById(addS.dataset.bsadd); if(es){ var i1=inScr.querySelector('[data-bsaddl="'+addS.dataset.bsadd+'"]'); var l1=(i1&&i1.value||'').trim()||'特別賞与'; bonusEntry(es).addShikyu.push({label:l1,value:'',hikazei:false}); renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); } return; }
         var addK=ev.target.closest('[data-bkadd]'); if(addK){ var ek=bonusById(addK.dataset.bkadd); if(ek){ var i2=inScr.querySelector('[data-bkaddl="'+addK.dataset.bkadd+'"]'); var l2=(i2&&i2.value||'').trim()||'控除'; bonusEntry(ek).addKojo.push({label:l2,value:''}); renderBonus(); if(window.persistSaveDebounced)persistSaveDebounced(); } return; }
@@ -2870,7 +2871,9 @@
       if(e.target.dataset.reviewonly!=null){ state._reviewOnly=e.target.checked; renderInput(); return; }
       var ivw=e.target.closest('[data-ivw]'); if(ivw){ state.inputView=ivw.dataset.ivw==='table'?'table':'card'; renderInput(); if(window.persistSaveDebounced)persistSaveDebounced(); return; }
       var cmb=e.target.closest('[data-confirm-month]');
-      if(cmb){ state.employees.forEach(function(emp){ if(isActiveInMonth(emp,state.month)) setConfirm(emp.id,true); }); try{ saveMonthlyPayslips(true); }catch(_){} persistSave(); renderInput(); toast('今月を確定しました'); return; }
+      if(cmb){ state.employees.forEach(function(emp){ if(isActiveInMonth(emp,state.month)) setConfirm(emp.id,true); }); try{ saveMonthlyPayslips(true); }catch(_){} persistSave(); renderInput();
+        // ★確定した月は自動で従業員のWeb明細に公開(会社が「Web明細で公開」を押さなくても、従業員はいつでもどの月でも閲覧可)
+        publishMeisaiNow(false,{silent:true}).then(function(n){ toast('今月を確定しました'+(n?'（従業員のWeb明細に公開）':'')); }, function(){ toast('今月を確定しました'); }); return; }
       var fs=e.target.closest('[data-fillsche]');
       if(fs){ var sd=fs.dataset.fillsche;
         var hasManual=state.employees.some(function(emp){ if(!isActiveInMonth(emp,state.month))return false; var mi=kinIdx(emp,/出勤/); return mi>=0 && emp.kintai[mi].value!=='' && emp.kintai[mi].value!=null && String(emp.kintai[mi].value)!==String(sd); });
@@ -3007,17 +3010,7 @@
       var fn=isBonus?('賞与明細_'+bonusYmOf()+'.xlsx'):('給与明細_'+state.month+'.xlsx');
       PayslipXlsx.download(people, {company:state.company.name, monthLabel:lbl, filename:fn}); });
     // Web明細で公開(従業員向け配布・アクセスコード方式)
-    $('#b-webpub').addEventListener('click',function(){
-      markOutput();
-      if(!(window.Store&&Store.publishMeisai)) return;
-      var isBonus=state.printMode==='bonus';
-      var emps=state.employees.filter(function(e){return isActiveInMonth(e,isBonus?bonusYmOf():state.month);});
-      var ym=isBonus?bonusYmOf():state.month, kind=isBonus?'bonus':'monthly';
-      var items=emps.map(function(e){ var person=(isBonus?buildBonusPeople([e]):buildPeople([e]))[0];
-        return { employeeId:e.id, name:e.name, ym:ym, kind:kind,
-          data:{ person:person, doc:isBonus?{month:bonusMonthLabel(),kind:'bonus'}:{month:monthLabel()}, prefer:state.prefer, theme:state.theme } }; });
-      Store.publishMeisai(items).then(function(){ renderWebMeisai(); toast(emps.length+'名の'+(isBonus?'賞与':'給与')+'明細をWeb公開しました'); });
-    });
+    $('#b-webpub').addEventListener('click',function(){ markOutput(); publishMeisaiNow(state.printMode==='bonus'); });
     $('#webmeisai-card').addEventListener('click',function(e){
       var cp=e.target.closest('.wm-copy'); if(cp){ try{ navigator.clipboard.writeText(cp.dataset.link); toast('コピーしました'); }catch(err){} return; }
       var qb=e.target.closest('.wm-qr'); if(qb){ showMeisaiQR(qb.dataset.qrName, qb.dataset.qrUrl); return; } // 個人のQR表示/印刷
@@ -3067,6 +3060,21 @@
       setTimeout(function(){ try{ window.print(); }catch(e){} setTimeout(function(){ pc.remove(); st.remove(); }, 800); }, 120);
     });
   }
+  // 明細をWeb明細(従業員配布)に公開。★確定時に自動で呼ぶ→会社が「Web明細で公開」を押さなくても、
+  //   確定した月は従業員のリンクに自動で並ぶ(従業員はいつでもどの月でも閲覧可)。手動ボタンからも呼ぶ。
+  //   token/初回コード/パスワード/同意は保持(publishMeisaiが冪等upsert)。返り=公開した人数(0=対象なし/未対応)。
+  function publishMeisaiNow(isBonus, opts){
+    opts=opts||{};
+    if(!(window.Store&&Store.publishMeisai)) return Promise.resolve(0);
+    var ym=isBonus?bonusYmOf():state.month; if(!ym) return Promise.resolve(0);
+    var emps=state.employees.filter(function(e){return isActiveInMonth(e,ym);});
+    if(!emps.length) return Promise.resolve(0);
+    var kind=isBonus?'bonus':'monthly';
+    var items=emps.map(function(e){ var person=(isBonus?buildBonusPeople([e]):buildPeople([e]))[0];
+      return { employeeId:e.id, name:e.name, ym:ym, kind:kind,
+        data:{ person:person, doc:isBonus?{month:bonusMonthLabel(),kind:'bonus'}:{month:monthLabel()}, prefer:state.prefer, theme:state.theme } }; });
+    return Store.publishMeisai(items).then(function(){ renderWebMeisai(); if(!opts.silent) toast(emps.length+'名の'+(isBonus?'賞与':'給与')+'明細をWeb公開しました'); return emps.length; }).catch(function(){ return 0; });
+  }
   // Web明細: 公開状況(従業員リンク＋同意＋未読/開封)を印刷タブに表示
   function renderWebMeisai(){
     var card=$('#webmeisai-card'), host=$('#webmeisai-body'); if(!card||!host||!(window.Store&&Store.listMeisaiPub))return;
@@ -3074,7 +3082,7 @@
       card.style.display=list.length?'':'none'; if(!list.length){ host.innerHTML=''; return; }
       var unread=0; list.forEach(function(p){ (p.docs||[]).forEach(function(d){ if(!d.openedAt)unread++; }); });
       var origin=(location.origin&&location.origin.indexOf('http')===0)?location.origin+location.pathname.replace(/[^\/]*$/,''):'';
-      host.innerHTML='<p class="hint" style="margin:-4px 0 10px">従業員に<b>リンク（QR）＋初回コード</b>を渡してください（LINE/メール/手渡し）。初回だけコードで自分のパスワードを設定→以後はパスワードだけ。'+(unread?'<b style="color:#92500A"> 未読 '+unread+'件</b>':' <b style="color:#2E7D54">全員が閲覧済み</b>')+'</p>'
+      host.innerHTML='<p class="hint" style="margin:-4px 0 10px">従業員に<b>リンク（QR）＋初回コード</b>を最初に一度だけ渡してください（LINE/メール/手渡し）。初回だけコードで自分のパスワードを設定→以後はパスワードだけ。<b>「今月を確定」すると、その月は自動でここに公開</b>され、従業員はいつでもどの月でも見られます（毎回「Web明細で公開」を押す必要はありません）。'+(unread?'<b style="color:#92500A"> 未読 '+unread+'件</b>':' <b style="color:#2E7D54">全員が閲覧済み</b>')+'</p>'
         +'<div style="margin:0 0 10px"><button class="btn-ghost wm-qrall" style="padding:8px 12px;font-size:12px">全員のQRコードを印刷</button></div>'
         +list.map(function(p){
           var ds=(p.docs||[]).slice().sort(function(a,b){return (b.ym||'').localeCompare(a.ym||'');});
