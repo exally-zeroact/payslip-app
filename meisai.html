@@ -36,6 +36,14 @@ body{font-family:'Noto Sans JP',sans-serif;color:#1a4a2e;background:#F0FAF4;-web
 .badge-new{display:inline-block;font-size:9px;background:#52B788;color:#fff;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
 .preview-wrap{overflow:auto;background:#cfcabd;border-radius:12px;padding:12px;position:relative;}
 #frame{border:none;background:#fff;box-shadow:0 8px 32px rgba(30,60,40,.16);transform-origin:top left;display:block;pointer-events:none;}
+/* 印刷/PDF保存: 明細だけを原寸(A4)で印刷。新窓を開かないので「戻れない」にならない。@page margin:0でブラウザのフッター(URL/日付/ページ)も消す */
+@media print{
+  body>*{visibility:hidden!important;}
+  .preview-wrap,.preview-wrap *{visibility:visible!important;}
+  .preview-wrap{position:absolute!important;left:0!important;top:0!important;width:794px!important;height:1123px!important;margin:0!important;padding:0!important;background:#fff!important;border-radius:0!important;overflow:visible!important;box-shadow:none!important;}
+  #frame{transform:none!important;width:794px!important;height:1123px!important;box-shadow:none!important;}
+  @page{size:A4 portrait;margin:0;}
+}
 .topbar{display:flex;gap:8px;margin-bottom:10px;}
 .topbar .btn{margin-top:0;}
 .hidden{display:none;}

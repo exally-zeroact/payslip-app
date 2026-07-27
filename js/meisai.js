@@ -140,18 +140,11 @@
   }
   window.addEventListener('resize', function(){ var v=$('sc-view'); if(v && !v.classList.contains('hidden')) fitFrame(); });
   $('v-back').addEventListener('click', function(){ renderList(); show('sc-list'); });
-  // PDFで保存/印刷 = 代行請求書アプリと同じ実機検証済方式。
-  //   新しい窓に明細HTML(@page A4・原寸)をそのまま書き出して window.print()。
-  //   → 拡大なしのベクター描画=A4いっぱいにくっきり印刷/PDF保存できる(iOSは印刷ダイアログで「PDFとして保存」)。
+  // PDFで保存/印刷 = ★新しい窓を開かず、アプリ内でそのまま印刷する(スマホ/ホーム画面アプリでも「戻れない」にならない)。
+  //   @media print で明細だけを原寸(A4)表示し、window.print() でiOS標準の印刷/PDF保存を開く。
+  //   @page{margin:0} でブラウザのURL/日付/ページ番号フッターも出さない。印刷後はそのまま明細画面に戻る。
   $('v-pdf').addEventListener('click', function(){
-    if(!_psHtml){ return; }
-    var w=window.open('', '_blank');
-    if(!w){ var load=$('ps-loading'); if(load){ load.style.display=''; load.textContent='⚠️ ポップアップを許可すると、PDF保存/印刷ができます。'; setTimeout(function(){ if(load) load.style.display='none'; },2500); } return; }
-    // 明細HTMLに、モバイルで原寸フィット表示するためのviewportを差し込む(@pageはそのままA4印刷)。
-    var vp='<meta name="viewport" content="width='+(_isLand?1123:794)+'">';
-    var full=_psHtml.replace(/<head([^>]*)>/i, '<head$1>'+vp);
-    w.document.open(); w.document.write(full); w.document.close(); w.focus();
-    setTimeout(function(){ try{ w.print(); }catch(e){} }, 700);
+    try{ window.print(); }catch(e){}
   });
 
   // ⑥ 年末調整 従業員セルフ申告(平易な質問→保存。会社が取り込む)
