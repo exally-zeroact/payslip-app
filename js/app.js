@@ -2961,17 +2961,17 @@
         try{f.contentWindow.focus();f.contentWindow.print();}catch(err){window.print();} return; // 保険=ライブラリ未読込ならブラウザ印刷
       }
       var isLand=(+(f.dataset.pw||794))>900; // pw=1123→A4横
-      var CW=isLand?1123:794, CH=isLand?794:1123, pw=isLand?842:595, ph=isLand?595:842;
-      var doc=new window.jspdf.jsPDF({ orientation:isLand?'landscape':'portrait', unit:'pt', format:[pw,ph] });
+      var CW=isLand?1123:794, CH=isLand?794:1123, W0=isLand?842:595; // A4幅(pt)
       try{ toast('PDFを作成中…'); }catch(e){}
-      var i=0;
+      var doc=null, i=0;
       (function next(){
-        if(i>=pages.length){ try{ doc.save('給与明細.pdf'); }catch(e){} return; }
+        if(i>=pages.length){ if(doc){ try{ doc.save('給与明細.pdf'); }catch(e){} } return; }
         window.html2canvas(pages[i], { scale:3, backgroundColor:'#ffffff', useCORS:true, width:CW, height:CH, windowWidth:CW, windowHeight:CH }).then(function(canvas){
-          if(i>0){ doc.addPage([pw,ph], isLand?'landscape':'portrait'); }
-          var iw=canvas.width, ih=canvas.height, r=Math.min(pw/iw, ph/ih); // アスペクト保持(潰れ防止)
-          var w=iw*r, h=ih*r, ox=(pw-w)/2;
-          doc.addImage(canvas.toDataURL('image/jpeg',0.92), 'JPEG', ox, 0, w, h);
+          // ★ページを画像の比率に合わせる=必ず横幅いっぱい・歪めない・左右余白も作らない(環境差でcanvas比がズレても幅いっぱい)
+          var iw=canvas.width, ih=canvas.height, W=W0, H=Math.max(1, Math.round(W*ih/iw));
+          if(!doc){ doc=new window.jspdf.jsPDF({ orientation:(W>H?'landscape':'portrait'), unit:'pt', format:[W,H] }); }
+          else { doc.addPage([W,H], (W>H?'landscape':'portrait')); }
+          doc.addImage(canvas.toDataURL('image/jpeg',0.92), 'JPEG', 0, 0, W, H);
           i++; next();
         }).catch(function(){ i++; next(); });
       })();
