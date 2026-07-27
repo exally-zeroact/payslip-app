@@ -163,12 +163,17 @@
     var target=idoc&&idoc.querySelector('.sheet,.page');
     if(!target || !(window.html2canvas) || !(window.jspdf&&window.jspdf.jsPDF)){ try{ window.print(); }catch(e){} return; } // 保険=ライブラリ未読込ならブラウザ印刷
     if(load){ load.style.display=''; load.textContent='PDFを作成中…'; }
-    window.html2canvas(target, { scale:3, backgroundColor:'#ffffff', useCORS:true, width:_psW, windowWidth:_psW }).then(function(canvas){
+    // ★A4寸法を固定で焼く(width/height両方指定)=iOSでも必ずA4比率のcanvasになる(縦潰れ防止)。
+    var CW=_isLand?1123:794, CH=_isLand?794:1123;
+    window.html2canvas(target, { scale:3, backgroundColor:'#ffffff', useCORS:true, width:CW, height:CH, windowWidth:CW, windowHeight:CH }).then(function(canvas){
       try{
         var jsPDF=window.jspdf.jsPDF;
         var pw=_isLand?842:595, ph=_isLand?595:842; // A4 pt
         var doc=new jsPDF({ orientation:_isLand?'landscape':'portrait', unit:'pt', format:[pw,ph] });
-        doc.addImage(canvas.toDataURL('image/jpeg',0.92), 'JPEG', 0, 0, pw, ph);
+        // ★アスペクト比を絶対に歪めない(潰れ防止)。canvasがA4比なら全面・ズレてもレターボックスで歪めない。
+        var iw=canvas.width, ih=canvas.height, r=Math.min(pw/iw, ph/ih);
+        var w=iw*r, h=ih*r, ox=(pw-w)/2, oy=0;
+        doc.addImage(canvas.toDataURL('image/jpeg',0.92), 'JPEG', ox, oy, w, h);
         doc.save('給与明細.pdf');
         if(load){ load.style.display='none'; }
       }catch(e){ if(load){ load.textContent='PDFの作成に失敗しました。時間をおいて再度お試しください。'; setTimeout(function(){ if(load)load.style.display='none'; },2200); } }
