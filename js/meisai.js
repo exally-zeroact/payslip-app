@@ -176,7 +176,12 @@
         //   幅いっぱいで載せ、はみ出た下端(明細の空白部分)はA4ページで自然に収まる=環境差でも常に幅いっぱい。
         var iw=canvas.width, ih=canvas.height;
         doc.addImage(canvas.toDataURL('image/jpeg',0.92), 'JPEG', 0, 0, pw, pw*ih/iw);
-        doc.save('給与明細.pdf');
+        // ★PDFの受け渡し=代行請求書アプリと同じ「blobを新しいタブで開く」方式。
+        //   doc.save()(ダウンロード)はiOSで WebKitBlobResourceエラー が出るため不使用。ポップアップ不可時のみsaveにフォールバック。
+        var url=URL.createObjectURL(doc.output('blob'));
+        var w=window.open(url,'_blank');
+        if(!w){ try{ doc.save('給与明細.pdf'); }catch(e){} }
+        setTimeout(function(){ try{ URL.revokeObjectURL(url); }catch(e){} }, 60000);
         if(load){ load.style.display='none'; }
       }catch(e){ if(load){ load.textContent='PDFの作成に失敗しました。時間をおいて再度お試しください。'; setTimeout(function(){ if(load)load.style.display='none'; },2200); } }
     }).catch(function(){ if(load){ load.textContent='PDFの作成に失敗しました。時間をおいて再度お試しください。'; setTimeout(function(){ if(load)load.style.display='none'; },2200); } });
