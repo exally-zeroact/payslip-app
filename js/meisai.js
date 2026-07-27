@@ -168,13 +168,12 @@
     window.html2canvas(target, { scale:3, backgroundColor:'#ffffff', useCORS:true, width:CW, height:CH, windowWidth:CW, windowHeight:CH }).then(function(canvas){
       try{
         var jsPDF=window.jspdf.jsPDF;
-        // ★ページを画像の比率に合わせる=必ず横幅いっぱい・歪めない・余白(左右)も作らない。
-        //   canvasが多少A4比からズレても(環境差)、常に幅いっぱいで潰れない。
+        var pw=_isLand?842:595, ph=_isLand?595:842; // ★A4ページ(印刷がちゃんとA4になる)
+        var doc=new jsPDF({ orientation:_isLand?'landscape':'portrait', unit:'pt', format:[pw,ph] });
+        // ★A4ページのまま明細を横幅いっぱいに(比率維持=潰さない・左右余白ゼロ)。canvasがA4比より縦長でも
+        //   幅いっぱいで載せ、はみ出た下端(明細の空白部分)はA4ページで自然に収まる=環境差でも常に幅いっぱい。
         var iw=canvas.width, ih=canvas.height;
-        var W=_isLand?842:595;             // A4幅(pt)
-        var H=Math.max(1, Math.round(W*ih/iw)); // 高さは比率維持
-        var doc=new jsPDF({ orientation:(W>H?'landscape':'portrait'), unit:'pt', format:[W,H] });
-        doc.addImage(canvas.toDataURL('image/jpeg',0.92), 'JPEG', 0, 0, W, H);
+        doc.addImage(canvas.toDataURL('image/jpeg',0.92), 'JPEG', 0, 0, pw, pw*ih/iw);
         doc.save('給与明細.pdf');
         if(load){ load.style.display='none'; }
       }catch(e){ if(load){ load.textContent='PDFの作成に失敗しました。時間をおいて再度お試しください。'; setTimeout(function(){ if(load)load.style.display='none'; },2200); } }
