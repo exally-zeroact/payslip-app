@@ -125,22 +125,34 @@
           _psH=natH; f.style.height=natH+'px';
           fitFrame();
           if(load){ load.style.display='none'; }
+          // ★レイアウト確定のタイミングがiOSで遅れることがあるので複数回フィット(幅0で空振りした分を拾う)
+          try{ requestAnimationFrame(fitFrame); }catch(e){}
+          setTimeout(fitFrame, 250); setTimeout(fitFrame, 600);
         }catch(e){ fitFrame(); if(load){ load.style.display='none'; } }
       }, 120);
     };
     f.srcdoc=html;
   }
-  // iframe(原寸_psW×_psH)を preview-wrap の内幅にフィットさせる
+  // iframe(原寸_psW×_psH)を preview-wrap の内幅にフィットさせる。
+  //   ★transformは「見た目」だけ縮小しレイアウトの箱は原寸のまま=横にはみ出て横スクロール+巨大余白になる。
+  //     負マージンで箱ごと縮めて溢れを消す(本体アプリのfitPreviewと同方式・iOSで実績あり)。
   function fitFrame(){
     var f=$('frame'); if(!f) return;
     var wrap=f.parentNode; if(!wrap) return;
-    var avail=wrap.clientWidth - 24; // padding 12+12
+    var cw=wrap.clientWidth || Math.round(wrap.getBoundingClientRect().width) || document.documentElement.clientWidth;
+    var avail=cw - 24; // padding 12+12
     if(avail<=0) return;
-    var scale=Math.min(1, avail/_psW);
-    f.style.transform='scale('+scale+')';
-    wrap.style.height=(_psH*scale + 24)+'px';
+    var s=Math.min(1, avail/_psW);
+    f.style.transformOrigin='top left';
+    f.style.transform='scale('+s+')';
+    f.style.marginRight=(-(_psW*(1-s)))+'px';   // レイアウト箱の幅を縮小分だけ詰める=横スクロール消滅
+    f.style.marginBottom=(-(_psH*(1-s)))+'px';  // 高さも詰める=下の巨大余白消滅
+    wrap.style.height='';                        // 折り畳んだiframeが高さを決める(明示height不要)
   }
   window.addEventListener('resize', function(){ var v=$('sc-view'); if(v && !v.classList.contains('hidden')) fitFrame(); });
+  // ★レイアウト確定/画面回転で確実にフィットさせる(iOSはonload直後に幅が0のことがある対策)
+  var _ro=null;
+  try{ if(window.ResizeObserver){ _ro=new ResizeObserver(function(){ var v=$('sc-view'); if(v && !v.classList.contains('hidden')) fitFrame(); }); _ro.observe($('frame').parentNode); } }catch(e){}
   $('v-back').addEventListener('click', function(){ renderList(); show('sc-list'); });
   // PDFで保存 = ★jsPDFで自前生成(A4ぴったり1ページ・ブラウザのURL/日付フッター無し)。
   //   iOSのwebページ印刷(window.print)はURL/日付フッターが必ず付き、その余白ぶんで2ページ目(空白)が出るため不使用。
