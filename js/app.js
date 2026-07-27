@@ -3043,8 +3043,7 @@
     items=(items||[]).filter(function(it){ return it&&it.url; }); if(!items.length){ uiAlert('公開中のWeb明細がありません。'); return; }
     var cards=items.map(function(it){ var svg=qrSvg(it.url,190);
       return '<div class="qc">'+svg+'<div class="qn">'+esc(it.name||'')+'</div>'
-        +(it.initCode?'<div class="qi">初回コード：<b>'+esc(it.initCode)+'</b></div>':'<div class="qi" style="color:#2E7D54">設定済み</div>')
-        +'<div class="qh">スマホのカメラでこのQRを読み取り→初回だけ「初回コード」で自分のパスワードを設定してください。</div>'
+        +'<div class="qh">スマホのカメラでこのQRを読み取り→初回だけ自分のパスワードを決めてください（次回からはパスワードだけ）。</div>'
         +'<div class="qu">'+esc(it.url)+'</div></div>'; }).join('');
     // ★新窓(window.open)は使わない=スマホ/ホーム画面アプリで開けず「戻れない」ため。アプリ内オーバーレイで表示＋任意で印刷。
     var css='.qc{border:1px dashed #9ac3ad;border-radius:10px;padding:12px;width:230px;max-width:100%;text-align:center;page-break-inside:avoid;box-sizing:border-box}.qc svg{width:180px;height:180px}.qn{font-weight:700;font-size:14px;margin:6px 0 2px}.qi{font-size:12px;margin:2px 0}.qh{font-size:10px;color:#5C7E6C;margin:6px 0 4px;line-height:1.5}.qu{font-size:8.5px;color:#8aa89a;word-break:break-all}';
@@ -3082,16 +3081,17 @@
       card.style.display=list.length?'':'none'; if(!list.length){ host.innerHTML=''; return; }
       var unread=0; list.forEach(function(p){ (p.docs||[]).forEach(function(d){ if(!d.openedAt)unread++; }); });
       var origin=(location.origin&&location.origin.indexOf('http')===0)?location.origin+location.pathname.replace(/[^\/]*$/,''):'';
-      host.innerHTML='<p class="hint" style="margin:-4px 0 10px">従業員に<b>リンク（QR）＋初回コード</b>を最初に一度だけ渡してください（LINE/メール/手渡し）。初回だけコードで自分のパスワードを設定→以後はパスワードだけ。<b>「今月を確定」すると、その月は自動でここに公開</b>され、従業員はいつでもどの月でも見られます（毎回「Web明細で公開」を押す必要はありません）。'+(unread?'<b style="color:#92500A"> 未読 '+unread+'件</b>':' <b style="color:#2E7D54">全員が閲覧済み</b>')+'</p>'
+      host.innerHTML='<p class="hint" style="margin:-4px 0 10px">従業員に<b>リンク（QR）</b>を最初に一度だけ渡してください（LINE/メール/手渡し）。<b>リンクが鍵</b>なので本人にだけ。従業員は開いて<b>自分のパスワードを決めるだけ</b>→以後はパスワードだけ。<b>「今月を確定」すると、その月は自動でここに公開</b>され、従業員はいつでもどの月でも見られます（毎回「Web明細で公開」を押す必要はありません）。'+(unread?'<b style="color:#92500A"> 未読 '+unread+'件</b>':' <b style="color:#2E7D54">全員が閲覧済み</b>')+'</p>'
         +'<div style="margin:0 0 10px"><button class="btn-ghost wm-qrall" style="padding:8px 12px;font-size:12px">全員のQRコードを印刷</button></div>'
         +list.map(function(p){
           var ds=(p.docs||[]).slice().sort(function(a,b){return (b.ym||'').localeCompare(a.ym||'');});
           var openedTxt=ds.map(function(d){ return esc(d.ym)+(d.kind==='bonus'?'賞':'')+(d.openedAt?'✓':'<span style="color:#C0392B">未</span>'); }).join(' ');
           var pwState=p.hasPassword?'<span style="font-size:10.5px;color:#2E7D54">パスワード設定済</span>':'<span style="font-size:10.5px;color:#92500A">パスワード未設定</span>';
           var consentState=p.consentAt?'<span style="font-size:10.5px;color:#2E7D54">・同意済</span>':'<span style="font-size:10.5px;color:#92500A">・未同意</span>';
-          var codeRow = (!p.hasPassword && p.initCode)
-            ? '<div style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:#3D6B53;min-width:52px">初回コード</span><input class="finput num" readonly value="'+attr(p.initCode)+'" style="flex:1;font-size:13px;letter-spacing:.12em;padding:7px 9px" onclick="this.select()"><button class="btn-ghost wm-copy" data-link="'+attr(p.initCode)+'" style="padding:7px 10px;font-size:11px">コピー</button></div>'
-            : '<div style="font-size:10.5px;color:#5C7E6C;margin-top:5px">初回コードは設定後に非表示（忘れた/漏れたら「再発行」）<button class="btn-ghost wm-reissue" data-token="'+attr(p.token)+'" style="padding:4px 8px;font-size:10.5px;margin-left:6px">初回コード再発行</button></div>';
+          // 初回コードはリンク(?c=)に内包=従業員は入力不要。会社は「リンク(QR)を本人に渡す」だけ。漏れたら「リンク再発行」で旧リンクを無効化。
+          var codeRow = '<div style="font-size:10.5px;color:#5C7E6C;margin-top:5px">'
+            +(p.hasPassword ? 'パスワード設定済み。' : 'このリンク（QR）を開くと本人がパスワードを設定します。')
+            +'<b>リンクは本人にだけ渡してください</b>（リンクが鍵）。<button class="btn-ghost wm-reissue" data-token="'+attr(p.token)+'" style="padding:4px 8px;font-size:10.5px;margin-left:6px">リンク再発行（前のを無効化）</button></div>';
           // 配布用URL: パスワード未設定の間は初回コードを ?c= で埋め込む→従業員はスキャン/リンクを開くだけでコード自動入力→パスワードを決めるだけ(手間最小)。設定後はコード不要なので付けない。
           var handoutUrl = origin+p.link + ((!p.hasPassword && p.initCode) ? ('&c='+encodeURIComponent(p.initCode)) : '');
           return '<div style="border:1px solid #d4eae0;border-radius:10px;padding:9px 11px;margin-bottom:7px">'

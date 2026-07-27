@@ -23,7 +23,7 @@
   Store.meisaiAuth(token, savedDev).then(function(r){
     if(!r || !r.found){ show('sc-bad'); return; }
     if(r.remembered){ cred={ deviceToken:savedDev }; afterAuth(r.name); return; }   // 記憶済→パスワード省略
-    if(!r.hasPassword){ if(initFromUrl){ var sc=$('setup-code'); if(sc) sc.value=initFromUrl; } show('sc-setup'); return; } // 初回=パスワード設定(コードはURLから自動入力)
+    if(!r.hasPassword){ show('sc-setup'); return; }                                  // 初回=パスワード設定(コードはリンクに内包・従業員は入力不要)
     show('sc-login');                                                                // 2回目以降=パスワード
   });
 
@@ -36,15 +36,15 @@
     });
   }
 
-  // ① 初回パスワード設定(会社発行の初回コード＋新パスワード)
+  // ① 初回パスワード設定(コードはリンク(?c=)に内包=従業員はパスワードを決めるだけ)
   $('setup-go').addEventListener('click', function(){
-    var code=($('setup-code').value||'').trim(), pw=$('setup-pw').value||'', pw2=$('setup-pw2').value||'';
+    var code=initFromUrl, pw=$('setup-pw').value||'', pw2=$('setup-pw2').value||'';
     $('setup-err').textContent='';
-    if(!code){ $('setup-err').textContent='会社から渡された初回コードを入力してください。'; return; }
+    if(!code){ $('setup-err').textContent='このリンクが正しくありません。会社から届いた最新のリンク（QR）をそのまま開いてください。'; return; }
     if(pw.length<8){ $('setup-err').textContent='パスワードは8文字以上にしてください。'; return; }
     if(pw!==pw2){ $('setup-err').textContent='パスワード(確認)が一致しません。'; return; }
     Store.meisaiSetPassword(token, code, pw).then(function(r){
-      if(!r || !r.ok){ $('setup-err').textContent = (r&&r.locked)?'初回コードを何度も間違えたため、しばらくロックされています。時間をおいて再度お試しください。':(r&&r.weak)?'パスワードは8文字以上にしてください。':(r&&r.badInit)?('初回コードが違います。'+(r.remaining!=null?'（あと'+r.remaining+'回でロックされます）':'')):(r&&r.alreadySet)?'すでにパスワードが設定済みです。ログインしてください。':'設定できませんでした。'; if(r&&r.alreadySet)show('sc-login'); return; }
+      if(!r || !r.ok){ $('setup-err').textContent = (r&&r.locked)?'しばらくロックされています。時間をおいて再度お試しください。':(r&&r.weak)?'パスワードは8文字以上にしてください。':(r&&r.badInit)?'このリンクが正しくありません。会社から届いた最新のリンク（QR）をそのまま開いてください。':(r&&r.alreadySet)?'すでにパスワードが設定済みです。ログインしてください。':'設定できませんでした。'; if(r&&r.alreadySet)show('sc-login'); return; }
       // 設定できたらそのままパスワードでログイン→端末記憶
       loginWith(pw);
     });

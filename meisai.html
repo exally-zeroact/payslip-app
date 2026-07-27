@@ -77,11 +77,9 @@ body{font-family:'Noto Sans JP',sans-serif;color:#1a4a2e;background:#F0FAF4;-web
   <!-- ②a 初回パスワード設定(会社発行の初回コード＋自分のパスワード) -->
   <div class="card hidden" id="sc-setup">
     <h2>はじめての設定</h2>
-    <p class="lead">初回だけ設定します。会社から渡された<b>初回コード</b>を入れて、<b>自分のパスワード</b>を決めてください。<br>次回からはパスワードだけ（この端末では省略）で開けます。</p>
+    <p class="lead">初回だけ、<b>自分のパスワード</b>を決めてください。<br>次回からはこのパスワードだけ（この端末では省略）で開けます。</p>
     <div style="margin-top:14px">
-      <label class="lbl">初回コード（会社から受け取ったもの）</label>
-      <input class="finput num" id="setup-code" maxlength="8" placeholder="例：ABCD2345" autocomplete="off" autocapitalize="characters">
-      <label class="lbl" style="margin-top:12px">パスワード（8文字以上・自分で決める）</label>
+      <label class="lbl">パスワード（8文字以上・自分で決める）</label>
       <input class="finput" id="setup-pw" type="password" placeholder="パスワード" autocomplete="new-password">
       <label class="lbl" style="margin-top:12px">パスワード（確認）</label>
       <input class="finput" id="setup-pw2" type="password" placeholder="もう一度" autocomplete="new-password">
