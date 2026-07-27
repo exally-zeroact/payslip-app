@@ -2670,7 +2670,10 @@
     }
     var people=isBonus?buildBonusPeople(emps):buildPeople(emps);
     var doc=isBonus?{month:bonusMonthLabel(),kind:'bonus'}:{month:monthLabel()};
-    var out=Render.build(people, doc, state.prefer, state.theme);
+    // ★1人だけの時は必ず1人用・縦向き(全幅)で。会社の複数人テンプレ(例:col1_3=3人横)のままだと1人が横幅の1/3しか
+    //   埋めず両側が白(縮んで見える)ため。複数人の時は会社が選んだテンプレ(state.prefer)を使う。
+    var prefer=(people.length===1)?'col2_1':state.prefer;
+    var out=Render.build(people, doc, prefer, state.theme);
     var f=$('#frame'); f.srcdoc=out.html;
     var pw=out.orientation==='landscape'?1123:794, ph=out.orientation==='landscape'?794:1123;
     f.style.width=pw+'px'; f.style.height=ph+'px'; f.style.transformOrigin='top left';

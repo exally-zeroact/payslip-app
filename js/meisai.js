@@ -101,7 +101,9 @@
       if(d.kind==='gensen'){ html=data.gensenHtml||'<!doctype html><html><head><meta charset="UTF-8"></head><body><p style="padding:16px">源泉徴収票を表示できませんでした。</p></body></html>'; }
       else {
         var people=[data.person||{}], doc=data.doc||{month:ymLabel(d.ym,d.kind), kind:d.kind};
-        var out=window.Render.build(people, doc, data.prefer, data.theme);
+        // ★従業員の明細は常に1人=1人用・縦向き(hero)で全幅表示。会社の複数人テンプレ(例:col1_3=3人横)だと
+        //   1人分が横幅の1/3しか埋めず両側が白(縮んで見える)ため、data.preferに関わらずcol2_1に固定。
+        var out=window.Render.build(people, doc, 'col2_1', data.theme);
         html=out.html; if(out.orientation==='landscape'){ pw=1123; ph=794; _isLand=true; }
       }
     }catch(e){ return; }
