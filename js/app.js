@@ -118,6 +118,7 @@
     annual:{ t:'💡 年間の休み', b:'1年間の休日数（例：120日）。\nフルタイム(1日8時間)だと法律の目安は約105日以上。少ないと「年間の労働時間が法律の目安を超える」と黄色で教えますが、残業として割増計算すれば<b>保存も計算もできます</b>（ブロックしません）。' },
     design:{ t:'💡 明細のデザイン', b:'給与明細の見た目を決めます（ここが毎月の既定）。\n\n● <b>レイアウト</b>…縦1人（1人1枚）／2カラム（1枚に2人）／横ストリップ（横向きに数人）。人数が多くても<b>自動で複数ページに分けて全員</b>出ます。\n● <b>色</b>…アクセント・罫線・文字を別々に。Excelで使える色から選べます。\n● <b>初期設定に戻す</b>…レイアウトと色を最初の状態に戻します。\n\n印刷タブで「その回だけ」変えることもできます。' },
     workstatus:{ t:'💡 就業状況（産休・育休・休職など）', b:'休んでいる人の区分です。給与計算に自動で反映します（すべて手で調整できます）。\n\n● <b>産休・育休</b>…社会保険（健保・厚年・介護）が<b>免除</b>＝自動で0に。給与は無給が一般的（入力で調整）。出産手当金・育児休業給付金は健保/雇用保険から出るお金で<b>給与には含めません</b>。\n● <b>介護休・病気休職</b>…社会保険は<b>継続</b>（無給でも本人負担が出ます）。介護休業給付金・傷病手当金は別途（給与でない）。\n● <b>休業（会社都合）</b>…<b>休業手当＝平均賃金の60%以上</b>を支給に入れます（課税・社保の対象）。\n\n※自動の社保オフは「法定控除」のチップで個別に戻せます。' },
+    houshu:{ t:'💡 源泉区分（報酬・料金の源泉徴収／所得税法204条）', b:'業務委託でも、<b>所得税法204条の掲載報酬</b>を払う場合は源泉徴収が必要です（区分ごとに計算式が違います）。\n\n● <b>非該当（運転代行・運送・軽貨物 等）</b>…源泉なし・支払調書なし（既定）。<b>全部の業務委託に源泉は掛けません。</b>\n● <b>一般・士業（原稿料/講演/デザイン/弁護士/税理士 等）</b>…支払額×10.21%（1回100万円超の部分は20.42%）。\n● <b>司法書士等</b>…（支払額−1万円）×10.21%。\n● <b>外交員等</b>…（その月の報酬−12万円※同月の給与控除後）×10.21%。\n● <b>その他（要確認）</b>…区分が曖昧なら非該当扱い（源泉なし）にして、当たる場合のみ具体区分を選択。\n\n税額は復興特別所得税込み（×1.021）・1円未満切り捨て。対象額は原則<b>税込</b>。支払調書は同一人・年間で 士業/原稿料 5万円超・外交員等 50万円超 で提出（翌年1/31）。<b>最終判断は会社</b>（アプリは目安・ブロックしません）。' },
     emptype:{ t:'💡 雇用形態（従業員／業務委託）', b:'給与計算の大枠を決めます。\n\n● <b>従業員（正社員/パート）</b>…労働者。社会保険・源泉徴収・住民税・年末調整あり（従来どおり）。\n● <b>業務委託（個人事業主）</b>…外注先への<b>報酬</b>。<b>控除なしの報酬明細</b>（源泉・社保・住民税・年末調整なし＝支給＝支払額）。運転代行・運送などの外注はこちら。\n\n【源泉徴収】業務委託でも源泉が要るのは原稿料・デザイン・士業・モデル・ホステス等の<b>限定8区分だけ</b>。運転・運送は対象外＝源泉しません（国税庁No.2792）。\n\n【偽装請負に注意】契約が業務委託でも、<b>実態が労働者</b>なら社会保険・労働法の対象になり得ます（総合判断）。当てはまる要素が多いと「従業員の可能性」を黄色でお知らせします（ブロックはしません・最終判断は会社で）。' },
     taxclass:{ t:'💡 所得税の区分（甲・乙・丙）', b:'所得税の源泉徴収の区分です。\n\n● <b>甲欄</b>…「扶養控除等申告書」を提出している人（＝メインの勤務先）。扶養を加味して計算。通常はこちら。\n● <b>乙欄</b>…申告書を未提出の人（副業・掛け持ちの2か所目など）。税率が高め・扶養は加味しません。\n● <b>丙欄</b>…<b>日雇い</b>（日々雇い入れられる人・継続2か月以内）。日額表 丙欄×出勤日数で計算。2か月を超えたら甲/乙へ。\n\n年分（令和7/令和8）は給与の対象月から自動で正しい税額表を選びます。' },
     shahoTiming:{ t:'💡 社会保険料の当月／翌月徴収', b:'社会保険料（健保・厚年・介護）を<b>いつの給与から天引きするか</b>です。\n\n● <b>翌月徴収</b>（法律の原則・健保167条/厚年84条）…前月分の保険料を当月の給与から控除。<b>入社した月は天引きなし</b>（翌月から）、<b>月末退職の月は2か月分</b>（前月＋当月）を最終給与から控除。\n● <b>当月徴収</b>…当月分をその月の給与から控除（会社の慣行）。\n\n※このアプリの既定は<b>当月</b>（今までの計算と同じ）。翌月に切り替えると入社月・退職月の天引きが上記のとおり変わります。雇用保険はどちらも実支払額×率です。' },
@@ -167,6 +168,7 @@
   // ライブラリは const SHAKAIHOKEN_HYO 定義で window に付かない→bare参照で取得
   function SHH(){ try{ if(typeof SHAKAIHOKEN_HYO!=='undefined'&&SHAKAIHOKEN_HYO) return SHAKAIHOKEN_HYO; }catch(e){} return (typeof window!=='undefined'&&window.SHAKAIHOKEN_HYO)||null; }
   function SAI(){ try{ if(typeof SAITEI_CHINGIN!=='undefined'&&SAITEI_CHINGIN) return SAITEI_CHINGIN; }catch(e){} return (typeof window!=='undefined'&&window.SAITEI_CHINGIN)||null; }
+  function SC(){ try{ if(typeof ShiharaiChosho!=='undefined'&&ShiharaiChosho) return ShiharaiChosho; }catch(e){} return (typeof window!=='undefined'&&window.ShiharaiChosho)||null; } // K3 支払調書/源泉
   // 最賃算入判定(最賃法4条3項・施行規則1条)。★最賃に算入しないのは=割増(所定外/休日/深夜)・通勤・家族・精皆勤・臨時/1か月超(賞与等)・控除行・基本給(baseで別計上)★。
   //  それ以外の手当(役職/職務/住宅/技能/資格/営業/地域/調整/食事/単身赴任 等)は算入。割増基礎(isInBasis)とは除外リストが異なる=別関数。
   function isInMinWage(label){
@@ -305,7 +307,7 @@
   function prefRate(code, payYm){ var S=SHH(); if(S&&S.getKenko){ var k=S.getKenko(code,payYm); var sh=S.getShienkin?S.getShienkin(payYm):0; return k.jugyoin+sh; } var K=(S&&S.KENKO_RITSU)||{}; return (K[code]&&K[code].jugyoin)||0.04955; }
 
   function defEmp(name){
-    return { id:uid(), name:name||'山田 太郎', no:'', birthYmd:'1980-05-15', dept:'', role:'', employmentType:'employee',
+    return { id:uid(), name:name||'山田 太郎', no:'', birthYmd:'1980-05-15', dept:'', role:'', employmentType:'employee', houshuKubun:'none',
       payType:'月給', base:'250000', hourly:'1200', commissionAmt:'', hourlyGuarantee:'', salesAmt:'', pieceCount:'', payRule:null, fuyou:'1', nenshoFuyo:'', pref:'tokyo', commute:'8400', commuteType:'public', commuteKm:'', residentTax:'12500', residentTaxMode:'monthly', residentTaxAnnual:'', residentTaxIkkatsu:false, juminCollect:'special', bank:'',
       furiBankName:'', furiBankNo:'', furiBranchName:'', furiBranchNo:'', furiYokin:'普通', furiAccount:'', furiKana:'',
       annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0', dailyEntries:[],
@@ -513,7 +515,10 @@
     var effTaxClass=(e.taxClass==='hei' && e.payType!=='日給') ? 'ko' : e.taxClass; // 丙×非日給は甲で計算
     // 甲欄のみ: 本人の人的加算(障害者/寡婦orひとり親/勤労学生)を扶養親族等の数に足す(乙/丙は対象外)
     var effFuyou=num(e.fuyou)+jintekiOf(e, effTaxClass);
-    var r=PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:effFuyou, taxClass:effTaxClass, heiTaxAmount:heiAmt, residentTax:residentTaxOf(e), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:apply, extraKojo:e.extraKojo, shahoMonth:_shMonth, shahoMult:_shMult, employmentType:e.employmentType });
+    // ★K3 業務委託=204条掲載報酬の源泉(区分該当時のみ)。対象額=支給合計(税込・安全側)。非該当(代行)は0=控除ゼロ維持。
+    var contractorGensen=0;
+    if(e.employmentType==='contractor'){ var _SC=SC(); if(_SC){ var _payG=shikyu.reduce(function(a,x){return a+num(x.value);},0); contractorGensen=_SC.gensenFor(e.houshuKubun, _payG, {monthlySalary:0}); } }
+    var r=PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:effFuyou, taxClass:effTaxClass, heiTaxAmount:heiAmt, residentTax:residentTaxOf(e), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:apply, extraKojo:e.extraKojo, shahoMonth:_shMonth, shahoMult:_shMult, employmentType:e.employmentType, contractorGensen:contractorGensen });
     if(e.employmentType!=='contractor') applyNenchoAdj(e, r); // 年末調整の過不足を反映(業務委託=年調なし=対象外)
     return r;
   }
@@ -820,6 +825,23 @@
       +'<div style="display:flex;gap:6px;align-items:center"><input class="finput parse-in" data-i="'+i+'" placeholder="例：売上の3.5割か時給1200の高い方"><button class="btn-ghost parse-go" data-i="'+i+'" style="white-space:nowrap;padding:9px 12px">読み取る</button></div></div>'
       +'<div class="hint" style="margin:2px 2px 8px">給料の決め方を言葉で書いて「読み取る」→ 内容を"数字例つき"で確認して設定できます（時給/月給/日給/歩合/売上×率/件数×単価/固定＋歩合/高い方/段階制「◯万まで◯％超◯％」）。</div>';
   }
+  // K3 源泉区分セレクタ(業務委託のみ)。該当区分=源泉プレビュー・非該当/その他=源泉なしの注記。
+  function houshuKubunRow(e){
+    var _SC=SC(); if(!_SC) return '';
+    var cur=e.houshuKubun||'none';
+    var opts=_SC.KUBUN_ORDER.map(function(k){ var o=_SC.KUBUN[k]; return '<option value="'+k+'"'+(cur===k?' selected':'')+'>'+esc(o.label)+'</option>'; }).join('');
+    var k=_SC.kubunOf(cur), note='';
+    if(k.gensen){
+      var r=compute(e); var g=(r&&r.kojo)?r.kojo.filter(function(x){return /源泉/.test(x.label);}).reduce(function(a,x){return a+num(x.value);},0):0;
+      note='<div class="hint" style="margin:2px 2px 8px;color:#3B7A5A">この区分は<b>源泉徴収の対象</b>＝明細に「源泉徴収税」が出ます（当月概算 '+yen(g)+'）。支払調書は年間'+(k.threshold?yen(k.threshold)+'超':'')+'で提出対象。対象額は<b>税込</b>で計算します。</div>';
+    } else if(cur==='sonota'){
+      note='<div class="hint" style="margin:2px 2px 8px;color:#8A5A00">区分が曖昧な時は「その他（非該当扱い）」＝源泉なし。掲載報酬に当たる場合のみ具体区分を選択（掛け過ぎ厳禁・最終判断は会社）。</div>';
+    } else {
+      note='<div class="hint" style="margin:2px 2px 8px;color:#6E907E">非該当（運転代行・運送等）＝源泉なし・支払調書の対象外（支給＝支払額）。</div>';
+    }
+    return '<div class="frow" style="margin:2px 2px 2px"><div class="flabel">源泉区分<span class="hint2">204条・該当時のみ源泉</span><span class="help-i" data-help="houshu">💡</span></div>'
+      +'<select class="finput m-f" data-f="houshuKubun">'+opts+'</select></div>'+note;
+  }
   function empCardBody(e,i){
     var dOpen=!!state.open['D'+e.id];
     var payField=(e.payType==='時給'?'hourly':e.payType==='歩合'?'hourlyGuarantee':'base');
@@ -840,8 +862,9 @@
           +'<li>本人が他人に代わってもらえない（代替不可）</li>'
           +'<li>報酬が時間・日給ベースで、欠勤控除や残業手当がある</li>'
           +'</ul><div style="font-size:11px;color:#6E907E;margin-top:5px">補足：車両・機材が会社負担／他社の仕事ができない専属 も労働者性を強めます。最終判断は総合判断＝このアプリは<b>可能性の目安</b>で、ブロックはしません。</div>'
-          +'<div style="font-size:11px;color:#8A5A00;margin-top:5px">※ 士業・原稿料・デザイン料など<b>源泉徴収が必要な報酬</b>（所得税法204条の8区分）は「源泉なし」の対象外です（別途・K3で対応予定）。運転代行・運送の外注は源泉不要（現状のまま）。</div></details></div>'
+          +'<div style="font-size:11px;color:#8A5A00;margin-top:5px">※ 士業・原稿料・デザイン料など<b>源泉徴収が必要な報酬</b>（所得税法204条）は、下の<b>「源泉区分」</b>で選ぶと明細に源泉が反映されます。運転代行・運送は源泉不要＝「非該当」のまま。</div></details></div>'
         : '')
+      +(isContractor ? houshuKubunRow(e) : '')
       +(e.payType==='カスタム'
         ? '<div class="frow"><div class="flabel">給与形態</div><select class="finput m-f" data-f="payType">'+PAYTYPES.map(function(p){return '<option'+(p===e.payType?' selected':'')+'>'+p+'</option>';}).join('')+'</select></div>'+payRuleEditor(e,i)
         : '<div class="frow2"><div class="frow"><div class="flabel">給与形態</div><select class="finput m-f" data-f="payType">'+PAYTYPES.map(function(p){return '<option'+(p===e.payType?' selected':'')+'>'+p+'</option>';}).join('')+'</select></div>'
@@ -1874,7 +1897,8 @@
     +'<button class="seg-b'+(v==='santei'?' on':'')+'" data-cho="santei">算定基礎届</button>'
     +'<button class="seg-b'+(v==='gekkaku'?' on':'')+'" data-cho="gekkaku">月額変更届</button>'
     +'<button class="seg-b'+(v==='roudou'?' on':'')+'" data-cho="roudou">労働保険</button>'
-    +'<button class="seg-b'+(v==='shikaku'?' on':'')+'" data-cho="shikaku">資格取得・喪失</button></div>'; }
+    +'<button class="seg-b'+(v==='shikaku'?' on':'')+'" data-cho="shikaku">資格取得・喪失</button>'
+    +'<button class="seg-b'+(v==='chosho'?' on':'')+'" data-cho="chosho">支払調書</button></div>'; }
   // 算定基礎届: 確定済みの4〜6月明細(総支給・支払基礎日数)から各人の標準報酬を決定して一覧化(年金機構提出の素)。
   var SANTEI_COLS=['被保険者整理番号','氏名','生年月日','従前(健保)','従前(厚年)','4月 日数','4月 報酬','5月 日数','5月 報酬','6月 日数','6月 報酬','総計','平均額','決定 標準報酬(健保)','等級(健保)','決定 標準報酬(厚年)','等級(厚年)','備考'];
   function santeiRows(recs, year, emps){
@@ -2070,9 +2094,47 @@
     else if(v==='gekkaku'){ host.innerHTML=sub+'<div class="card"><div class="card-h">月額変更届</div><p class="hint">読込中…</p></div>'; renderGekkaku(sub); }
     else if(v==='roudou'){ host.innerHTML=sub+'<div class="card"><div class="card-h">労働保険</div><p class="hint">読込中…</p></div>'; renderRoudou(sub); }
     else if(v==='shikaku'){ renderShikaku(sub); }
+    else if(v==='chosho'){ host.innerHTML=sub+'<div class="card"><div class="card-h">支払調書</div><p class="hint">読込中…</p></div>'; renderChosho(sub); }
     else host.innerHTML=sub+shakaiListHTML(); }
+  // K3 支払調書: 業務委託の年間支払(確定済み月次のshikyuTotal)＋源泉(tax)を人ごとに集計→区分別に提出基準判定。
+  function choshoPeople(recs){ var _SC=SC(); if(!_SC) return [];
+    return (state.employees||[]).filter(function(e){ return e.employmentType==='contractor'; }).map(function(e){
+      var mine=recs.filter(function(r){ return r.employee_id===e.id; });
+      return { name:e.name, kubun:e.houshuKubun||'none',
+        annualPay:mine.reduce(function(a,r){ return a+num(r.data&&r.data.shikyuTotal); },0),
+        annualGensen:mine.reduce(function(a,r){ return a+num(r.data&&r.data.tax); },0) }; }); }
+  function renderChosho(sub){ var host=$('#view-cho'); if(!host)return; var _SC=SC();
+    var year=parseInt(String(state.month||'').slice(0,4),10)||2026;
+    if(!_SC){ host.innerHTML=sub+'<div class="card"><div class="card-h">支払調書</div><p class="hint">ライブラリ未ロード</p></div>'; return; }
+    Store.getPayslipsByYm(year+'-01', year+'-12').then(function(recs){
+      recs=confirmedRecs(recs).filter(function(r){ return r.data.kind!=='bonus'; });
+      state._choshoRows=_SC.choshoRows(choshoPeople(recs));
+      host.innerHTML=sub+choshoHTML(state._choshoRows, year); }); }
+  function choshoHTML(rows, year){
+    var targets=rows.filter(function(r){ return r.target; }), others=rows.filter(function(r){ return !r.target; });
+    var h='<div class="card"><div class="card-h">支払調書（報酬・料金等） '+year+'年<span class="help-i" data-help="houshu">💡</span></div>'
+      +'<p class="hint" style="margin:0 2px 8px">業務委託のうち所得税法204条の掲載報酬で年間の提出基準を超えた人が対象（翌年1/31提出）。<b>運転代行・運送等の非該当はデフォルトで対象外</b>。金額は確定済みの月次明細から集計（税込）。個人番号は各自記入・マイナンバーは扱いません。</p>';
+    if(!rows.length){ return h+'<div class="empty">業務委託の従業員がいません（雇用形態＝業務委託で登録）。</div></div>'; }
+    h+='<div class="sec-lb">提出対象 '+targets.length+'名</div>';
+    if(targets.length){
+      h+='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:1px solid #d4eae0;color:#3D6B53"><th style="text-align:left;padding:6px 4px">氏名</th><th style="text-align:left;padding:6px 4px">区分</th><th style="text-align:right;padding:6px 4px">年間支払(税込)</th><th style="text-align:right;padding:6px 4px">源泉徴収税</th></tr></thead><tbody>';
+      h+=targets.map(function(r){ return '<tr style="border-bottom:1px solid #eef6f1"><td style="padding:6px 4px">'+esc(r.name)+'</td><td style="padding:6px 4px;font-size:11px;color:#527A66">'+esc(r.kubunLabel)+'</td><td style="text-align:right;padding:6px 4px">'+yen(r.annualPay)+'</td><td style="text-align:right;padding:6px 4px">'+yen(r.annualGensen)+'</td></tr>'; }).join('');
+      h+='</tbody></table><div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn" data-choxlsx="chosho" style="padding:10px 18px;border:none;border-radius:10px;background:#2E7D54;color:#fff;font-weight:700;cursor:pointer">支払調書をExcel出力</button></div>';
+    } else { h+='<div class="empty">提出基準を超える対象者はいません。</div>'; }
+    if(others.length){ h+='<div class="sec-lb" style="margin-top:12px">対象外 '+others.length+'名</div>'
+      +'<div class="hint" style="margin:0 2px">'+others.map(function(r){ return '<div style="padding:3px 0">'+esc(r.name)+'（'+esc(r.kubunLabel)+'）… '+esc(r.reason)+'</div>'; }).join('')+'</div>'; }
+    return h+'</div>'; }
+  function choshoAoa(rows, year){ var co=(state.company||{});
+    var aoa=[['支払調書（報酬、料金、契約金及び賞金の支払調書）'],['支払者：'+(co.name||'')],['対象年：'+year+'年（提出期限 翌年1月31日）'],[],
+      ['氏名','区分','年間支払額(税込)','源泉徴収税額','摘要']];
+    (rows||[]).filter(function(r){ return r.target; }).forEach(function(r){ aoa.push([r.name, r.kubunLabel, r.annualPay, r.annualGensen, '']); });
+    aoa.push([]); aoa.push(['※個人番号(マイナンバー)は各自記入。本表はマイナンバーを扱いません。']);
+    aoa.push(['※提出基準未満・204条非該当（運転代行・運送等）は本表の対象外です。']); return aoa; }
   function downloadChoXlsx(kind){ if(!window.PayslipXlsx) return; var co=(state.company||{}).name, mlabel=monthLabel().replace(/ /g,'');
     if(kind==='shakai'){ PayslipXlsx.downloadSheets([{name:'社保一覧', aoa:PayslipXlsx.shakaiListAOA(shakaiRows(),{company:co,monthLabel:mlabel})}], {filename:'社保一覧_'+state.month+'.xlsx'}); return; }
+    if(kind==='chosho'){ var cyr=parseInt(String(state.month||'').slice(0,4),10)||2026; var crows=(state._choshoRows||[]).filter(function(r){return r.target;});
+      if(!crows.length){ uiAlert('支払調書の提出対象者がいません（区分・提出基準を確認）。'); return; }
+      PayslipXlsx.downloadSheets([{name:'支払調書'+cyr, aoa:choshoAoa(state._choshoRows,cyr)}], {filename:'支払調書_'+cyr+'.xlsx'}); return; }
     if(kind==='dept'){ var g=CD().deptGroups(deptRows()); PayslipXlsx.downloadSheets([{name:'部署別集計', aoa:PayslipXlsx.deptSummaryAOA(g,{company:co,monthLabel:mlabel})}], {filename:'部署別集計_'+state.month+'.xlsx'}); return; }
     if(kind==='daicho'){ var year=parseInt(String(state.month||'').slice(0,4),10)||2026;
       Store.getPayslipsByYm(year+'-01',year+'-12').then(function(recs){ recs=confirmedRecs(recs).filter(function(r){return r.data.kind!=='bonus';}); var L=CD().buildLedger(recs,year,state.employees); // 賃金台帳(月次)は賞与除外
@@ -2838,7 +2900,7 @@
       if((f==='dept'||f==='role')&&ev.target.value==='__new'){ var label=f==='dept'?'部署':'役職'; var fld=f; uiPrompt('新しい'+label+'名を入力').then(function(nv){ nv=(nv||'').trim(); if(nv){ var list=fld==='dept'?state.depts:state.roles; if(list.indexOf(nv)<0)list.push(nv); emp[fld]=nv; } renderEmpMaster(); }); return; }
       emp[f]=ev.target.value; if(ev.target.classList.contains('num')){ emp[f]=String(num(ev.target.value)); ev.target.value=fmtN(emp[f]); }
       if(f==='workStatus'){ if(!emp.apply)emp.apply={}; var off=(emp.workStatus==='sankyu'||emp.workStatus==='ikukyu'); ['health','pension','kaigo'].forEach(function(k){ if(off) emp.apply[k]=false; else delete emp.apply[k]; }); }
-      if(f==='payType'||f==='dept'||f==='role'||f==='commuteType'||f==='workStatus'||f==='residentTaxMode'||f==='residentTaxAnnual'||f==='taishokuYmd'||f==='minWageReduce') renderEmpMaster(); // minWageReduce=減額特例率→最賃警告を再判定
+      if(f==='payType'||f==='dept'||f==='role'||f==='commuteType'||f==='workStatus'||f==='residentTaxMode'||f==='residentTaxAnnual'||f==='taishokuYmd'||f==='minWageReduce'||f==='houshuKubun') renderEmpMaster(); // minWageReduce=最賃警告再判定 / houshuKubun=源泉区分の注記・源泉プレビュー更新
     });
     el.addEventListener('input',function(ev){ var card=ev.target.closest('.mco'); if(!card)return; var i=+card.dataset.i; var emp=state.employees[i]; var t=ev.target;
       if(!emp.shaho)emp.shaho={mode:'teiji',months:[]};

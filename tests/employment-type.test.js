@@ -50,6 +50,19 @@ T('業務委託は emp.apply を変異させない(従業員に戻すと復元)'
   ok(r.si.total > 0 && r.incomeTax > 0, '従業員に戻すとフル控除に回帰');
 });
 
+T('K3 業務委託の源泉(contractorGensen)=控除に「源泉徴収税」で載る・非該当は控除ゼロ', function () {
+  // 該当区分=源泉あり(app側がShiharaiChoshoで算出しcontractorGensenで渡す)
+  var r = PayslipCalc.computePayslip(baseEmp({ employmentType: 'contractor', contractorGensen: 5105,
+    shikyu: [{ label: '原稿料', value: 50000 }] }));
+  eq(r.si.total, 0, '社保は0のまま(業務委託)');
+  ok(r.kojo.some(function (k) { return k.label === '源泉徴収税' && k.value === 5105; }), '源泉徴収税5,105が控除に');
+  eq(r.kojoTotal, 5105, '控除計=源泉のみ');
+  eq(r.net, 50000 - 5105, '手取り=報酬−源泉');
+  // 非該当(contractorGensen未指定/0)=控除ゼロ回帰
+  var r0 = PayslipCalc.computePayslip(baseEmp({ employmentType: 'contractor', shikyu: [{ label: '報酬', value: 50000 }] }));
+  eq(r0.kojoTotal, 0, '非該当=控除ゼロ'); eq(r0.net, 50000, '非該当=支給=支払額');
+});
+
 T('業務委託でも extraKojo(任意の手動控除)は尊重=法定だけオフ', function () {
   var r = PayslipCalc.computePayslip(baseEmp({ employmentType: 'contractor', extraKojo: [{ label: '材料費相殺', value: 5000 }] }));
   eq(r.si.total, 0, '法定社保は0');

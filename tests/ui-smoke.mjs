@@ -767,6 +767,17 @@ T('K2 期間分割: 従業員は概算の黄警告・業務委託は警告なし
   A.state.company.shimeMethod = 'monthly'; e.dailyEntries = []; e.employmentType = 'employee';
 });
 
+T('K3 源泉区分の配線: 業務委託で該当区分=明細に源泉・非該当(代行)=控除ゼロ', function () {
+  const e = A.state.employees[0];
+  e.employmentType = 'contractor'; e.houshuKubun = 'none'; A.state.month = '2026-06';
+  ok(A.compute(e).kojoTotal === 0, '非該当(代行)=控除ゼロ(支給=支払額)');
+  e.houshuKubun = 'ippan';
+  const r = A.compute(e);
+  ok(r.kojo.some(k => /源泉/.test(k.label) && k.value > 0), '一般/士業=源泉徴収税が控除に載る');
+  ok(r.net === r.shikyuTotal - r.kojoTotal, '手取り=支給−源泉');
+  e.houshuKubun = 'none'; e.employmentType = 'employee'; // 後片付け
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });
