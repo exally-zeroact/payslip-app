@@ -32,6 +32,8 @@ jobs:
         run: node tests/cloud-sync.mjs
       - name: Meisai store (Web明細 公開一覧フィルタ＋削除時リンク失効・docs物理削除しない)
         run: node tests/meisai-store.mjs
+      - name: Login signup分岐 (メール確認ON=確認メール待機画面・確認OFF即ログインは回帰なし)
+        run: node tests/exally-login.test.mjs
       - name: Cache-buster stamp guard (全HTMLが現在の内容ハッシュ ?v= で貼られているか=貼り忘れ検知)
         run: node scripts/stamp-build.mjs --check
       - name: Statutory drift guard (lib == 中央statutory)

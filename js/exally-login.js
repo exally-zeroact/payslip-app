@@ -91,41 +91,68 @@
       ov.id = "loginOv";
       document.body.appendChild(ov);
     }
-    ov.innerHTML =
-      '<div class="login-card">' +
-      '<div class="login-logo">Exally <span>エクサリー</span></div>' +
-      '<div class="login-title">' +
-      esc(o.app || "") +
-      "</div>" +
-      '<div class="login-sub">メールでログイン</div>' +
-      '<input class="login-inp" id="loginEmail" type="email" inputmode="email" ' +
-      'autocomplete="email" placeholder="メールアドレス">' +
-      '<input class="login-inp" id="loginPass" type="password" ' +
-      'autocomplete="current-password" placeholder="パスワード（6文字以上）">' +
-      '<div class="login-err" id="loginErr"></div>' +
-      '<button class="login-btn login-btn-main" type="button" id="btnLogin">ログイン</button>' +
-      // 折り返しの位置は自分で決める（機種任せだと語の途中で割れる）
-      '<div class="login-mid">はじめての方は、メールとパスワードを<br>' +
-      "入力してから新規登録ボタンを押して下さい</div>" +
-      '<button class="login-btn login-btn-sub" type="button" id="btnSignup">新規登録</button>' +
-      '<div class="login-note">' +
-      esc(o.note || "一度ログインすれば、次からは自動で入れます。") +
-      "</div>" +
-      "</div>";
-
     var $ = function (id) {
       return document.getElementById(id);
     };
+    // ログイン入力カードを描画（初回＋「戻る」からの復帰で使う）。ハンドラも都度バインドし直す。
+    function renderLoginCard() {
+      ov.innerHTML =
+        '<div class="login-card">' +
+        '<div class="login-logo">Exally <span>エクサリー</span></div>' +
+        '<div class="login-title">' +
+        esc(o.app || "") +
+        "</div>" +
+        '<div class="login-sub">メールでログイン</div>' +
+        '<input class="login-inp" id="loginEmail" type="email" inputmode="email" ' +
+        'autocomplete="email" placeholder="メールアドレス">' +
+        '<input class="login-inp" id="loginPass" type="password" ' +
+        'autocomplete="current-password" placeholder="パスワード（6文字以上）">' +
+        '<div class="login-err" id="loginErr"></div>' +
+        '<button class="login-btn login-btn-main" type="button" id="btnLogin">ログイン</button>' +
+        // 折り返しの位置は自分で決める（機種任せだと語の途中で割れる）
+        '<div class="login-mid">はじめての方は、メールとパスワードを<br>' +
+        "入力してから新規登録ボタンを押して下さい</div>" +
+        '<button class="login-btn login-btn-sub" type="button" id="btnSignup">新規登録</button>' +
+        '<div class="login-note">' +
+        esc(o.note || "一度ログインすれば、次からは自動で入れます。") +
+        "</div>" +
+        "</div>";
+      $("btnLogin").onclick = login;
+      $("btnSignup").onclick = signup;
+      $("loginPass").onkeydown = function (ev) {
+        if (ev.key === "Enter") login();
+      };
+    }
+    // ★メール確認ON: 登録直後はセッションが無い＝まだ入れない。確認メールの案内(待機画面)を出す。
+    //  「Email not confirmed」で失敗するauto-loginは試みない（誤案内の元）。確認リンクを開くと
+    //  supabaseがセッション付きで戻す→store.jsのsession復元(detectSessionInUrl)＋auth.jsのonChangeでログイン成立。
+    function showConfirmSent(email) {
+      ov.innerHTML =
+        '<div class="login-card">' +
+        '<div class="login-logo">Exally <span>エクサリー</span></div>' +
+        '<div class="login-title">確認メールを送りました</div>' +
+        '<div class="login-sub">' + esc(email) + " 宛</div>" +
+        '<p class="login-note" id="loginConfirmSent" style="margin-top:6px;line-height:1.8">' +
+        "届いたメールのリンクを開くと、登録が完了してそのまま使えます。<br>" +
+        "メールが見つからないときは、迷惑メールフォルダもご確認ください。" +
+        "</p>" +
+        '<button class="login-btn login-btn-sub" type="button" id="btnBackLogin">ログイン画面へ戻る</button>' +
+        "</div>";
+      $("btnBackLogin").onclick = renderLoginCard;
+    }
     function err(msg) {
-      $("loginErr").textContent = msg || "";
+      var e = $("loginErr");
+      if (e) e.textContent = msg || ""; // 待機画面では#loginErrが無い→ガード
     }
     function busy(on) {
-      $("btnLogin").disabled = on;
-      $("btnSignup").disabled = on;
+      var a = $("btnLogin"), b = $("btnSignup");
+      if (a) a.disabled = on;
+      if (b) b.disabled = on;
     }
     function ok(user) {
       err("");
-      $("loginPass").value = "";
+      var p = $("loginPass");
+      if (p) p.value = "";
       hide();
       if (o.onLogin) o.onLogin(user);
     }
@@ -164,31 +191,21 @@
       err("");
       busy(true);
       var r = await sb.auth.signUp({ email: email, password: pass });
+      busy(false);
       if (r.error) {
-        busy(false);
         err(friendly(r.error));
         return;
       }
-      // メール確認オフのときは、登録の直後にそのまま入れる
-      if (r.data.session) {
-        busy(false);
+      // メール確認オフ=登録の直後にセッションが返る→そのまま入れる(既存動作)
+      if (r.data && r.data.session) {
         ok(r.data.user);
         return;
       }
-      var li = await sb.auth.signInWithPassword({ email: email, password: pass });
-      busy(false);
-      if (li.error) {
-        err("登録できました。そのままログインしてください");
-        return;
-      }
-      ok(li.data.user);
+      // ★メール確認オン=セッションが無い→確認メールの待機画面。auto-loginは試みない。
+      showConfirmSent(email);
     }
 
-    $("btnLogin").onclick = login;
-    $("btnSignup").onclick = signup;
-    $("loginPass").onkeydown = function (ev) {
-      if (ev.key === "Enter") login();
-    };
+    renderLoginCard();
 
     return { show: show, hide: hide, error: err, el: ov };
   }

@@ -7,8 +7,11 @@
   var LS_KEY = 'payslip_batches_v1';
   var hasSupa = !!(global.SUPA && global.SUPA.url && global.SUPA.key && global.supabase);
   var sb = hasSupa ? global.supabase.createClient(global.SUPA.url, global.SUPA.key, {
-    // ログイン状態を端末に保持(iOSホーム画面PWA等でも維持を狙う)。detectSessionInUrl=false(メール+パスのみ・URL解析不要)。
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+    // ログイン状態を端末に保持(iOSホーム画面PWA等でも維持を狙う)。
+    // ★detectSessionInUrl=true: メール確認リンク(確認ON時)で戻ると URL に access/refresh トークンが載る→
+    //   これを解析してセッションを成立させる為に必要。通常のメール+パスワードのみの利用では URL にトークンが
+    //   無いので副作用なし(=既定値true・回帰なし)。確認OFFのままでも安全。
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
   }) : null;
 
   function lsAll(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch(e){ return []; } }
