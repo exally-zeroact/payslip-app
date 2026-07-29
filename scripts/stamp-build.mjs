@@ -24,13 +24,15 @@ function buildHash() {
     const dir = path.join(ROOT, d);
     if (!fs.existsSync(dir)) continue;
     for (const f of fs.readdirSync(dir).sort()) {
-      if (/\.(js|css)$/.test(f)) files.push(path.join(d, f));
+      if (/\.(js|css)$/.test(f)) files.push(d + '/' + f); // ★relは常にスラッシュ=OS(Windows\ vs Linux/)差でハッシュがブレない
     }
   }
   files.sort();
   for (const rel of files) {
     hash.update(rel + '\n');
-    hash.update(fs.readFileSync(path.join(ROOT, rel)));
+    // ★行末を LF に正規化してからハッシュ=CRLF(Windows)/LF(CI Linux)でブレない(決定論)。
+    const body = fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    hash.update(body, 'utf8');
     hash.update('\0');
   }
   return hash.digest('hex').slice(0, 8);
