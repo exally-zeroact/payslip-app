@@ -16,7 +16,7 @@ function near(a, b, tol, m) { if (Math.abs(a - b) > (tol || 1)) throw new Error(
 
 function loadApp() {
   let html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-  const srcs = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]).filter(s => !/^https?:/.test(s) && !/supabase|supa-config|auth/.test(s));
+  const srcs = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1].replace(/\?.*$/, '')).filter(s => !/^https?:/.test(s) && !/supabase|supa-config|auth/.test(s));
   const dom = new JSDOM(html.replace(/<script[\s\S]*?<\/script>/g, ''), { runScripts: 'dangerously', url: 'http://localhost/', pretendToBeVisual: true });
   const win = dom.window; win.fetch = () => Promise.reject(new Error('no net'));
   for (const src of srcs) { const el = win.document.createElement('script'); el.textContent = fs.readFileSync(path.join(ROOT, src), 'utf8'); win.document.body.appendChild(el); }
