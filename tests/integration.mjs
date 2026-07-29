@@ -23,7 +23,7 @@ function ok(c, m) { if (!c) throw new Error(m || 'expected truthy'); }
 function loadApp() {
   let html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   // ローカルscriptの順序を index.html から取得(外部CDN/supabase/認証は除外=ログイン無しローカルモード)
-  const srcs = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1])
+  const srcs = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1].replace(/\?.*$/, ''))
     .filter(s => !/^https?:/.test(s) && !/supabase|supa-config|auth/.test(s));
   // 全script除去したDOMだけのHTMLを作る
   const domHtml = html.replace(/<script[\s\S]*?<\/script>/g, '');

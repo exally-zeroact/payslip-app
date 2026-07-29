@@ -30,5 +30,9 @@ jobs:
         run: node tests/ui-smoke.mjs
       - name: Cloud sync (保存層・Supabaseモックで全項目保存/差分削除ガード/保存成否)
         run: node tests/cloud-sync.mjs
+      - name: Meisai store (Web明細 公開一覧フィルタ＋削除時リンク失効・docs物理削除しない)
+        run: node tests/meisai-store.mjs
+      - name: Cache-buster stamp guard (全HTMLが現在の内容ハッシュ ?v= で貼られているか=貼り忘れ検知)
+        run: node scripts/stamp-build.mjs --check
       - name: Statutory drift guard (lib == 中央statutory)
         run: node scripts/verify-statutory.mjs
