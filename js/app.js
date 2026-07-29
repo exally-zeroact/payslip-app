@@ -322,6 +322,33 @@
     if(!off.length) return '';
     return '<div class="cr-warn" style="margin:6px 2px 0">⚠ '+off.join('・')+'をオフにしています。<b>短時間労働者などの適用除外</b>でなければ、常用の方は<b>加入が必要</b>です（健保法・厚年法。最終判断は会社でご確認ください）。</div>';
   }
+  // 正社員(通常労働者)の週所定労働時間 = 1日の所定 × 週の労働日数(7 − 休みの曜日数)。会社設定から導出。未設定は法定上限40hで代用。
+  function fullTimeWeeklyH(){
+    var c=state.company||{};
+    var dwh=num(c.dailyWorkH)+num(c.dailyWorkM)/60; if(dwh<=0) return 40;
+    var offDays=((c.holidays||[]).length); var workDays=7-offDays; if(workDays<=0||workDays>7) workDays=5;
+    var h=dwh*workDays; return (h>0&&h<=60)?h:40; // 常識外の値は40hで代用(誤判定防止)
+  }
+  // その人の「所定内 月額賃金」推定(社保88,000円判定用)。残業/賞与/通勤/家族/精皆勤は含めない=最賃算入賃金と同じ考え方。
+  //  時給=時給×(週所定×52/12)/ 日給=日給×月所定日数概算 / 月給等=基本給+最賃算入手当。あくまで概算(黄警告の入口・最終は会社確認)。
+  function shoteiMonthlyWage(e){
+    var wk=num(e.weeklyScheduledH);
+    if(e.payType==='時給'){ return Math.round(num(e.hourly)*(wk>0?wk*52/12:0)); }
+    if(e.payType==='日給'){ var dwh=num((e.dailyWorkH!=''&&e.dailyWorkH!=null)?e.dailyWorkH:(state.company||{}).dailyWorkH)+num((e.dailyWorkM!=''&&e.dailyWorkM!=null)?e.dailyWorkM:(state.company||{}).dailyWorkM)/60; var days=(dwh>0&&wk>0)?(wk/dwh*52/12):0; return Math.round(num(e.base)*days); }
+    return num(e.base)+(minWageTeate?num(minWageTeate(e)):0); // 月給/役員/歩合/カスタム=基本給+最賃算入手当
+  }
+  // ②社保 加入判定の黄警告(短時間労働者)。lib/shaho-kanyu.js。役員/業務委託/休職・既に社保オンは対象外。誤警告ゼロ最優先。
+  function shahoKanyuWarn(e){
+    var SK=(typeof ShahoKanyu!=='undefined')?ShahoKanyu:(window&&window.ShahoKanyu); if(!SK) return '';
+    if(!e||e.employmentType==='contractor'||e.payType==='役員'||(e.workStatus&&e.workStatus!=='normal')) return '';
+    var wk=num(e.weeklyScheduledH); if(wk<=0) return ''; // 週所定未入力=判定材料なし(誤警告しない)
+    var ap=e.apply||{}, alreadyOn=(ap.health!==false)&&(ap.pension!==false); // 既に健保・厚年オン=加入済み→注意不要
+    if(alreadyOn) return '';
+    var r=SK.judge({ weeklyH:wk, fullTimeWeeklyH:fullTimeWeeklyH(), monthlyShoteiWage:shoteiMonthlyWage(e),
+      isStudent:!!e.honninKinrou, tokuteiTekiyo:!!(state.company&&state.company.shakaTokutei), ym:state.month });
+    if(!r.required) return '';
+    return '<div class="cr-warn" style="margin:6px 2px 0">⚠ この方は<b>社会保険（健康保険・厚生年金）の加入対象の可能性</b>があります（'+esc(r.reasons.join('／'))+'）。健保・厚年をオフにしています。最終判断は会社・年金事務所でご確認ください。</div>';
+  }
   // 対象月の法定値(社保料率・所得税額表・最低賃金)が未収録年度なら暫定計算の黄警告(silent-wrong防止)。値は捏造せず直近収録値で暫定。
   function statutoryStaleWarn(){
     var msgs=[]; var S=SHH();
@@ -353,7 +380,7 @@
     return { id:uid(), name:name||'従業員 1', no:'', birthYmd:'1980-05-15', dept:'', role:'', employmentType:'employee', houshuKubun:'none',
       payType:'月給', base:'', hourly:'', commissionAmt:'', hourlyGuarantee:'', salesAmt:'', pieceCount:'', payRule:null, fuyou:'1', nenshoFuyo:'', pref:'tokyo', commute:'', commuteType:'public', commuteKm:'', residentTax:'', residentTaxMode:'monthly', residentTaxAnnual:'', residentTaxIkkatsu:false, juminCollect:'special', bank:'',
       furiBankName:'', furiBankNo:'', furiBranchName:'', furiBranchNo:'', furiYokin:'普通', furiAccount:'', furiKana:'',
-      annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0', dailyEntries:[],
+      annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0', weeklyScheduledH:'', dailyEntries:[],
       kintai:[{label:'出勤日数',value:'21'},{label:'欠勤日数',value:'0'},{label:'有給取得',value:'1'}],
       shikyu:[{label:'基本給',value:''}],
       apply:{}, taxClass:'ko', honninShogai:false, honninKafuHitorioya:'', honninKinrou:false, shortTimeType:'', minWageReduce:'', retired:false, workStatus:'normal', leavePay:'', leaveStartYmd:'', leaveEndYmd:'', leaveDaysInMonth:'',
@@ -367,7 +394,7 @@
   var RULE_ITEMS=[['teikyu','休みの日'],['companyHol','会社独自の休日'],['shotei','1日の働く時間'],['annual','年間の休み'],['warimashiRate','割増の率'],['koyoGyoshu','雇用保険の業種'],['paymentDays','支払基礎日数の数え方'],['shahoTiming','社保の当月／翌月徴収'],['kekkin','欠勤控除の計算'],['minashi','固定残業（みなし）'],['daikyu','代休・振替休日'],['shoyo','賞与の有無']];
   // 会社の既定値(毎回新規オブジェクト=共有参照事故防止)。ロード時はこれにマージ=古い保存で欠けた項目がundefinedにならない。
   function defCompany(){ return { name:'株式会社 ゼロアクト',addr:'',close:'末日',paydayRel:'next',paydayDay:'25', payCycle:'monthly', shimeMethod:'monthly', shimeN:'10',
-      holidays:[0], dailyWorkH:'8', dailyWorkM:'0', annualHolidays:'120',
+      holidays:[0], dailyWorkH:'8', dailyWorkM:'0', annualHolidays:'120', shakaTokutei:false,
       ruleOn:{teikyu:true,shotei:true,annual:true,warimashiRate:true,koyoGyoshu:true},
       rateOt:'', rateHoliday:'', rateNight:'', rateOver60:'', gyoshu:'ippan', rousaiRate:'',
       furiCode:'', furiName:'', furiBankNo:'', furiBankName:'', furiBranchNo:'', furiBranchName:'', furiYokin:'普通', furiAccount:'', furiDate:'' }; }
@@ -709,6 +736,10 @@
   }
   function renderCompanyRules(){
     var host=$('#rule-host'); if(!host)return; var c=state.company, on=c.ruleOn||{}, h='';
+    // 社保の特定適用事業所(厚年被保険者51人以上)トグル。パートの社保「適用拡大」判定をONにする（既定OFF=小さい会社では出さない）。
+    h+='<div class="cr-item" style="border:1px solid #E4EFE9;border-radius:12px;padding:10px 12px;margin-bottom:10px">'
+      +'<label class="cr-chk" style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:#2E7D54;cursor:pointer"><input type="checkbox" data-cf="shakaTokutei"'+(c.shakaTokutei?' checked':'')+'>社会保険 51人以上（特定適用事業所）</label>'
+      +'<div class="ri-note" style="margin-top:5px">厚生年金の被保険者が<b>常時51人以上</b>の会社はチェック。パートでも<b>週20時間以上・月88,000円以上・学生でない・2か月超の見込み</b>で社保加入の対象になります（2024年10月〜）。<b>50人以下ならチェック不要</b>（この判定は出しません）。</div></div>';
     if(on.teikyu){ h+=ruleItemHTML('teikyu','休みの日は？','法定休日','teikyu',
       '<div class="wdays">'+WDAYS.map(function(d,i){return '<span class="wday'+((c.holidays||[]).indexOf(i)>=0?' on':'')+'" data-wd="'+i+'">'+d+'</span>';}).join('')+'</div><div class="ri-note">複数えらべます。法律上の休み(法定休日)は自動で特定。例：日曜だけ＝週休1日(現場系OK)。</div>'); }
     if(on.companyHol){
@@ -944,7 +975,9 @@
       +'<div class="frow"><div class="flabel">就業状況<span class="hint2">産休/育休/休職等</span><span class="help-i" data-help="workstatus">💡</span></div><select class="finput m-f" data-f="workStatus">'+WORK_STATUS.map(function(w){return '<option value="'+w[0]+'"'+((e.workStatus||'normal')===w[0]?' selected':'')+'>'+w[1]+'</option>';}).join('')+'</select>'+wsNoteHTML(e)+'</div>'
       +(empOnLeave(e)?'<div class="frow"><div class="flabel">休暇中の支給額<span class="hint2">円/月</span></div><input class="finput num m-f" data-f="leavePay" inputmode="numeric" value="'+attr(fmtN(e.leavePay))+'" placeholder="0（無給）"></div>':'')
       +'<div class="frow2"><div class="frow"><div class="flabel">年間所定休日<span class="hint2">日/年</span><span class="help-i" data-help="shoteibase">💡</span></div><input class="finput num m-f" data-f="annualHolidays" value="'+attr(e.annualHolidays)+'"></div>'
-        +'<div class="frow"><div class="flabel">1日の所定労働</div><span class="dur"><input class="finput m-f dur-in" data-f="dailyWorkH" inputmode="numeric" value="'+attr(e.dailyWorkH)+'"><i>時</i><input class="finput m-f dur-in" data-f="dailyWorkM" inputmode="numeric" value="'+attr(e.dailyWorkM)+'"><i>分</i></span></div></div>';
+        +'<div class="frow"><div class="flabel">1日の所定労働</div><span class="dur"><input class="finput m-f dur-in" data-f="dailyWorkH" inputmode="numeric" value="'+attr(e.dailyWorkH)+'"><i>時</i><input class="finput m-f dur-in" data-f="dailyWorkM" inputmode="numeric" value="'+attr(e.dailyWorkM)+'"><i>分</i></span></div></div>'
+      +'<div class="frow"><div class="flabel">週の所定労働時間<span class="hint2">時間/週・パートの社保判定に使用</span></div><input class="finput num m-f" data-f="weeklyScheduledH" inputmode="decimal" value="'+attr(e.weeklyScheduledH)+'" placeholder="例：20"></div>'
+      +'<div class="ri-note" style="margin:-4px 2px 8px">パート・アルバイトの<b>社会保険の加入対象か</b>の目安に使います（正社員の3/4以上、または週20時間以上など）。空欄なら判定しません。</div>';
     var gZei=''
       +'<div class="frow2"><div class="frow"><div class="flabel">扶養人数<span class="hint2">配偶者含・16歳以上</span><span class="help-i" data-help="fuyou">💡</span></div><input class="finput num m-f" data-f="fuyou" value="'+attr(e.fuyou)+'"></div>'
         +'<div class="frow"><div class="flabel">16歳未満の扶養<span class="hint2">人・住民税用</span></div><input class="finput num m-f" data-f="nenshoFuyo" inputmode="numeric" value="'+attr(e.nenshoFuyo)+'" placeholder="0"></div></div>'
@@ -979,7 +1012,7 @@
       +'<div class="chip-row">'+LEGAL_KOJO.map(function(lk){
           if(lk[0]==='kaigo'){ var kt=(window.PayrollCalc&&PayrollCalc.isKaigoTarget(e.birthYmd,state.month)); if(!kt) return '<span class="chip chip-dim" title="40〜64歳が対象。生年月日から自動">介護保険（対象外）</span>'; var ko=(e.apply&&e.apply.kaigo===false); return '<span class="chip chip-auto'+(ko?'':' on')+'" data-apply="kaigo" title="40〜64歳=自動で対象">'+(ko?'':'✓ ')+'介護保険（自動）</span>'; }
           var off=(e.apply&&e.apply[lk[0]]===false); return '<span class="chip chip-auto'+(off?'':' on')+'" data-apply="'+lk[0]+'">'+(off?'':'✓ ')+esc(lk[1])+'</span>';
-        }).join('')+'</div>'+shahoOffWarn(e);
+        }).join('')+'</div>'+shahoOffWarn(e)+shahoKanyuWarn(e);
     var gTeate=''
       +'<div class="frow"><div class="flabel">通勤方法</div><select class="finput m-f" data-f="commuteType"><option value="public"'+(e.commuteType!=='car'?' selected':'')+'>公共交通</option><option value="car"'+(e.commuteType==='car'?' selected':'')+'>マイカー等</option></select></div>'
       +(e.commuteType==='car'?'<div class="frow2"><div class="frow"><div class="flabel">片道距離<span class="hint2">km</span></div><input class="finput num m-f" data-f="commuteKm" value="'+attr(e.commuteKm)+'"></div><div class="frow"><div class="flabel">非課税限度<span class="hint2">自動</span></div><input class="finput num" value="'+yen(commuteLimit(e))+'" readonly style="background:#f7fcf9;color:#3D6B53"></div></div>':'<div class="hint" style="margin:-4px 0 10px">公共交通＝月15万まで非課税。マイカーは距離別（自動）。</div>')
@@ -2893,8 +2926,8 @@
       var cd=ev.target.closest('[data-coh-del]'); if(cd){ (state.company.companyHolidays||[]).splice(+cd.dataset.cohDel,1); renderCompanyRules(); return; }
       var x=ev.target.closest('[data-rule-x]'); if(x){ state.company.ruleOn[x.dataset.ruleX]=false; renderRuleChips(); renderCompanyRules(); return; }
     });
-    rh.addEventListener('input',function(ev){ if(ev.target.tagName==='SELECT')return; var f=ev.target.dataset.cf; if(f) state.company[f]=ev.target.value.replace(/[^0-9]/g,''); });
-    rh.addEventListener('change',function(ev){ if(ev.target.dataset.coh!=null){ state.company.companyHolidays=(state.company.companyHolidays||[]); state.company.companyHolidays[+ev.target.dataset.coh]=ev.target.value; return; } var f=ev.target.dataset.cf; if(f==='gyoshu'){ state.company.gyoshu=ev.target.value; return; } if(f==='shahoTiming'){ state.company.shahoTiming=ev.target.value; return; } if(f==='paymentDaysMethod'){ state.company.paymentDaysMethod=ev.target.value; return; } if(f==='kekkinMethod'){ state.company.kekkinMethod=ev.target.value; return; } if(f==='kanzenGekkyu'){ state.company.kanzenGekkyu=ev.target.checked; renderCompanyRules(); return; } if(f==='daikyuDeduct'){ state.company.daikyuDeduct=ev.target.checked; return; } if(f==='annualHolidays'||f==='dailyWorkH'||f==='dailyWorkM'||f==='rateOt'||f==='rateHoliday'||f==='rateNight'||f==='rateOver60') renderCompanyRules(); }); // 年間労働時間(32条)/割増率(37条)の黄警告をライブ更新
+    rh.addEventListener('input',function(ev){ if(ev.target.tagName==='SELECT'||ev.target.type==='checkbox')return; var f=ev.target.dataset.cf; if(f) state.company[f]=ev.target.value.replace(/[^0-9]/g,''); });
+    rh.addEventListener('change',function(ev){ if(ev.target.dataset.coh!=null){ state.company.companyHolidays=(state.company.companyHolidays||[]); state.company.companyHolidays[+ev.target.dataset.coh]=ev.target.value; return; } var f=ev.target.dataset.cf; if(f==='gyoshu'){ state.company.gyoshu=ev.target.value; return; } if(f==='shahoTiming'){ state.company.shahoTiming=ev.target.value; return; } if(f==='paymentDaysMethod'){ state.company.paymentDaysMethod=ev.target.value; return; } if(f==='kekkinMethod'){ state.company.kekkinMethod=ev.target.value; return; } if(f==='kanzenGekkyu'){ state.company.kanzenGekkyu=ev.target.checked; renderCompanyRules(); return; } if(f==='daikyuDeduct'){ state.company.daikyuDeduct=ev.target.checked; return; } if(f==='shakaTokutei'){ state.company.shakaTokutei=ev.target.checked; return; } if(f==='annualHolidays'||f==='dailyWorkH'||f==='dailyWorkM'||f==='rateOt'||f==='rateHoliday'||f==='rateNight'||f==='rateOver60') renderCompanyRules(); }); // 年間労働時間(32条)/割増率(37条)の黄警告をライブ更新
     $('#b-add-emp').addEventListener('click',function(){ var e=defEmp('従業員 '+(state.employees.length+1)); state.employees.push(e); state.open[e.id]=true; if($('#emp-search'))$('#emp-search').value=''; renderEmpMaster(); });
     (function(){ var es=$('#emp-search'); if(es) es.addEventListener('input', filterEmpSearch); })(); // 氏名検索(UX#9)
 
@@ -3292,7 +3325,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc, shimePeriods:shimePeriods, shimeSplit:shimeSplit,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, isInMinWage:isInMinWage, minWageTeate:minWageTeate, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, stType:stType, stLabel:stLabel, santeiRule:santeiRule, gekkakuTh:gekkakuTh, shahoBasisOf:shahoBasisOf, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, ymdPlus1:ymdPlus1, shikakuRows:shikakuRows, shikakuAoa:shikakuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc, applyMigrationRows:applyMigrationRows, buildEmpFromRow:buildEmpFromRow, prevYmOf:prevYmOf, applyLedgerToEmployees:applyLedgerToEmployees, importLedgerForMonth:importLedgerForMonth, payRuleCtx:payRuleCtx, monthYmdRange:monthYmdRange }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, isInMinWage:isInMinWage, minWageTeate:minWageTeate, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, stType:stType, stLabel:stLabel, santeiRule:santeiRule, gekkakuTh:gekkakuTh, shahoBasisOf:shahoBasisOf, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, ymdPlus1:ymdPlus1, shikakuRows:shikakuRows, shikakuAoa:shikakuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc, applyMigrationRows:applyMigrationRows, buildEmpFromRow:buildEmpFromRow, prevYmOf:prevYmOf, applyLedgerToEmployees:applyLedgerToEmployees, importLedgerForMonth:importLedgerForMonth, payRuleCtx:payRuleCtx, monthYmdRange:monthYmdRange, shahoKanyuWarn:shahoKanyuWarn, fullTimeWeeklyH:fullTimeWeeklyH, shoteiMonthlyWage:shoteiMonthlyWage }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

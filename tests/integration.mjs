@@ -356,5 +356,62 @@ T('K4: 月範囲 monthYmdRange が月初〜月末を返す(うるう/月末差)'
   eq(A.monthYmdRange('2026-11').to, '2026-11-30', '11月=30日');
 });
 
+// ── ② 社保 加入判定（誤警告ゼロ最優先）: app.js配線（週所定→判定→警告HTML） ──
+function empShaho(over) {
+  // 健保・厚年をオフにしたパート(時給)を作る。over で上書き。
+  return Object.assign(A.defEmp('パート'), { payType: '時給', hourly: '1500', weeklyScheduledH: '', honninKinrou: false,
+    apply: { health: false, pension: false } }, over || {});
+}
+T('② 3/4基準: 週30h(=正社員40h×3/4)で社保オフ → 加入対象の警告が出る(規模不問)', function () {
+  A.state.company.dailyWorkH = '8'; A.state.company.dailyWorkM = '0'; A.state.company.holidays = [0, 6]; // 週40h(月-金)
+  A.state.company.shakaTokutei = false; // 小さい会社でも3/4は出る
+  eq(A.fullTimeWeeklyH(), 40, '正社員週所定=8h×5日=40h');
+  const w = A.shahoKanyuWarn(empShaho({ weeklyScheduledH: '30' }));
+  ok(/加入対象の可能性/.test(w) && /3\/4/.test(w), '3/4警告が出る: ' + w.slice(0, 40));
+});
+T('★② 誤警告ゼロ: 特定適用OFF(小さい会社)は週25h・高月収でも適用拡大を出さない', function () {
+  A.state.company.dailyWorkH = '8'; A.state.company.holidays = [0, 6]; A.state.company.shakaTokutei = false;
+  // 週25h=3/4(30h)未満 → 3/4非該当。トグルOFF → 適用拡大も出さない → 警告なし。
+  const w = A.shahoKanyuWarn(empShaho({ weeklyScheduledH: '25', hourly: '2000' }));
+  eq(w, '', '★小さい会社では出さない(入らなくていいパートに誤警告しない)');
+});
+T('② 適用拡大: 特定適用ON+週25h(3/4未満)+月8.8万以上+非学生 → 加入対象の警告', function () {
+  A.state.company.dailyWorkH = '8'; A.state.company.holidays = [0, 6]; A.state.company.shakaTokutei = true;
+  // 時給2000×週25h×52/12 ≈ 216,666 ≥ 88,000
+  const w = A.shahoKanyuWarn(empShaho({ weeklyScheduledH: '25', hourly: '2000' }));
+  ok(/加入対象の可能性/.test(w) && /適用拡大/.test(w), '適用拡大警告: ' + w.slice(0, 40));
+});
+T('★② 学生は除外: 特定適用ON+週25h+高月収でも勤労学生なら出さない', function () {
+  A.state.company.shakaTokutei = true; A.state.company.holidays = [0, 6];
+  const w = A.shahoKanyuWarn(empShaho({ weeklyScheduledH: '25', hourly: '2000', honninKinrou: true }));
+  eq(w, '', '学生→適用拡大は出さない');
+});
+T('② 月88,000円未満は適用拡大を出さない(特定適用ON・週20h・低時給)', function () {
+  A.state.company.shakaTokutei = true; A.state.company.holidays = [0, 6];
+  // 時給1000×週20h×52/12 ≈ 86,666 < 88,000
+  const w = A.shahoKanyuWarn(empShaho({ weeklyScheduledH: '20', hourly: '1000' }));
+  eq(w, '', '月88,000円未満→出さない(概算約86,666)');
+});
+T('② 週所定 未入力なら判定しない(誤警告防止)', function () {
+  A.state.company.shakaTokutei = true;
+  eq(A.shahoKanyuWarn(empShaho({ weeklyScheduledH: '' })), '', '週所定空=出さない');
+});
+T('② 既に健保・厚年オンの人には注意を出さない(加入済み)', function () {
+  A.state.company.shakaTokutei = true; A.state.company.holidays = [0, 6];
+  const e = empShaho({ weeklyScheduledH: '30', apply: { health: true, pension: true } });
+  eq(A.shahoKanyuWarn(e), '', '社保オン=加入済み→注意不要');
+});
+T('② 業務委託・役員には出さない', function () {
+  A.state.company.shakaTokutei = true;
+  eq(A.shahoKanyuWarn(empShaho({ weeklyScheduledH: '40', employmentType: 'contractor' })), '', '業務委託は対象外');
+  eq(A.shahoKanyuWarn(empShaho({ weeklyScheduledH: '40', payType: '役員' })), '', '役員は対象外');
+});
+T('② 回帰: 従来の逆向き警告(社保オフ→加入かも)は残っている(月給・常用)', function () {
+  const e = Object.assign(A.defEmp('常用'), { payType: '月給', base: '300000', apply: { health: false, pension: false } });
+  // shahoKanyuWarnは週所定空で出ないが、既存のshahoOffWarnはcompute経由の別警告。ここでは共存(クラッシュしない)を確認。
+  ok(typeof A.shahoKanyuWarn(e) === 'string', 'shahoKanyuWarnは文字列を返す(週所定空=空文字)');
+  eq(A.shahoKanyuWarn(e), '', '週所定空なら②は出さない(逆向き警告は別途shahoOffWarnが担当)');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
