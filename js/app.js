@@ -98,8 +98,49 @@
     syncBasePay(e);
   }
   // spec+当月コンテキストで基本給を評価(PayRule)。ctx=労働時間/出勤日数/売上。
-  function payRuleCtx(e){ return { workMin:workedMin(e), workDays:kintaiVal(e,/出勤/), sales:num(e.salesAmt), commission:num(e.commissionAmt), count:num(e.pieceCount) }; }
+  //  ★K4: 台帳(pay_ledger)を取り込んだ月は e._ledgerCtx(台帳集計)を使う=二度手間ゼロ・単一ソース(§5-2)。
+  //     _ledgerCtx は `_`始まりなので保存されず、取り込みの度に台帳から再導出される。
+  function payRuleCtx(e){ if(e&&e._ledgerCtx) return e._ledgerCtx; return { workMin:workedMin(e), workDays:kintaiVal(e,/出勤/), sales:num(e.salesAmt), commission:num(e.commissionAmt), count:num(e.pieceCount) }; }
   function payRuleResult(e){ var pr=PR(); if(!pr)return null; ensurePayRule(e); return pr.basePay(e.payRule, payRuleCtx(e)); } // B5: payRule未初期化(null)でも既定を作ってから評価=基本給0の黙り込みを防ぐ
+  // ★K4: 台帳(pay_ledger)行を従業員ごとに単一ソース集計→各従業員に _ledgerCtx を載せる純関数(テスト対象)。
+  //  rows=[{employee_id,ymd,data}](Store.getLedgerの返り)。単一ソース(§5-2)=同じ(emp,ymd)は台帳のみ・dailyEntriesは台帳に無い日だけ補完。
+  //  返り: { applied:[名前...], matched, unmatched:[台帳にあるがKyuallyに居ないemployee_id...] }
+  function applyLedgerToEmployees(employees, rows){
+    var LA=(typeof LedgerAgg!=='undefined')?LedgerAgg:(window&&window.LedgerAgg); if(!LA) return { applied:[], matched:0, unmatched:[] };
+    (employees||[]).forEach(function(e){ if(e){ delete e._ledgerCtx; delete e._ledgerHikazei; } }); // 前回取り込みの残りを一旦消す(台帳から外れた人にstale ctxを残さない)
+    var byEmp={}; (rows||[]).forEach(function(r){ if(r&&r.employee_id) (byEmp[r.employee_id]=byEmp[r.employee_id]||[]).push(r); });
+    var empById={}; (employees||[]).forEach(function(e){ if(e&&e.id) empById[e.id]=e; });
+    var applied=[], unmatched=[];
+    Object.keys(byEmp).forEach(function(eid){
+      var e=empById[eid]; if(!e){ unmatched.push(eid); return; }
+      var dailyRows=(e.dailyEntries||[]).filter(function(d){return d&&d.ymd;}).map(function(d){
+        return { ymd:d.ymd, data:{ minutes:hmToMin(d.hm), amount:num(d.amount), count:num(d.count), hikazei:!!d.hikazei } };
+      });
+      var agg=LA.unifyEmployee(byEmp[eid], dailyRows); // 台帳=正・同日はdailyを捨てる(倍計上防止)
+      e._ledgerCtx=agg.ctx; e._ledgerHikazei=agg.hikazeiAmount;
+      applied.push(e.name||eid);
+    });
+    return { applied:applied, matched:applied.length, unmatched:unmatched };
+  }
+  // state.month('YYYY-MM')の月初〜月末(YYYY-MM-DD)。
+  function monthYmdRange(ym){ var s=String(ym||''); var y=parseInt(s.slice(0,4),10), m=parseInt(s.slice(5,7),10); if(!y||!m) return null;
+    var last=new Date(y, m, 0).getDate(); var mm=('0'+m).slice(-2); return { from:s.slice(0,7)+'-01', to:s.slice(0,7)+'-'+('0'+last).slice(-2) }; }
+  // ★台帳を当月ぶん読んで取り込む(二度手間ゼロ)。切れ検知(§1)=合計を出さず中止。
+  function importLedgerForMonth(){
+    if(!window.Store||!Store.getLedger){ uiAlert('クラウド未接続のため台帳を読めません。'); return Promise.resolve({ok:false,reason:'no-store'}); }
+    var rng=monthYmdRange(state.month); if(!rng){ uiAlert('対象月が不正です。'); return Promise.resolve({ok:false,reason:'bad-month'}); }
+    return Store.getLedger(rng.from, rng.to).then(function(res){
+      if(res&&res.error){ uiAlert('台帳の読み込みに失敗しました：'+res.error); return {ok:false,reason:'error'}; }
+      if(res&&res.truncated){ uiAlert('台帳の件数が多く、全部を読み切れませんでした（'+res.count+'件中'+res.rows.length+'件）。期間を短く分けて取り込んでください。合計がずれるため取り込みを中止しました。'); return {ok:false,reason:'truncated'}; }
+      var r=applyLedgerToEmployees(state.employees, (res&&res.rows)||[]);
+      renderInput(); if(typeof doPreview==='function') doPreview();
+      if(window.persistSaveDebounced) persistSaveDebounced();
+      var msg=r.matched?('台帳から'+r.matched+'人ぶんを取り込みました（'+state.month+'）。'):'当月の台帳データはありませんでした。';
+      if(r.unmatched&&r.unmatched.length) msg+='\n※ 台帳にあるがこのアプリに未登録の人が'+r.unmatched.length+'人います（従業員登録が必要です）。';
+      uiAlert(msg);
+      return {ok:true, matched:r.matched, unmatched:r.unmatched};
+    }).catch(function(e){ uiAlert('台帳の取り込み中にエラー：'+((e&&e.message)||e)); return {ok:false,reason:'exception'}; });
+  }
   // 就業状況。産休/育休=社保免除(自動off・上書き可)、介護休/病休=社保継続、休業=会社都合(休業手当)
   var WORK_STATUS=[['normal','通常'],['sankyu','産休'],['ikukyu','育休'],['kaigokyu','介護休'],['byoukyu','病気休職'],['kyugyo','休業(会社都合)']];
   var WS_LABEL=function(k){ var f=WORK_STATUS.find(function(x){return x[0]===k;}); return f?f[1]:'通常'; };
@@ -198,7 +239,7 @@
     if(e.payType==='時給') hourly=num(e.hourly)+teateHourly;
     else if(e.payType==='日給') hourly= (dwh>0? num(e.base)/dwh : 0)+teateHourly;
     else if(e.payType==='歩合'){ var wmw=workedMin(e); var gpw=window.Warimashi?Warimashi.guaranteePay(e.hourlyGuarantee,wmw):Math.round(num(e.hourlyGuarantee)*wmw/60); var bpw=Math.max(num(e.commissionAmt),gpw); hourly= (wmw>0? bpw/(wmw/60) : 0)+teateHourly; } // 歩合=賃金合計(高い方)÷総労働時間で最賃判定
-    else if(e.payType==='カスタム'){ var wmc=workedMin(e); var prc=payRuleResult(e); var bpc=prc?prc.base:0; hourly= (wmc>0? bpc/(wmc/60) : 0)+teateHourly; } // カスタム=基本給÷総労働時間
+    else if(e.payType==='カスタム'){ var wmc=payRuleCtx(e).workMin; var prc=payRuleResult(e); var bpc=prc?prc.base:0; hourly= (wmc>0? bpc/(wmc/60) : 0)+teateHourly; } // カスタム=基本給÷総労働時間(★K4:基本給と同じソース=台帳取り込み時は台帳のworkMin。未取り込みはworkedMin(e)と同値)
     else { hourly= (stdH>0? num(e.base)/stdH : 0)+teateHourly; } // 月給=基本給÷月平均所定時間＋算入手当
     hourly=Math.floor(hourly);
     // 減額の特例(最賃法7条・労働局長許可): 障害者/試用期間/認定職業訓練/軽易業務/断続的労働。許可された減額率(%)で最賃を下げて判定。
@@ -474,6 +515,9 @@
     e.hyojunBase = sb.hoshu>0 ? sb.hoshu : fb;
     var w=warimashiOf(e); e._wari=w; // 割増は満額base(=e.shikyu)で算定済→日割の影響を受けない
     var shikyu=(e.shikyu||[]).slice();
+    // ★K4 §3: 台帳を取り込んだ月は、台帳の非課税ぶん(hikazei:true の実費等)を非課税支給として別に足す。
+    //  local slice に足すだけ=非永続(再取り込みで重複しない)。hikazei:true→源泉/課税には入らず、総支給と手取りには入る。
+    if(e._ledgerCtx && num(e._ledgerHikazei)>0) shikyu=shikyu.concat([{label:'台帳（非課税支給）', value:num(e._ledgerHikazei), hikazei:true}]);
     // 入社月/退職月の日割: 基本給＋課税手当を在籍日数で日割(通勤/非課税/割増は除外)。標準報酬(hyojunBase)・割増は満額のまま。
     if(pr.prorate && pr.factor<1){ shikyu=shikyu.map(function(x){ if(x.hikazei||/通勤|割増/.test(x.label||'')) return x; return {label:x.label, value:Math.round(num(x.value)*pr.factor), hikazei:x.hikazei, nonTaxLimit:x.nonTaxLimit}; }); }
     if(w.total>0) shikyu=shikyu.concat([{label:'割増賃金',value:w.total}]); // 課税・総支給・雇用保険ベースに算入(日割しない)
@@ -1466,6 +1510,19 @@
     });
     return { added:added, match:match, mismatch:mismatch, needInput:needInput, mmList:mmList, prevYm:prevYm };
   }
+  // ★K4: 台帳(Exallyで毎日入れた記録)から当月ぶんを取り込むバナー。クラウド接続時のみ表示。
+  function ledgerImportBanner(){
+    if(!(window.SUPA && window.Store && Store.getLedger)) return ''; // オフライン(ローカルのみ)は台帳が無いので出さない
+    var imported=(state.employees||[]).some(function(e){ return e && e._ledgerCtx; });
+    return '<div class="cal-box" style="background:#F0FAF4;border:1px solid #C8ECD8;border-radius:12px;padding:10px 12px;margin-bottom:12px">'
+      +'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">'
+        +'<b style="color:#2E7D54;font-size:13px">🗒️ 台帳から取り込む</b>'
+        +(imported?'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 今月ぶんを取り込み済み</span>':'')
+        +'<button data-ledger-import="1" style="margin-left:auto;padding:7px 12px;border:1px solid #3D9E72;background:#fff;color:#2E7D54;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer">'+(imported?'台帳を再取り込み':'台帳から取り込む')+'（'+esc(state.month||'')+'）</button>'
+      +'</div>'
+      +'<div style="font-size:10.5px;color:#3D6B53;margin-top:5px">毎日つけた記録（売上・時間・件数）を読み込んで、代行など<b>売上や歩合で決まる基本給を自動計算</b>します。二度打ちは不要です。</div>'
+      +'</div>';
+  }
   function renderInput(){
     var host=$('#input-list'); if(!host) return; loadPrev(); loadOtHistory();
     var sche=scheduledDaysOf(state.month), H=HD();
@@ -1506,7 +1563,7 @@
     var confirmBtn='<div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px"><button class="btn-primary" data-confirm-month style="flex:0 0 auto;padding:11px 18px;font-size:14px">今月を確定（台帳・年調に反映）</button>'
       +(cnt.need>0?'<span style="font-size:11px;color:#92500A;font-weight:700">未確認 '+cnt.need+'名</span>':'<span style="font-size:11px;color:#3D9E72;font-weight:700">✓ 確認済</span>')
       +'<span style="font-size:10px;color:#5C7E6C"><b>保存は自動</b>です。「確定」は全員を確認済みにし、<b>賃金台帳・年末調整の集計対象</b>として今月を記録し、<b>従業員のWeb明細に自動公開</b>します（従業員はいつでも閲覧可・あとで直せます）。</span></div>';
-    if(view==='table' && activeCount>1){ host.innerHTML=statutoryStaleWarn()+calHTML+progHTML+viewToggle+renderInputTableHTML(reviewOnly)+confirmBtn; return; }
+    if(view==='table' && activeCount>1){ host.innerHTML=statutoryStaleWarn()+ledgerImportBanner()+calHTML+progHTML+viewToggle+renderInputTableHTML(reviewOnly)+confirmBtn; return; }
     var cards=state.employees.map(function(e,i){
       if(!isActiveInMonth(e,state.month)) return '';
       ensureKintai(e);
@@ -1542,7 +1599,7 @@
       return;
     }
     var emptyMsg=(reviewOnly && !cards) ? '<p class="hint" style="text-align:center;padding:18px 0">要確認の人はいません（全員確認済み）。</p>' : '';
-    host.innerHTML=statutoryStaleWarn()+calHTML+progHTML+viewToggle+cards+emptyMsg+confirmBtn;
+    host.innerHTML=statutoryStaleWarn()+ledgerImportBanner()+calHTML+progHTML+viewToggle+cards+emptyMsg+confirmBtn;
   }
   // 表でまとめて入力(全従業員1画面・弥生の弱点/Exallyモデル)。列は既存と同じdata属性を再利用=同じハンドラで書ける。
   function renderInputTableHTML(reviewOnly){
@@ -2956,6 +3013,7 @@
         if(hasManual){ uiConfirm('手入力した出勤日数がある人も含めて、全員の出勤を所定（'+sd+'日）で上書きします。よろしいですか？').then(function(ok){ if(ok)doFill(); }); } else { doFill(); }
         return; }
       if(e.target.closest('[data-csvimport]')){ var kf=$('#kintai-file'); if(kf){ kf.value=''; kf.click(); } return; }
+      if(e.target.closest('[data-ledger-import]')){ var lb=e.target.closest('[data-ledger-import]'); lb.disabled=true; var ol=lb.textContent; lb.textContent='読み込み中…'; importLedgerForMonth().then(function(){ /* renderInputで再描画済み。失敗時はボタンを戻す */ if(lb&&lb.parentNode){ lb.disabled=false; lb.textContent=ol; } }); return; }
       if(e.target.closest('[data-migrate]')){ var mf0=$('#migrate-file'); if(mf0){ mf0.value=''; mf0.click(); } return; }
       var tg=e.target.closest('[data-toggle]');
       if(tg){ var i=+tg.dataset.toggle; var emp=state.employees[i]; state.open['I'+emp.id]=!state.open['I'+emp.id]; il.querySelector('.acc[data-i="'+i+'"]').classList.toggle('open'); return; }
@@ -3234,7 +3292,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc, shimePeriods:shimePeriods, shimeSplit:shimeSplit,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, isInMinWage:isInMinWage, minWageTeate:minWageTeate, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, stType:stType, stLabel:stLabel, santeiRule:santeiRule, gekkakuTh:gekkakuTh, shahoBasisOf:shahoBasisOf, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, ymdPlus1:ymdPlus1, shikakuRows:shikakuRows, shikakuAoa:shikakuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc, applyMigrationRows:applyMigrationRows, buildEmpFromRow:buildEmpFromRow, prevYmOf:prevYmOf }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, isInMinWage:isInMinWage, minWageTeate:minWageTeate, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, stType:stType, stLabel:stLabel, santeiRule:santeiRule, gekkakuTh:gekkakuTh, shahoBasisOf:shahoBasisOf, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, ymdPlus1:ymdPlus1, shikakuRows:shikakuRows, shikakuAoa:shikakuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc, applyMigrationRows:applyMigrationRows, buildEmpFromRow:buildEmpFromRow, prevYmOf:prevYmOf, applyLedgerToEmployees:applyLedgerToEmployees, importLedgerForMonth:importLedgerForMonth, payRuleCtx:payRuleCtx, monthYmdRange:monthYmdRange }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';
