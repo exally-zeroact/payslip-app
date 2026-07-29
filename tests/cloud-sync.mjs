@@ -27,11 +27,18 @@ function makeMock(opts) {
   }
   function query(kind) {
     const _cua = curCompanyUA();
-    const data = kind === 'companyData' ? ((opts.companyData || _cua) ? { data: opts.companyData, updated_at: _cua } : null)
-      : kind === 'empIds' ? serverEmpIds.map(id => ({ id }))
-        : (opts.serverEmps || []);
-    const res = { data, error: null };
-    const q = { eq: () => q, order: () => q, maybeSingle: () => Promise.resolve(res), then: (f, r) => Promise.resolve(res).then(f, r) };
+    let res;
+    if (kind === 'ledger') { // K4: pay_ledger。count:'exact'(切れ検知)を模擬
+      const rows = opts.ledgerRows || [];
+      res = { data: rows, count: (opts.ledgerCount != null ? opts.ledgerCount : rows.length), error: opts.ledgerError || null };
+    } else {
+      const data = kind === 'companyData' ? ((opts.companyData || _cua) ? { data: opts.companyData, updated_at: _cua } : null)
+        : kind === 'empIds' ? serverEmpIds.map(id => ({ id }))
+          : (opts.serverEmps || []);
+      res = { data, error: null };
+    }
+    // is/gte/lte もチェーン可能(pay_ledger の .is().gte().lte().order() 用)
+    const q = { eq: () => q, is: () => q, gte: () => q, lte: () => q, order: () => q, maybeSingle: () => Promise.resolve(res), then: (f, r) => Promise.resolve(res).then(f, r) };
     return q;
   }
   function from(table) {
@@ -46,7 +53,7 @@ function makeMock(opts) {
         p.select = () => ({ single: () => Promise.resolve(res), maybeSingle: () => Promise.resolve(res), then: (f, r) => Promise.resolve(res).then(f, r) });
         return p;
       },
-      select: (cols) => query(table === 'pay_companies' ? 'companyData' : cols === 'id' ? 'empIds' : 'emps'),
+      select: (cols) => query(table === 'pay_ledger' ? 'ledger' : table === 'pay_companies' ? 'companyData' : cols === 'id' ? 'empIds' : 'emps'),
       delete: () => ({ in: (col, ids) => { calls.deletes.push(ids); return Promise.resolve({ error: null }); } }),
     };
   }
@@ -155,6 +162,42 @@ runs.push(T('楽観ロック: 初回(load前)は競合扱いにせず保存で�
   const Store = loadStore(mock);
   const r = await Store.cloudSaveState(SNAP);
   ok(r.ok === true, '初回保存OK(reason=' + r.reason + ')');
+}));
+
+// ── K4: Store.getLedger(pay_ledger 読取・count:'exact' 切れ検知) ──
+// HANDOFF §1: count > data.length なら「全部読めていない」= truncated:true(静かな過少を検出)
+runs.push(T('K4 getLedger: 全行読めた時 truncated:false・rows/count 一致', async function () {
+  const rows = [
+    { id: 'l1', employee_id: 'e1', ymd: '2026-07-03', data: { uriage: 100000 } },
+    { id: 'l2', employee_id: 'e1', ymd: '2026-07-05', data: { minutes: 480 } },
+    { id: 'l3', employee_id: 'e2', ymd: '2026-07-06', data: { amount: 5000 } }
+  ];
+  const mock = makeMock({ ledgerRows: rows, ledgerCount: 3 });
+  const Store = loadStore(mock);
+  const r = await Store.getLedger('2026-07-01', '2026-07-31');
+  ok(r.rows.length === 3, 'rows=3件: ' + r.rows.length);
+  ok(r.count === 3, 'count=3: ' + r.count);
+  ok(r.truncated === false, '切れていない(truncated:false): ' + r.truncated);
+  ok(!r.error, 'errorなし');
+}));
+
+runs.push(T('K4 getLedger: サーバ上限で切れたら truncated:true(count>rows)', async function () {
+  // Supabase既定1000行で切れた状況: 実データ1500件だが1000件しか返らない
+  const rows = Array.from({ length: 1000 }, (_, i) => ({ id: 'l' + i, employee_id: 'e1', ymd: '2026-07-03', data: {} }));
+  const mock = makeMock({ ledgerRows: rows, ledgerCount: 1500 });
+  const Store = loadStore(mock);
+  const r = await Store.getLedger('2026-07-01', '2026-07-31');
+  ok(r.count === 1500 && r.rows.length === 1000, 'count1500 > rows1000');
+  ok(r.truncated === true, '★切れ検知 truncated:true(合計を静かに過少にしない): ' + r.truncated);
+}));
+
+runs.push(T('K4 getLedger: エラー時は空+error(嘘の空集計を返さない)', async function () {
+  const mock = makeMock({ ledgerError: { message: 'permission denied' } });
+  const Store = loadStore(mock);
+  const r = await Store.getLedger('2026-07-01', '2026-07-31');
+  ok(r.rows.length === 0 && r.count === 0, '空');
+  ok(r.error === 'permission denied', 'errorを載せる: ' + r.error);
+  ok(r.truncated === false, 'エラー時 truncated:false');
 }));
 
 await Promise.all(runs);

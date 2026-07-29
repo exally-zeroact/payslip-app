@@ -205,6 +205,22 @@
       .map(function(x){ return { ym:x.ym, employee_id:x.employee_id, data:x.data }; }));
   };
 
+  // ── K4: Exally台帳(pay_ledger)を期間で読む。二度手間ゼロの源。RLSで自分のアカウント分のみ・削除済み(deleted_at)は除く ──
+  //  ★count:'exact' で全部読めたか検知。count>rows.length なら PostgREST上限(既定1000)で"黙って切れた"=合計が過少→truncated:true。
+  //  返り: { rows:[{id,employee_id,ymd,data}], count, truncated }。未ログイン/ローカルは空(台帳はクラウド専用)。
+  Store.getLedger = function(fromYmd, toYmd){
+    if(hasSupa){
+      return sb.from('pay_ledger').select('id,employee_id,ymd,data', { count:'exact' })
+        .is('deleted_at', null).gte('ymd', fromYmd).lte('ymd', toYmd).order('ymd', { ascending:true })
+        .then(function(r){
+          if(r.error) return { rows:[], count:0, truncated:false, error:(r.error.message||'error') };
+          var rows=r.data||[]; var count=(r.count==null)?rows.length:r.count;
+          return { rows:rows, count:count, truncated:(count > rows.length) };
+        }).catch(function(e){ return { rows:[], count:0, truncated:false, error:(e&&e.message)||'exception' }; });
+    }
+    return Promise.resolve({ rows:[], count:0, truncated:false }); // 台帳はクラウド専用(未ログイン=空)
+  };
+
   // ── Web明細(従業員向け配布・パスワード方式) ──
   // 会社が月次/賞与明細を「Web公開」→従業員は リンク(?t=token)で開き、初回だけ「会社発行の初回コード」で本人を縛って
   // 自分のパスワードを設定→以後はパスワード(＋端末記憶deviceToken)で閲覧。★電子交付の同意(所得税法)まで明細を1バイトも返さない★。

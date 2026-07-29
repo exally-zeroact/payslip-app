@@ -279,5 +279,82 @@ T('移行: 都道府県・住民税・生年月日が揃えば実際に突合が
   eq(s.match + s.mismatch, 1, '実データが揃えば再計算して突合(一致 or 要確認)');
 });
 
+// ── K4: 台帳(pay_ledger)→明細 二度手間ゼロ。台帳ctxが compute の基本給まで通り、単一ソースで倍にならない ──
+T('K4: 台帳取り込みで代行の基本給が売上×0.35 に置き換わる(ctx→basePay→compute)', function () {
+  // 代行: 固定0 + max(売上35%, 時給1200保障)。従業員フィールドには売上を入れない=台帳から来ることを証明。
+  const e = Object.assign(A.defEmp('代行太郎'), { id: 'led-e1', payType: 'カスタム',
+    payRule: { fixed: '0', variable: { mode: 'max', parts: [{ type: 'rate', amount: '35' }, { type: 'hourly', amount: '1200' }] } },
+    salesAmt: '', dailyEntries: [] });
+  // 台帳: 当月に売上30万ぶんの行(uriage合計=300000・分は0) → max(30万×0.35=105,000, 時給1200×0h=0)=105,000
+  const rows = [
+    { employee_id: 'led-e1', ymd: '2026-07-03', data: { uriage: 150000 } },
+    { employee_id: 'led-e1', ymd: '2026-07-20', data: { uriage: 150000 } }
+  ];
+  const r = A.applyLedgerToEmployees([e], rows);
+  eq(r.matched, 1, '1人取り込み');
+  eq(A.payRuleCtx(e).sales, 300000, '★ctx.sales が台帳の売上合計=300000(フィールドは空)');
+  eq(A.payRuleCtx(e).workMin, 0, '★分は台帳由来=0(単一ソース。フィールドの標準160hを混ぜない)');
+  eq(win.PayRule.basePay(e.payRule, A.payRuleCtx(e)).base, 105000, '★基本給=売上×0.35=105,000(ctx→basePay)');
+  const after = A.compute(e);
+  ok(isFinite(after.net) && Math.abs(after.net - (after.shikyuTotal - after.kojoTotal)) <= 2, 'compute整合(差引=支給-控除)');
+});
+
+T('K4 ★§5-2: 台帳と同じ日の dailyEntries を二重計上しない(commission)', function () {
+  // commission型: 変動=commission(amount合計をそのまま基本給に)。
+  const e = Object.assign(A.defEmp('歩合花子'), { id: 'led-e2', payType: 'カスタム',
+    payRule: { fixed: '0', variable: { mode: 'max', parts: [{ type: 'commission', amount: '', label: '歩合' }] } },
+    // dailyEntries: 台帳と同じ 2026-07-03 に 9999(★捨てられるべき)
+    dailyEntries: [{ ymd: '2026-07-03', hm: '', amount: '9999' }] });
+  const rows = [
+    { employee_id: 'led-e2', ymd: '2026-07-03', data: { amount: 5000 } },
+    { employee_id: 'led-e2', ymd: '2026-07-03', data: { amount: 3000 } }
+  ];
+  A.applyLedgerToEmployees([e], rows);
+  eq(A.payRuleCtx(e).commission, 8000, '★台帳のみ=8000(9999を足して17999にしない=単一ソース)');
+});
+
+T('K4 §3: 台帳の非課税分(hikazei)は総支給・手取りに入り、課税(源泉)には入らない', function () {
+  const e = Object.assign(A.defEmp('実費太郎'), { id: 'led-h1', payType: 'カスタム',
+    payRule: { fixed: '200000', variable: { mode: 'none', parts: [] } }, dailyEntries: [] });
+  const before = A.compute(e);
+  // 台帳: 課税amount 0・非課税(実費)amount 3000 の行
+  A.applyLedgerToEmployees([e], [{ employee_id: 'led-h1', ymd: '2026-07-03', data: { amount: 3000, hikazei: true } }]);
+  const after = A.compute(e);
+  eq(after.shikyuTotal - before.shikyuTotal, 3000, '★総支給が非課税3000ぶん増える');
+  // ★核心(§3): 課税に混ぜない → 所得税は据え置き。
+  eq(after.tax, before.tax, '★所得税は非課税3000では増えない(課税に混ぜない)');
+  // 非課税でも社保/雇用保険は対象(通勤手当と同じ既存仕様) → 手取り増=3000−(増えた控除ぶん)。支給保存則で確認。
+  const netD = after.net - before.net, kojoD = after.kojoTotal - before.kojoTotal;
+  eq(netD + kojoD, 3000, '★支給保存: 手取り増+控除増=3000(非課税ぶんは所得税以外の社保/雇用のみ増)');
+  ok(kojoD >= 0 && kojoD < 200, '控除増は雇用保険/社保ぶんの少額のみ(所得税は増えていない): kojoD=' + kojoD);
+});
+
+T('K4: 最賃判定の時給も台帳workMinを使う(基本給と同じソース=一貫性)', function () {
+  const e = Object.assign(A.defEmp('最賃太郎'), { id: 'led-mw', payType: 'カスタム', pref: 'tokyo',
+    payRule: { fixed: '200000', variable: { mode: 'none', parts: [] } }, dailyEntries: [] });
+  // 台帳: 当月 100時間(6000分)を計上 → 最賃時給 = 200000 ÷ 100h = 2000円/h
+  A.applyLedgerToEmployees([e], [
+    { employee_id: 'led-mw', ymd: '2026-07-03', data: { minutes: 3000 } },
+    { employee_id: 'led-mw', ymd: '2026-07-20', data: { minutes: 3000 } }
+  ]);
+  const mw = A.minWageInfo(e);
+  ok(mw && mw.hourly === 2000, '★最賃時給=200000/100h=2000(台帳の分を分母に。before=' + (mw && mw.hourly) + ')');
+});
+
+T('K4: 台帳から外れた人の _ledgerCtx は次の取り込みで消える(stale防止)', function () {
+  const e = Object.assign(A.defEmp('元太郎'), { id: 'led-e3', payType: 'カスタム',
+    payRule: { fixed: '0', variable: { mode: 'max', parts: [{ type: 'rate', amount: '35' }] } } });
+  A.applyLedgerToEmployees([e], [{ employee_id: 'led-e3', ymd: '2026-07-03', data: { uriage: 100000 } }]);
+  ok(A.payRuleCtx(e).sales === 100000, '1回目=台帳ctx');
+  A.applyLedgerToEmployees([e], []); // 台帳が空(この人の行が無くなった)
+  ok(!e._ledgerCtx, '★_ledgerCtxが消える → フィールド由来ctxに戻る(stale売上を残さない)');
+});
+
+T('K4: 月範囲 monthYmdRange が月初〜月末を返す(うるう/月末差)', function () {
+  eq(A.monthYmdRange('2026-07').from, '2026-07-01'); eq(A.monthYmdRange('2026-07').to, '2026-07-31', '7月=31日');
+  eq(A.monthYmdRange('2026-02').to, '2026-02-28', '2026年2月=28日'); eq(A.monthYmdRange('2024-02').to, '2024-02-29', 'うるう年2月=29日');
+  eq(A.monthYmdRange('2026-11').to, '2026-11-30', '11月=30日');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
