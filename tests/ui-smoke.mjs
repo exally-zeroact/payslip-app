@@ -778,6 +778,25 @@ T('K3 源泉区分の配線: 業務委託で該当区分=明細に源泉・非�
   e.houshuKubun = 'none'; e.employmentType = 'employee'; // 後片付け
 });
 
+T('修正A 新規従業員ひな型=決めつけ金額なし(基本給/時給/通勤/住民税/住宅手当が空・骨組みは維持)', function () {
+  const e = A.defEmp('テスト');
+  ok(e.base === '' && e.hourly === '' && e.commute === '' && e.residentTax === '', '金額既定(基本給/時給/通勤/住民税)が空');
+  ok(e.shikyu.length === 1 && e.shikyu[0].label === '基本給' && e.shikyu[0].value === '', 'shikyu=基本給(空)のみ・住宅手当なし');
+  ok(e.payType === '月給' && e.pref === 'tokyo' && e.taxClass === 'ko' && e.fuyou === '1', '骨組み(payType/pref/taxClass/fuyou)維持');
+  ok(Array.isArray(e.kintai) && e.kintai.length === 3, 'kintai骨組み維持');
+});
+
+T('修正C 業務委託の源泉=課税支給のみ(非課税通勤を除外・住宅手当は対象)', function () {
+  const e = A.defEmp('委託C');
+  e.employmentType = 'contractor'; e.houshuKubun = 'ippan';
+  e.shikyu = [{ label: '報酬', value: '500000' }, { label: '住宅手当', value: '50000' }, { label: '通勤手当', value: '20000', hikazei: true }];
+  A.state.employees.push(e); A.state.month = '2026-06';
+  const r = A.compute(e);
+  const g = r.kojo.filter(k => /源泉/.test(k.label)).reduce((a, k) => a + k.value, 0);
+  ok(g === 56155, '源泉=課税支給55万(報酬50万+住宅5万・通勤2万は除外)×10.21%=56,155 (got ' + g + ')');
+  A.state.employees.pop();
+});
+
 T('UI操作を通してJS例外・window.error が0', function () {
   ok(errs.length === 0, '例外あり: ' + errs.join(' | '));
 });

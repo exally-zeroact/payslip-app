@@ -306,13 +306,15 @@
   // 健保従業員負担率(対象月payYmの社保年度で自動選択)＋子育て支援金(令和8/4〜)。両方healthRateに含めて社保計算へ渡す。
   function prefRate(code, payYm){ var S=SHH(); if(S&&S.getKenko){ var k=S.getKenko(code,payYm); var sh=S.getShienkin?S.getShienkin(payYm):0; return k.jugyoin+sh; } var K=(S&&S.KENKO_RITSU)||{}; return (K[code]&&K[code].jugyoin)||0.04955; }
 
+  // ★新規従業員のひな型は"骨組みだけ"=決めつけ金額を持たない(基本給/時給/通勤/住民税/住宅手当は空=要入力)。
+  //  勝手に手当や額が付くのを防ぐ。payType/pref/taxClass/fuyou/kintai 等の構造は既定を維持。
   function defEmp(name){
-    return { id:uid(), name:name||'山田 太郎', no:'', birthYmd:'1980-05-15', dept:'', role:'', employmentType:'employee', houshuKubun:'none',
-      payType:'月給', base:'250000', hourly:'1200', commissionAmt:'', hourlyGuarantee:'', salesAmt:'', pieceCount:'', payRule:null, fuyou:'1', nenshoFuyo:'', pref:'tokyo', commute:'8400', commuteType:'public', commuteKm:'', residentTax:'12500', residentTaxMode:'monthly', residentTaxAnnual:'', residentTaxIkkatsu:false, juminCollect:'special', bank:'',
+    return { id:uid(), name:name||'従業員 1', no:'', birthYmd:'1980-05-15', dept:'', role:'', employmentType:'employee', houshuKubun:'none',
+      payType:'月給', base:'', hourly:'', commissionAmt:'', hourlyGuarantee:'', salesAmt:'', pieceCount:'', payRule:null, fuyou:'1', nenshoFuyo:'', pref:'tokyo', commute:'', commuteType:'public', commuteKm:'', residentTax:'', residentTaxMode:'monthly', residentTaxAnnual:'', residentTaxIkkatsu:false, juminCollect:'special', bank:'',
       furiBankName:'', furiBankNo:'', furiBranchName:'', furiBranchNo:'', furiYokin:'普通', furiAccount:'', furiKana:'',
       annualHolidays:'', dailyWorkH:'', dailyWorkM:'', workedH:'160', workedM:'0', dailyEntries:[],
       kintai:[{label:'出勤日数',value:'21'},{label:'欠勤日数',value:'0'},{label:'有給取得',value:'1'}],
-      shikyu:[{label:'基本給',value:'250000'},{label:'住宅手当',value:'10000'}],
+      shikyu:[{label:'基本給',value:''}],
       apply:{}, taxClass:'ko', honninShogai:false, honninKafuHitorioya:'', honninKinrou:false, shortTimeType:'', minWageReduce:'', retired:false, workStatus:'normal', leavePay:'', leaveStartYmd:'', leaveEndYmd:'', leaveDaysInMonth:'',
       warimashi:{ mode:'easy', otH:'', otM:'', nightH:'', nightM:'', holidayH:'', holidayM:'',
         detail:{ ot:{h:'',m:''}, otNight:{h:'',m:''}, over60:{h:'',m:''}, over60Night:{h:'',m:''}, night:{h:'',m:''}, holiday:{h:'',m:''}, holidayNight:{h:'',m:''} } },
@@ -332,7 +334,7 @@
   function curYm(){ var d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2); }
   var state={ company: defCompany(),
     month:curYm(), prefer:'col2_1', theme:{accent:'#6f5a3e',line:'#cfc9b8',ink:'#23261f'}, depts:['営業部'], roles:['課長','主任','一般'],
-    employees:[defEmp('山田 太郎')], open:{},
+    employees:[defEmp('従業員 1')], open:{},
     inputMode:'monthly', printMode:'monthly', empFilter:'active', bonus:{ payYm:'', payDay:'', byEmp:{} }, confirmed:{}, nencho:{}, onboardDone:false, onboardOutput:false, payPatterns:[], dailySlipLayout:'1col', inputView:'card' };
 
   // マイカー通勤 1か月非課税限度(片道km・国税庁No.2585 令和8年4月〜)★12区分 公式照合済2026-07★
@@ -517,7 +519,8 @@
     var effFuyou=num(e.fuyou)+jintekiOf(e, effTaxClass);
     // ★K3 業務委託=204条掲載報酬の源泉(区分該当時のみ)。対象額=支給合計(税込・安全側)。非該当(代行)は0=控除ゼロ維持。
     var contractorGensen=0;
-    if(e.employmentType==='contractor'){ var _SC=SC(); if(_SC){ var _payG=shikyu.reduce(function(a,x){return a+num(x.value);},0); contractorGensen=_SC.gensenFor(e.houshuKubun, _payG, {monthlySalary:0}); } }
+    // ★源泉の対象額=課税支給のみ(非課税の通勤等 hikazei:true は除外・住宅手当など課税手当は対象)。taxableTotalで課税支給を単一ソース化。
+    if(e.employmentType==='contractor'){ var _SC=SC(); if(_SC){ var _payG=PayslipCalc.taxableTotal(shikyu); contractorGensen=_SC.gensenFor(e.houshuKubun, _payG, {monthlySalary:0}); } }
     var r=PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:effFuyou, taxClass:effTaxClass, heiTaxAmount:heiAmt, residentTax:residentTaxOf(e), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:apply, extraKojo:e.extraKojo, shahoMonth:_shMonth, shahoMult:_shMult, employmentType:e.employmentType, contractorGensen:contractorGensen });
     if(e.employmentType!=='contractor') applyNenchoAdj(e, r); // 年末調整の過不足を反映(業務委託=年調なし=対象外)
     return r;
@@ -2712,6 +2715,15 @@
     aoa.push(['合計','','','','','','','', tr.reduce(function(a,t){return a+t.amount;},0)]);
     PayslipXlsx.downloadSheets([{ name:'振込一覧', aoa:aoa, cols:[{wch:14},{wch:16},{wch:12},{wch:10},{wch:12},{wch:10},{wch:6},{wch:12},{wch:12}] }], { filename:'振込一覧_'+state.month+'.xlsx' });
   }
+  // プレビューiframeの高さを「ページ数×1ページ高」にする=複数人/複数期間が全員見える(1ページ固定で2人目以降が隠れる問題の修正)。
+  //  ★PDF本体(b-print)は各.sheetを個別に焼くので不変=ここはプレビュー表示専用。dataset.pwは向き判定用に維持。
+  function fitFrameToPages(fr, pageW, pageH){
+    fr.style.width=pageW+'px'; fr.style.transformOrigin='top left'; fr.dataset.pw=pageW; fr.dataset.ph=pageH;
+    function apply(){ var n=1;
+      try{ var idoc=fr.contentDocument; var pages=idoc?idoc.querySelectorAll('.sheet,.page'):null; n=(pages&&pages.length)||1; }catch(e){}
+      var total=n*pageH; fr.style.height=total+'px'; fr.dataset.ph=total; fitPreview(); }
+    fr.onload=apply; setTimeout(apply, 80); // srcdoc読込後に測る(onload未発火の保険にsetTimeoutも)
+  }
   function doPreview(){
     var v=$('#p-emp').value; var emps=v==='__all'?state.employees.filter(function(e){return isActiveInMonth(e,state.month);}):[state.employees[+v]];
     var isBonus=state.printMode==='bonus';
@@ -2719,16 +2731,14 @@
     if(!isBonus && (cyc==='daily'||cyc==='weekly')){ // 日払い/週払い=スリップ明細(日別)。全員選択なら全員分を並べる(M2修正)
       var ddList=emps.map(function(e){ return buildDailyData(e); }).filter(function(d){ return d && d.days && d.days.length; }); var fr=$('#frame');
       fr.srcdoc=dailySlipDoc(ddList, state.dailySlipLayout||'1col');
-      fr.style.width='794px'; fr.style.height='1123px'; fr.style.transformOrigin='top left'; fr.dataset.pw=794; fr.dataset.ph=1123;
-      fitPreview(); return;
+      fitFrameToPages(fr, 794, 1123); return; // 全員分のページを表示
     }
     if(!isBonus && shimeSplit()){ // K2 締め方=期間分割。期間×従業員 の報酬明細を並べる(期間の若い順→従業員順)
       var periods=shimePeriods(), pList=[];
       periods.forEach(function(p){ emps.forEach(function(e){ var d=buildDailyData(e, p); if(d && d.days && d.days.length) pList.push(d); }); });
       var frp=$('#frame');
       frp.srcdoc=dailySlipDoc(pList, state.dailySlipLayout||'1col');
-      frp.style.width='794px'; frp.style.height='1123px'; frp.style.transformOrigin='top left'; frp.dataset.pw=794; frp.dataset.ph=1123;
-      fitPreview(); return;
+      fitFrameToPages(frp, 794, 1123); return; // 全期間×全員のページを表示
     }
     var people=isBonus?buildBonusPeople(emps):buildPeople(emps);
     var doc=isBonus?{month:bonusMonthLabel(),kind:'bonus'}:{month:monthLabel()};
@@ -2738,9 +2748,7 @@
     var out=Render.build(people, doc, prefer, state.theme);
     var f=$('#frame'); f.srcdoc=out.html;
     var pw=out.orientation==='landscape'?1123:794, ph=out.orientation==='landscape'?794:1123;
-    f.style.width=pw+'px'; f.style.height=ph+'px'; f.style.transformOrigin='top left';
-    f.dataset.pw=pw; f.dataset.ph=ph; // リサイズ時の再フィット用
-    fitPreview();
+    fitFrameToPages(f, pw, ph); // 複数人=複数ページを全員表示(1ページ固定で2人目以降が隠れる問題の修正)
   }
   // A4プレビューを親幅にフィット(モバイル回転/リサイズで再計算)
   function fitPreview(){
