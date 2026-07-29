@@ -256,14 +256,17 @@
     mPubW(pubs); mDocW(docs); return Promise.resolve(out);
   };
   // 会社: 公開一覧。返り=[{employeeId,name,token,link,hasPassword,initCode(パスワード未設定の間だけ),consentAt,docs:[{ym,kind,openedAt}]}]
-  Store.listMeisaiPub = function(){
+  // empIds(現在の名簿=在籍+退職者のemployee_id配列)を渡すと、名簿に居る人だけに絞る。
+  //  ★削除済み(名簿に無い)employee_idの公開行は一覧に出さない=既存の幽霊も即消える。empIds未指定なら従来どおり全件。
+  Store.listMeisaiPub = function(empIds){
+    var keep = Array.isArray(empIds) ? function(id){ return empIds.indexOf(id)>=0; } : function(){ return true; };
     if(hasSupa){ // 会社側=RLSで自分の発行分のみ。init_code/pw_hashは自分の行なので読める(従業員anonは直read不可)
       return Promise.all([
         sb.from('pay_meisai_pub').select('token,employee_id,init_code,pw_hash,consent_at'),
         sb.from('pay_meisai_docs').select('token,ym,kind,published_at,opened_at,data')
       ]).then(function(res){
         var pubs=(res[0].data||[]), docs=(res[1].data||[]);
-        return pubs.map(function(p){
+        return pubs.filter(function(p){ return keep(p.employee_id); }).map(function(p){
           var ds=docs.filter(function(x){ return x.token===p.token; }).map(function(x){ return { ym:x.ym, kind:x.kind, name:(x.data&&x.data.person&&x.data.person.name)||'', publishedAt:x.published_at, openedAt:x.opened_at }; });
           var nm=(ds[0]&&ds[0].name)||''; var hasPw=!!p.pw_hash;
           return { employeeId:p.employee_id, name:nm, token:p.token, link:'meisai.html?t='+p.token, hasPassword:hasPw, initCode:(hasPw?null:p.init_code), consentAt:p.consent_at, docs:ds };
@@ -271,11 +274,23 @@
       });
     }
     var pubs=mPub(), docs=mDoc();
-    return Promise.resolve(pubs.map(function(p){
+    return Promise.resolve(pubs.filter(function(p){ return keep(p.employeeId); }).map(function(p){
       var ds=docs.filter(function(x){ return x.token===p.token; }).map(function(x){ return { ym:x.ym, kind:x.kind, name:x.name, publishedAt:x.publishedAt, openedAt:x.openedAt }; });
       var nm=(ds[0]&&ds[0].name)||''; var hasPw=!!p.pwHash;
       return { employeeId:p.employeeId, name:nm, token:p.token, link:'meisai.html?t='+p.token, hasPassword:hasPw, initCode:(hasPw?null:p.initCode), consentAt:p.consentAt, docs:ds };
     }));
+  };
+  // 従業員削除時=Web明細リンクを失効(その従業員の全公開行の認証情報をクリア=get_meisaiが明細を返さない=リンク死)。
+  //  ★pay_meisai_docs(公開明細)は物理削除しない=pub行を消すとcascadeで消えるため、行は残し認証情報だけ無効化する(既存方針=お金の記録は残す)。
+  //  オフライン/未ログインは no-op で安全に(RLSで auth.uid()=null は0行更新)。
+  Store.unpublishMeisai = function(employeeId){
+    if(!employeeId) return Promise.resolve({ ok:false });
+    if(hasSupa){
+      return sb.from('pay_meisai_pub').update({ init_code:null, pw_hash:null, device_tokens:[], consent_at:null, fail_count:0, locked_until:null })
+        .eq('employee_id', employeeId).then(function(r){ return { ok:!r.error }; }).catch(function(){ return { ok:false }; });
+    }
+    try{ var pubs=mPub(); var changed=false; pubs.forEach(function(p){ if(p.employeeId===employeeId){ p.initCode=null; p.pwHash=null; p.deviceTokens=[]; p.consentAt=null; changed=true; } }); if(changed) mPubW(pubs); }catch(e){}
+    return Promise.resolve({ ok:true });
   };
   // 従業員: トークンの状態(初回か/記憶済か)。★明細/コードは返さない★。返り={found,hasPassword,remembered,name}
   Store.meisaiAuth = function(token, deviceToken){

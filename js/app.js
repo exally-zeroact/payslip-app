@@ -2324,7 +2324,7 @@
     if(!(window.Store&&Store.getPayslipsByYm&&Nen_())){ host.innerHTML='<div class="empty-cta"><div class="ec-emoji">📅</div><div class="ec-t">年末調整のデータがまだありません</div><div class="ec-s">各月の入力を「今月を確定」で記録すると、1〜12月分がここに自動集計されます。まずは入力タブで当月を確定してください。</div><button class="btn-primary ec-btn" data-scr="scr-input">入力タブへ</button></div>'; return; }
     host.innerHTML='<div class="card"><div class="card-h">年末調整 '+year+'年</div><p class="hint">読込中…</p></div>';
     var declP = (Store.listNenchoDecl) ? Store.listNenchoDecl(year).catch(function(){ return []; }) : Promise.resolve([]);
-    var pubP = (Store.listMeisaiPub) ? Store.listMeisaiPub().catch(function(){ return []; }) : Promise.resolve([]);
+    var pubP = (Store.listMeisaiPub) ? Store.listMeisaiPub(rosterIds()).catch(function(){ return []; }) : Promise.resolve([]);
     Promise.all([Store.getPayslipsByYm(year+'-01', year+'-12'), declP, pubP]).then(function(res){
       var recs=res[0], decls=res[1]||[], pubs=res[2]||[];
       state._nenDecls={}; decls.forEach(function(d){ if(d&&d.employeeId) state._nenDecls[d.employeeId]=d; }); // 従業員のWeb申告(employeeId→{decl,submittedAt,updatedAt})
@@ -2892,7 +2892,9 @@
       var prta=ev.target.closest('[data-prtieradd]'); if(prta){ var _tp=ensurePayRule(emp).variable.parts[+String(prta.dataset.prtieradd).split(':')[1]]; if(_tp){ if(!_tp.tiers||!_tp.tiers.length)_tp.tiers=[{from:0,rate:''}]; _tp.tiers.push({from:'',rate:''}); } renderEmpMaster(); return; } // 段追加
       var prtd=ev.target.closest('[data-prtierdel]'); if(prtd){ var _pp=String(prtd.dataset.prtierdel).split(':'); var _tp2=ensurePayRule(emp).variable.parts[+_pp[1]]; if(_tp2&&_tp2.tiers)_tp2.tiers.splice(+_pp[2],1); renderEmpMaster(); return; } // 段削除
       if(ev.target.classList.contains('m-retire')){ if(!emp.retired){ uiConfirm((emp.name||'この従業員')+' を退職にします。給与計算・印刷の対象から外れます（データは残ります）。').then(function(ok){ if(!ok)return; emp.retired=true; emp.retiredYmd=state.month; state.open[emp.id]=false; renderEmpMaster(); }); } else { emp.retired=false; renderEmpMaster(); } return; }
-      if(ev.target.classList.contains('m-del-emp')){ if(activeEmps().length<=1&&!emp.retired){uiAlert('稼働中は最低1名必要です');return;} state.employees.splice(i,1); renderEmpMaster(); return; }
+      if(ev.target.classList.contains('m-del-emp')){ if(activeEmps().length<=1&&!emp.retired){uiAlert('稼働中は最低1名必要です');return;}
+        if(window.Store&&Store.unpublishMeisai){ try{ Store.unpublishMeisai(emp.id); }catch(_){} } // 削除=Web明細リンクを失効(docsは物理削除しない・オフラインはno-op)
+        state.employees.splice(i,1); renderEmpMaster(); return; }
     });
     el.addEventListener('change',function(ev){
       var card=ev.target.closest('.mco'); if(!card)return; var i=+card.dataset.i; var emp=state.employees[i];
@@ -3103,7 +3105,7 @@
       var cp=e.target.closest('.wm-copy'); if(cp){ try{ navigator.clipboard.writeText(cp.dataset.link); toast('コピーしました'); }catch(err){} return; }
       var qb=e.target.closest('.wm-qr'); if(qb){ showMeisaiQR(qb.dataset.qrName, qb.dataset.qrUrl); return; } // 個人のQR表示/印刷
       if(e.target.closest('.wm-qrall')){ // 全員のQRを印刷(リンク+初回コード同梱)
-        Store.listMeisaiPub().then(function(list){ var origin=(location.origin&&location.origin.indexOf('http')===0)?location.origin+location.pathname.replace(/[^\/]*$/,''):'';
+        Store.listMeisaiPub(rosterIds()).then(function(list){ var origin=(location.origin&&location.origin.indexOf('http')===0)?location.origin+location.pathname.replace(/[^\/]*$/,''):'';
           printQRCards((list||[]).map(function(p){ var code=(!p.hasPassword?p.initCode:''); return { name:p.name, url:origin+p.link+(code?('&c='+encodeURIComponent(code)):''), initCode:code }; })); }); // QRに初回コードを埋め込む=スキャンで自動入力
         return; }
       var ri=e.target.closest('.wm-reissue'); if(ri){ var tok=ri.dataset.token; uiConfirm('初回コードを再発行しますか？\n現在のパスワードと端末の記憶は無効になり、従業員は新しい初回コードで再設定します。').then(function(ok){ if(!ok)return;
@@ -3163,9 +3165,11 @@
     return Store.publishMeisai(items).then(function(){ renderWebMeisai(); if(!opts.silent) toast(emps.length+'名の'+(isBonus?'賞与':'給与')+'明細をWeb公開しました'); return emps.length; }).catch(function(){ return 0; });
   }
   // Web明細: 公開状況(従業員リンク＋同意＋未読/開封)を印刷タブに表示
+  // 現在の名簿(在籍+退職者)のemployee_id。Web明細一覧をこれで絞る=削除済み(名簿に無い)は出さない。退職者は名簿に残るので出る。
+  function rosterIds(){ return (state.employees||[]).map(function(e){ return e.id; }); }
   function renderWebMeisai(){
     var card=$('#webmeisai-card'), host=$('#webmeisai-body'); if(!card||!host||!(window.Store&&Store.listMeisaiPub))return;
-    Store.listMeisaiPub().then(function(list){
+    Store.listMeisaiPub(rosterIds()).then(function(list){
       card.style.display=list.length?'':'none'; if(!list.length){ host.innerHTML=''; return; }
       var unread=0; list.forEach(function(p){ (p.docs||[]).forEach(function(d){ if(!d.openedAt)unread++; }); });
       var origin=(location.origin&&location.origin.indexOf('http')===0)?location.origin+location.pathname.replace(/[^\/]*$/,''):'';
