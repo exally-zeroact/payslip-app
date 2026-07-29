@@ -160,15 +160,15 @@ body{font-family:'Noto Sans JP',sans-serif;color:#1a4a2e;background:#F0FAF4;-web
 </div>
 
 <!-- ★既存Service Worker/キャッシュを削除して常に最新に(古い版が居座る問題の根絶) --><script>try{if('serviceWorker'in navigator){navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();});});}if(window.caches){caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k);});});}}catch(e){}</script>
-<script src="js/render.js?v=e82b019d"></script>
-<script src="lib/nencho-declaration.js?v=e82b019d"></script>
+<script src="js/render.js?v=512b7af6"></script>
+<script src="lib/nencho-declaration.js?v=512b7af6"></script>
 <!-- PDF保存=jsPDFで自前生成(A4ぴったり1ページ・ブラウザのフッター無し)。iOSのwebページ印刷は必ずURL/日付フッターが付き余白で2ページ化するため不使用。 -->
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <!-- 本番はSupabase(RPC)。window.SUPA/supabase未読込ならstore.jsはlocalStorage層にフォールバック。 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/supa-config.js?v=e82b019d"></script>
-<script src="js/store.js?v=e82b019d"></script>
-<script src="js/meisai.js?v=e82b019d"></script>
+<script src="js/supa-config.js?v=512b7af6"></script>
+<script src="js/store.js?v=512b7af6"></script>
+<script src="js/meisai.js?v=512b7af6"></script>
 </body>
 </html>
