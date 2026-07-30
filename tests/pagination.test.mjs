@@ -16,8 +16,9 @@ function eq(a, b, m) { if (a !== b) throw new Error((m || '') + ' expected ' + b
 
 const PAGE = 1000, TOTAL = 1080; // 司さんの実データ規模(1000超)
 
-// ── 本物どおりの偽Supabase: table→行配列。select(cols,{count})→count=総数, range(a,b)→最大1000件スライス ──
-function makeMock(tables) {
+// ── 本物どおりの偽Supabase: table→行配列。select(cols,{count})→count=総数, range(a,b)→最大 cap 件スライス ──
+//  cap = サーバ側 max_rows(既定1000)。cap を小さくして「上限がページ幅より小さい」状況も再現できる。
+function makeMock(tables, cap = PAGE) {
   function from(table) {
     const all = tables[table] || [];
     function builder() {
@@ -30,8 +31,8 @@ function makeMock(tables) {
         maybeSingle: () => Promise.resolve({ data: all[0] || null, error: null }),
         single: () => Promise.resolve({ data: all[0] || null, error: null }),
         then: (f, r) => {
-          const top = (hi == null) ? PAGE - 1 : hi;
-          const to = Math.min(top, lo + PAGE - 1);           // 1リクエスト最大1000行(本物の上限)
+          const top = (hi == null) ? cap - 1 : hi;
+          const to = Math.min(top, lo + cap - 1);            // 1リクエスト最大 cap 行(本物の上限)
           const data = all.slice(lo, to + 1);
           return Promise.resolve({ data, count: wantCount ? all.length : null, error: null }).then(f, r);
         }
@@ -96,6 +97,12 @@ runs.push(T('getStatutory(中央の法定データ): 1080件全部', async () =>
 }));
 runs.push(T('listMeisaiPub(Web明細 公開一覧): 1080件全部', async () => {
   const r = await Store.listMeisaiPub(); eq(r.length, TOTAL, 'pub');
+}));
+
+// ★サーバ上限がページ幅より小さくても取りこぼさない（実受信数で offset を進める）
+const StoreSmallCap = loadStore(makeMock({ pay_payslips: tables.pay_payslips, pay_companies: tables.pay_companies }, 300));
+runs.push(T('★上限300(ページ幅未満)でも getPayslipsByYm が1080件全部（size固定なら止まる）', async () => {
+  const r = await StoreSmallCap.getPayslipsByYm('2026-01', '2026-12'); eq(r.length, TOTAL, '明細(小上限)');
 }));
 
 await Promise.all(runs);

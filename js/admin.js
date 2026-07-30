@@ -18,7 +18,7 @@
         var got = r.data || []; out = out.concat(got);
         if (!got.length || r.count == null || out.length >= r.count)
           return { data: out, error: null, count: (r.count == null ? out.length : r.count) };
-        from += size; return step();
+        from += got.length; return step(); // ★実受信数で進める(上限<ページ幅でも漏れない)
       });
     }
     return step();
