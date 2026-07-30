@@ -38,7 +38,14 @@ function makeMock(opts) {
       res = { data, error: null };
     }
     // is/gte/lte もチェーン可能(pay_ledger の .is().gte().lte().order() 用)
-    const q = { eq: () => q, is: () => q, gte: () => q, lte: () => q, order: () => q, maybeSingle: () => Promise.resolve(res), then: (f, r) => Promise.resolve(res).then(f, r) };
+    // range: store.js の全件ページング(fetchAllQ)を本物どおりに模擬。配列はrange位置で1000件ずつスライス
+    //  (少件数モックでは1ページ目=全件・2ページ目=空)。count注入(切れ検知テスト)もそのまま保つ。
+    let _lo = 0;
+    function paged() {
+      if (!Array.isArray(res.data)) return res; // 単一行(maybeSingle系)はそのまま
+      return { data: res.data.slice(_lo, _lo + 1000), count: (res.count != null ? res.count : res.data.length), error: res.error };
+    }
+    const q = { eq: () => q, is: () => q, gte: () => q, lte: () => q, order: () => q, range: (a) => { _lo = a; return q; }, maybeSingle: () => Promise.resolve(res), then: (f, r) => Promise.resolve(paged()).then(f, r) };
     return q;
   }
   function from(table) {

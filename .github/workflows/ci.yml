@@ -30,6 +30,8 @@ jobs:
         run: node tests/ui-smoke.mjs
       - name: Cloud sync (保存層・Supabaseモックで全項目保存/差分削除ガード/保存成否)
         run: node tests/cloud-sync.mjs
+      - name: Pagination (1000件超が黙って欠落しない=全件ページング・賃金台帳/年調/明細/法定)
+        run: node tests/pagination.test.mjs
       - name: Meisai store (Web明細 公開一覧フィルタ＋削除時リンク失効・docs物理削除しない)
         run: node tests/meisai-store.mjs
       - name: Cache-buster stamp guard (全HTMLが現在の内容ハッシュ ?v= で貼られているか=貼り忘れ検知)

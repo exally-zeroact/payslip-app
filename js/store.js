@@ -11,6 +11,25 @@
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
   }) : null;
 
+  // ── 全件ページング(PostgREST既定 max_rows=1000 で"黙って"切れるのを根治) ──
+  //  build=(from,to)=>完成クエリ。必ず .select(cols,{count:'exact'}) と .range(from,to) を付けて返す。
+  //  count で総数を見て、全ページ取り切るまで .range を回す。返り={ data, error, count }。
+  //  count が取れない応答は最初の非空ページで止める(飲み屋 fetchAll と同じ安全側)。
+  //  ★これを通さない .select() は1000件超で賃金台帳/年末調整/明細一覧などが黙って過少になる★。
+  function fetchAllQ(build){
+    var out=[], from=0, size=1000;
+    function step(){
+      return Promise.resolve(build(from, from+size-1)).then(function(r){
+        if(r.error) return { data:null, error:r.error };
+        var got=r.data||[]; out=out.concat(got);
+        if(!got.length || r.count==null || out.length>=r.count)
+          return { data:out, error:null, count:(r.count==null?out.length:r.count) };
+        from+=got.length; return step(); // ★size固定でなく実受信数で進める(上限<ページ幅でも漏れない)
+      });
+    }
+    return step();
+  }
+
   function lsAll(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch(e){ return []; } }
   function lsWrite(arr){ localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
   function uid(){ return 'b_'+Math.abs(Date.now()).toString(36)+'_'+Math.floor(performance.now()).toString(36); }
@@ -20,7 +39,7 @@
 
     list: function(){
       if(hasSupa){
-        return sb.from('payslip_batches').select('id,title,month,company,updated_at').order('updated_at',{ascending:false})
+        return fetchAllQ(function(a,b){ return sb.from('payslip_batches').select('id,title,month,company,updated_at',{count:'exact'}).order('updated_at',{ascending:false}).range(a,b); })
           .then(function(r){ return r.data||[]; });
       }
       return Promise.resolve(lsAll().map(function(b){ return {id:b.id,title:b.title,month:b.month,company:b.company,updated_at:b.updated_at}; })
@@ -130,7 +149,7 @@
         ];
         // ★差分削除は「同期済み(cloudSynced)かつ手元に従業員が居る」時だけ=空/古い端末が本番を消さない
         if(cloudSynced && emps.length>0){
-          ops.push(sb.from('pay_employees').select('id').eq('account_id',uid).then(function(r){ var ex=(r.data||[]).map(function(x){return x.id;}); var rm=ex.filter(function(id){ return ids.indexOf(id)<0; }); return rm.length? sb.from('pay_employees').delete().in('id',rm) : { error:null }; }));
+          ops.push(fetchAllQ(function(a,b){ return sb.from('pay_employees').select('id',{count:'exact'}).eq('account_id',uid).range(a,b); }).then(function(r){ var ex=(r.data||[]).map(function(x){return x.id;}); var rm=ex.filter(function(id){ return ids.indexOf(id)<0; }); return rm.length? sb.from('pay_employees').delete().in('id',rm) : { error:null }; }));
         }
         return Promise.all(ops).then(function(res){
           var bad=res.filter(function(x){ return x && x.error; })[0];
@@ -146,7 +165,7 @@
       return curUid().then(function(uid){ if(!uid) return null;
         return Promise.all([
           sb.from('pay_companies').select('data,updated_at').eq('account_id',uid).maybeSingle(),
-          sb.from('pay_employees').select('data,sort').eq('account_id',uid).order('sort',{ascending:true})
+          fetchAllQ(function(a,b){ return sb.from('pay_employees').select('data,sort',{count:'exact'}).eq('account_id',uid).order('sort',{ascending:true}).range(a,b); })
         ]).then(function(res){
           var co=res[0].data && res[0].data.data; var emps=(res[1].data||[]).map(function(r){ return r.data; });
           cloudSynced=true; // クラウドと通信できた=同期済み(空でも=新規アカウントとして差分削除を許可)
@@ -198,7 +217,7 @@
   };
   Store.getPayslipsByYm = function(ymFrom, ymTo){
     if(hasSupa){
-      return sb.from('pay_payslips').select('ym,employee_id,data').gte('ym',ymFrom).lte('ym',ymTo)
+      return fetchAllQ(function(a,b){ return sb.from('pay_payslips').select('ym,employee_id,data',{count:'exact'}).gte('ym',ymFrom).lte('ym',ymTo).range(a,b); })
         .then(function(r){ return r.data||[]; });
     }
     return Promise.resolve(psAll().filter(function(x){ return x.ym>=ymFrom && x.ym<=ymTo; })
@@ -210,12 +229,12 @@
   //  返り: { rows:[{id,employee_id,ymd,data}], count, truncated }。未ログイン/ローカルは空(台帳はクラウド専用)。
   Store.getLedger = function(fromYmd, toYmd){
     if(hasSupa){
-      return sb.from('pay_ledger').select('id,employee_id,ymd,data', { count:'exact' })
-        .is('deleted_at', null).gte('ymd', fromYmd).lte('ymd', toYmd).order('ymd', { ascending:true })
+      return fetchAllQ(function(a,b){ return sb.from('pay_ledger').select('id,employee_id,ymd,data', { count:'exact' })
+          .is('deleted_at', null).gte('ymd', fromYmd).lte('ymd', toYmd).order('ymd', { ascending:true }).range(a,b); })
         .then(function(r){
           if(r.error) return { rows:[], count:0, truncated:false, error:(r.error.message||'error') };
           var rows=r.data||[]; var count=(r.count==null)?rows.length:r.count;
-          return { rows:rows, count:count, truncated:(count > rows.length) };
+          return { rows:rows, count:count, truncated:(count > rows.length) }; // 全ページ取得後は基本 false(切れ検知は保険)
         }).catch(function(e){ return { rows:[], count:0, truncated:false, error:(e&&e.message)||'exception' }; });
     }
     return Promise.resolve({ rows:[], count:0, truncated:false }); // 台帳はクラウド専用(未ログイン=空)
@@ -278,8 +297,8 @@
     var keep = Array.isArray(empIds) ? function(id){ return empIds.indexOf(id)>=0; } : function(){ return true; };
     if(hasSupa){ // 会社側=RLSで自分の発行分のみ。init_code/pw_hashは自分の行なので読める(従業員anonは直read不可)
       return Promise.all([
-        sb.from('pay_meisai_pub').select('token,employee_id,init_code,pw_hash,consent_at'),
-        sb.from('pay_meisai_docs').select('token,ym,kind,published_at,opened_at,data')
+        fetchAllQ(function(a,b){ return sb.from('pay_meisai_pub').select('token,employee_id,init_code,pw_hash,consent_at',{count:'exact'}).range(a,b); }),
+        fetchAllQ(function(a,b){ return sb.from('pay_meisai_docs').select('token,ym,kind,published_at,opened_at,data',{count:'exact'}).range(a,b); })
       ]).then(function(res){
         var pubs=(res[0].data||[]), docs=(res[1].data||[]);
         return pubs.filter(function(p){ return keep(p.employee_id); }).map(function(p){
@@ -439,7 +458,7 @@
   // 会社: 提出済みの申告一覧(その年)。RLSで自分の発行分のみ。返り=[{employeeId,decl,submittedAt,updatedAt}]
   Store.listNenchoDecl = function(year){
     if(hasSupa){
-      return sb.from('pay_nencho_decl').select('employee_id,decl,submitted_at,updated_at').eq('year', year).then(function(r){
+      return fetchAllQ(function(a,b){ return sb.from('pay_nencho_decl').select('employee_id,decl,submitted_at,updated_at',{count:'exact'}).eq('year', year).range(a,b); }).then(function(r){
         return (r.data||[]).map(function(x){ return { employeeId:x.employee_id, decl:x.decl||{}, submittedAt:x.submitted_at, updatedAt:x.updated_at }; });
       });
     }
@@ -483,7 +502,7 @@
   // 会社: 提出済みの振込先一覧。RLSで自分の発行分のみ。返り=[{employeeId,data,submittedAt,updatedAt}]
   Store.listEmpProfile = function(){
     if(hasSupa){
-      return sb.from('pay_emp_profile').select('employee_id,data,submitted_at,updated_at').then(function(r){
+      return fetchAllQ(function(a,b){ return sb.from('pay_emp_profile').select('employee_id,data,submitted_at,updated_at',{count:'exact'}).range(a,b); }).then(function(r){
         return (r.data||[]).map(function(x){ return { employeeId:x.employee_id, data:x.data||{}, submittedAt:x.submitted_at, updatedAt:x.updated_at }; });
       });
     }
@@ -492,7 +511,7 @@
 
   // 中央の法定データ(statutory テーブル)を取得。全アプリ共通・anon読取可。localやDB無しは[]=libのハードコードで動く(フォールバック)。
   Store.getStatutory = function(){
-    if(hasSupa){ return sb.from('statutory').select('kind,year,data').then(function(r){ return r.data||[]; }).catch(function(){ return []; }); }
+    if(hasSupa){ return fetchAllQ(function(a,b){ return sb.from('statutory').select('kind,year,data',{count:'exact'}).range(a,b); }).then(function(r){ return r.data||[]; }).catch(function(){ return []; }); }
     return Promise.resolve([]);
   };
 
