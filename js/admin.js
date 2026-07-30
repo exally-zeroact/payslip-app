@@ -8,6 +8,22 @@
   var sb = window.supabase.createClient(window.SUPA.url, window.SUPA.key);
   var $ = function (id) { return document.getElementById(id); };
 
+  // 全件ページング(PostgREST既定 max_rows=1000 で全ユーザー/全法定行が黙って切れるのを根治)。
+  // build=(from,to)=>.select(cols,{count:'exact'})...range(from,to) を付けた完成クエリ。返り={data,error,count}。
+  function fetchAllQ(build) {
+    var out = [], from = 0, size = 1000;
+    function step() {
+      return Promise.resolve(build(from, from + size - 1)).then(function (r) {
+        if (r.error) return { data: null, error: r.error };
+        var got = r.data || []; out = out.concat(got);
+        if (!got.length || r.count == null || out.length >= r.count)
+          return { data: out, error: null, count: (r.count == null ? out.length : r.count) };
+        from += size; return step();
+      });
+    }
+    return step();
+  }
+
   var PLANS = [
     { key: 'trial', label: 'お試し' },
     { key: 'paid', label: '有料' },
@@ -54,7 +70,7 @@
 
   function loadList() {
     $('stat').textContent = '読み込み中…';
-    sb.from('exally_entitlements').select('account_id,app,plan,email,created_at').order('email', { ascending: true }).then(function (r) {
+    fetchAllQ(function (a, b) { return sb.from('exally_entitlements').select('account_id,app,plan,email,created_at', { count: 'exact' }).order('email', { ascending: true }).range(a, b); }).then(function (r) {
       if (r.error) { $('stat').textContent = '読み込みエラー: ' + r.error.message; rows = []; render(); return; }
       rows = r.data || []; render();
     });
@@ -157,7 +173,7 @@
     var desired;
     try { desired = SR.buildStatutoryRows(resolveLibs()); }
     catch (e) { $('statutory-stat').textContent = '内蔵値の生成に失敗: ' + e.message; return; }
-    sb.from('statutory').select('kind,year,data').then(function (r) {
+    fetchAllQ(function (a, b) { return sb.from('statutory').select('kind,year,data', { count: 'exact' }).range(a, b); }).then(function (r) {
       if (r.error) { $('statutory-stat').textContent = '中央の読み込みエラー: ' + r.error.message; return; }
       var diffs = SR.diffRows(desired, r.data || []);
       renderStatutory(diffs);

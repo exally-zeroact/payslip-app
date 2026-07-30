@@ -13,7 +13,8 @@
     "test:qr": "node tests/qr.test.mjs",
     "test:nencho": "node tests/nencho-compute.test.mjs",
     "test:login": "node tests/exally-login.test.mjs",
-    "test:all": "node tests/run.js && node tests/integration.mjs && node tests/payroll-patterns.mjs && node tests/ui-smoke.mjs && node tests/cloud-sync.mjs && node tests/meisai-store.mjs && node tests/qr.test.mjs && node tests/nencho-web-declaration.test.js && node tests/nencho-compute.test.mjs && node tests/exally-login.test.mjs"
+    "test:pagination": "node tests/pagination.test.mjs",
+    "test:all": "node tests/run.js && node tests/integration.mjs && node tests/payroll-patterns.mjs && node tests/ui-smoke.mjs && node tests/cloud-sync.mjs && node tests/pagination.test.mjs && node tests/meisai-store.mjs && node tests/qr.test.mjs && node tests/nencho-web-declaration.test.js && node tests/nencho-compute.test.mjs && node tests/exally-login.test.mjs"
   },
   "devDependencies": {
     "jsdom": "^29.1.1",
