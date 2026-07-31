@@ -15,7 +15,9 @@
     "test:login": "node tests/exally-login.test.mjs",
     "test:pagination": "node tests/pagination.test.mjs",
     "test:golden": "node tests/golden-immutable.test.mjs",
-    "test:all": "node tests/run.js && node tests/integration.mjs && node tests/payroll-patterns.mjs && node tests/ui-smoke.mjs && node tests/cloud-sync.mjs && node tests/pagination.test.mjs && node tests/meisai-store.mjs && node tests/qr.test.mjs && node tests/nencho-web-declaration.test.js && node tests/nencho-compute.test.mjs && node tests/exally-login.test.mjs && node tests/golden-immutable.test.mjs"
+    "test:headless": "node scripts/verify-headless.mjs",
+    "test:ops": "node tests/ops-golden-parity.test.mjs && node tests/ops-payroll-monthly.test.mjs && node tests/law-switchpoints.test.mjs",
+    "test:all": "node tests/run.js && node tests/integration.mjs && node tests/payroll-patterns.mjs && node tests/ui-smoke.mjs && node tests/cloud-sync.mjs && node tests/pagination.test.mjs && node tests/meisai-store.mjs && node tests/qr.test.mjs && node tests/nencho-web-declaration.test.js && node tests/nencho-compute.test.mjs && node tests/exally-login.test.mjs && node tests/golden-immutable.test.mjs && node scripts/verify-headless.mjs && node tests/ops-golden-parity.test.mjs && node tests/ops-payroll-monthly.test.mjs && node tests/law-switchpoints.test.mjs"
   },
   "devDependencies": {
     "jsdom": "^29.1.1",

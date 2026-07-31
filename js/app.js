@@ -3,7 +3,14 @@
   'use strict';
   var $=function(s,r){return (r||document).querySelector(s);};
   var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
-  var num=function(v){var s=String(v==null?0:v).replace(/[０-９]/g,function(d){return String.fromCharCode(d.charCodeAt(0)-0xFEE0);}).replace(/[，、]/g,'').replace(/[, ]/g,'');var n=Number(s);return isNaN(n)?0:n;}; // 全角数字/読点も数値化(M3: 全角123が0に化けるのを防ぐ)
+  /* -- 計算/警告エンジンへの委譲 --
+   * 月次給与の計算は lib/payroll-monthly.js、黄警告は lib/payroll-warnings.js が唯一の真実源。
+   * app.js に計算式は置かない(グリッド/チャット/CI が同じ物を呼べるようにするため)。
+   * ctxOf() が state(対象月・会社設定・36協定履歴)をエンジンへ渡す唯一の橋。 */
+  function PM(){ return (typeof PayrollMonthly!=='undefined')?PayrollMonthly:(typeof window!=='undefined'&&window.PayrollMonthly); }
+  function PW(){ return (typeof PayrollWarnings!=='undefined')?PayrollWarnings:(typeof window!=='undefined'&&window.PayrollWarnings); }
+  function ctxOf(){ return { company: state.company, month: state.month, otHist: state._otHist }; }
+  var num=function(v){ return PM().num(v); }; // 数値化は lib/payroll-monthly.js へ移設(単一定義)
   var yen=function(n){return '¥'+Math.round(n).toLocaleString('ja-JP');};
   var fmtN=function(v){var n=num(v);return n?n.toLocaleString('ja-JP'):(v===0||v==='0'?'0':'');};
   function activeEmps(){ return state.employees.filter(function(e){return !e.retired;}); } // 稼働中(退職を除く)
@@ -29,7 +36,7 @@
   var PAYTYPES=['月給','時給','日給','歩合','役員','カスタム'];
   function PR(){ return (typeof PayRule!=='undefined')?PayRule:(window&&window.PayRule); }
   // カスタム給の既定spec(固定 +「歩合 か 時給×時間 の高い方」)。payType=カスタムに切替時にlazy初期化。
-  function defPayRule(){ return { fixed:'', variable:{ mode:'max', parts:[{type:'commission',amount:'',label:''},{type:'hourly',amount:'',label:''}] } }; }
+  function defPayRule(){ return PM().defPayRule(); }
   // 保存/クラウドから読んだ従業員に既定値をマージ(会社と同じ防御)。旧保存で欠けた新項目をundefinedにしない=将来のクラッシュ防止(D2)。
   //  ネストも既定で埋める(warimashi/shaho)=浅いassignだけだと部分オブジェクトが残るため。
   function mergeEmp(x){ var e=Object.assign(defEmp(), x||{});
@@ -38,7 +45,7 @@
     e.shaho=Object.assign({}, d.shaho, x&&x.shaho); if(!Array.isArray(e.shaho.months)) e.shaho.months=d.shaho.months;
     if(!Array.isArray(e.kintai)) e.kintai=d.kintai; if(!Array.isArray(e.shikyu)) e.shikyu=d.shikyu; if(!Array.isArray(e.extraKojo)) e.extraKojo=[];
     return e; }
-  function ensurePayRule(e){ if(!e.payRule||!e.payRule.variable) e.payRule=defPayRule(); if(!e.payRule.variable.parts) e.payRule.variable.parts=[]; return e.payRule; }
+  function ensurePayRule(e){ return PM().ensurePayRule(e); }
   // 段階制の段(下限/率)を設定。key='i:idx:tidx:from|rate'。from=整数円 / rate=小数%許容。
   function prTierSet(e,key,val){ var p=String(key).split(':'); var part=ensurePayRule(e).variable.parts[+p[1]]; if(!part)return; if(!part.tiers)part.tiers=[]; var tr=part.tiers[+p[2]]; if(!tr){ tr={from:'',rate:''}; part.tiers[+p[2]]=tr; }
     if(p[3]==='rate'){ var v=String(val).replace(/[^0-9.]/g,''); var dot=v.indexOf('.'); if(dot>=0)v=v.slice(0,dot+1)+v.slice(dot+1).replace(/\./g,''); tr.rate=v; }
@@ -100,8 +107,8 @@
   // spec+当月コンテキストで基本給を評価(PayRule)。ctx=労働時間/出勤日数/売上。
   //  ★K4: 台帳(pay_ledger)を取り込んだ月は e._ledgerCtx(台帳集計)を使う=二度手間ゼロ・単一ソース(§5-2)。
   //     _ledgerCtx は `_`始まりなので保存されず、取り込みの度に台帳から再導出される。
-  function payRuleCtx(e){ if(e&&e._ledgerCtx) return e._ledgerCtx; return { workMin:workedMin(e), workDays:kintaiVal(e,/出勤/), sales:num(e.salesAmt), commission:num(e.commissionAmt), count:num(e.pieceCount) }; }
-  function payRuleResult(e){ var pr=PR(); if(!pr)return null; ensurePayRule(e); return pr.basePay(e.payRule, payRuleCtx(e)); } // B5: payRule未初期化(null)でも既定を作ってから評価=基本給0の黙り込みを防ぐ
+  function payRuleCtx(e){ return PM().payRuleCtx(e); }
+  function payRuleResult(e){ return PM().payRuleResult(e); }
   // ★K4: 台帳(pay_ledger)行を従業員ごとに単一ソース集計→各従業員に _ledgerCtx を載せる純関数(テスト対象)。
   //  rows=[{employee_id,ymd,data}](Store.getLedgerの返り)。単一ソース(§5-2)=同じ(emp,ymd)は台帳のみ・dailyEntriesは台帳に無い日だけ補完。
   //  返り: { applied:[名前...], matched, unmatched:[台帳にあるがKyuallyに居ないemployee_id...] }
@@ -204,7 +211,7 @@
   var EMPLOY_GYOSHU=[['ippan','一般の事業'],['kensetsu','建設の事業'],['norin','農林水産・清酒製造']];
   // 雇用保険料率は lib/koyo-hoken.js を単一ソースに(年度別・労働保険年度4月切替・厚労省照合済)。app側は薄いラッパで委譲。
   function KH(){ return (typeof KoyoHoken!=='undefined')?KoyoHoken:(window&&window.KoyoHoken); }
-  function employRateOf(code,year){ var k=KH(); if(!k) return 0.005; return k.employRate(code, year||k.employYearOfYm(state.month)); }
+  function employRateOf(code,year){ return PM().employRateOf(code, year, ctxOf()); }
 
   // ライブラリは const SHAKAIHOKEN_HYO 定義で window に付かない→bare参照で取得
   function SHH(){ try{ if(typeof SHAKAIHOKEN_HYO!=='undefined'&&SHAKAIHOKEN_HYO) return SHAKAIHOKEN_HYO; }catch(e){} return (typeof window!=='undefined'&&window.SHAKAIHOKEN_HYO)||null; }
@@ -212,167 +219,31 @@
   function SC(){ try{ if(typeof ShiharaiChosho!=='undefined'&&ShiharaiChosho) return ShiharaiChosho; }catch(e){} return (typeof window!=='undefined'&&window.ShiharaiChosho)||null; } // K3 支払調書/源泉
   // 最賃算入判定(最賃法4条3項・施行規則1条)。★最賃に算入しないのは=割増(所定外/休日/深夜)・通勤・家族・精皆勤・臨時/1か月超(賞与等)・控除行・基本給(baseで別計上)★。
   //  それ以外の手当(役職/職務/住宅/技能/資格/営業/地域/調整/食事/単身赴任 等)は算入。割増基礎(isInBasis)とは除外リストが異なる=別関数。
-  function isInMinWage(label){
-    label=label||'';
-    if(/割増|残業|時間外|深夜|休日(出勤)?手当/.test(label)) return false;   // 所定外・休日・深夜(規則1条3〜5号)
-    if(/通勤|家族|扶養|皆勤|精勤/.test(label)) return false;               // 精皆勤・通勤・家族(規則1条6号)
-    if(/賞与|一時金|臨時|寸志|決算賞与|報奨金|インセンティブ/.test(label)) return false; // 臨時・1か月超(4条3項1・2号)
-    if(/控除|欠勤|不就労|返還|立替/.test(label)) return false;             // マイナス行は算入賃金でない
-    if(/基本給/.test(label)) return false;                                 // 基本給はbaseで別計上(二重計上防止)
-    return true;
-  }
-  // 最賃算入の固定手当(月額・契約額=e.shikyuは日割前)。基本給と除外手当を除く。
-  function minWageTeate(e){ return (e.shikyu||[]).filter(function(x){ return isInMinWage(x.label) && num(x.value)>0; }).reduce(function(a,x){return a+num(x.value);},0); }
-  // 最低賃金チェック(事業所所在地=従業員prefの地域別最賃と時間額を比較)。役員/休業中は対象外。返り{hourly,minWage,prefName,ok,teate}
-  function minWageInfo(e){
-    if(!e||e.payType==='役員'||e.employmentType==='contractor'||(e.workStatus&&e.workStatus!=='normal')) return null;
-    var S=SAI(); if(!S||!S.getChingin) return null;
-    var mw=S.getChingin(e.pref); if(!mw) return null;
-    var co=state.company||{};
-    var ah=(e.annualHolidays!=null&&e.annualHolidays!=='')?e.annualHolidays:co.annualHolidays;
-    var dwh=num((e.dailyWorkH!=null&&e.dailyWorkH!=='')?e.dailyWorkH:co.dailyWorkH)+num((e.dailyWorkM!=null&&e.dailyWorkM!=='')?e.dailyWorkM:co.dailyWorkM)/60;
-    var ly=parseInt(String(state.month||'').slice(0,4),10)||0, leap=(ly%4===0&&ly%100!==0)||(ly%400===0);
-    var stdH=window.Warimashi?Warimashi.monthlyStdHours(ah,dwh,leap):0;
-    var teate=minWageTeate(e);                                   // 最賃算入の固定手当(月額)
-    var teateHourly= stdH>0 ? teate/stdH : 0;                    // 手当を月平均所定時間で時給換算し基本給の時給に加算(最賃法どおり手当も算入)
-    var hourly=0;
-    if(e.payType==='時給') hourly=num(e.hourly)+teateHourly;
-    else if(e.payType==='日給') hourly= (dwh>0? num(e.base)/dwh : 0)+teateHourly;
-    else if(e.payType==='歩合'){ var wmw=workedMin(e); var gpw=window.Warimashi?Warimashi.guaranteePay(e.hourlyGuarantee,wmw):Math.round(num(e.hourlyGuarantee)*wmw/60); var bpw=Math.max(num(e.commissionAmt),gpw); hourly= (wmw>0? bpw/(wmw/60) : 0)+teateHourly; } // 歩合=賃金合計(高い方)÷総労働時間で最賃判定
-    else if(e.payType==='カスタム'){ var wmc=payRuleCtx(e).workMin; var prc=payRuleResult(e); var bpc=prc?prc.base:0; hourly= (wmc>0? bpc/(wmc/60) : 0)+teateHourly; } // カスタム=基本給÷総労働時間(★K4:基本給と同じソース=台帳取り込み時は台帳のworkMin。未取り込みはworkedMin(e)と同値)
-    else { hourly= (stdH>0? num(e.base)/stdH : 0)+teateHourly; } // 月給=基本給÷月平均所定時間＋算入手当
-    hourly=Math.floor(hourly);
-    // 減額の特例(最賃法7条・労働局長許可): 障害者/試用期間/認定職業訓練/軽易業務/断続的労働。許可された減額率(%)で最賃を下げて判定。
-    //  減額後最賃=最賃×(1−率)を円未満切り上げ(労働者有利・記入要領)。率は会社が許可どおり入力。
-    var reduce=Math.max(0, Math.min(100, num(e.minWageReduce)));
-    var effMw = reduce>0 ? Math.ceil(mw*(100-reduce)/100) : mw;
-    return { hourly:hourly, minWage:mw, effMinWage:effMw, reduce:reduce, prefName:((S.todofuken||{})[e.pref]||{}).name||'', ok:(hourly===0||hourly>=effMw), teate:teate, stale:(S.saiteiStale?S.saiteiStale(state.month):false) };
-  }
-  // 最賃割れのtooltip/説明文(表ビューの⚠とカードのバナーで文面を統一)。製品方針=黄色・非ブロック・具体的に伝える。
-  function mwWarnText(mw){ var v=(mw.reduce>0)?mw.effMinWage:mw.minWage, sfx=(mw.reduce>0)?'（減額特例'+fmtN(mw.reduce)+'%後）':''; return '最低賃金（'+esc(mw.prefName)+'：時給'+fmtN(v)+'円'+sfx+'）を下回っています（約'+fmtN(mw.hourly)+'円）'; }
-  // 出来高払制の保障給チェック(労基法27条)。完全歩合で保障(時給/日給の下限 or 固定給)が一切ない=27条違反の恐れ。役員/休業中は対象外。返り{ok} ok=false=無保障。
-  //  ★製品方針=黄色・非ブロック(違法・グレーでもユーザーが選択/入力して使えるようにする=注意のみ)。構造判定は lib/pay-rule.js の lacksGuarantee に集約。
-  function hoshoInfo(e){
-    if(!e||e.payType==='役員'||e.employmentType==='contractor'||(e.workStatus&&e.workStatus!=='normal')) return null;
-    if(e.payType==='歩合') return { ok: num(e.hourlyGuarantee)>0 };                 // 歩合payType=保障給の時給が未設定(0)なら無保障
-    if(e.payType==='カスタム'){ if(!e.payRule||!window.PayRule||!PayRule.lacksGuarantee) return null; return { ok: !PayRule.lacksGuarantee(e.payRule) }; }
-    return null;                                                                    // 月給/時給/日給=定額or時間給=保障あり(対象外)
-  }
-  function hoshoWarnText(){ return '<b>保障給がありません</b>（労基法27条）。出来高払・歩合で働く人には<b>労働時間に応じた保障給</b>（例：時給の下限）が必要で、保障のない完全歩合は違反の恐れがあります。決め方を<b>「高い方（完全歩合＋保障）」</b>にして<b>時給×時間</b>の候補を足すか、歩合形態なら<b>保障給の時給</b>を入れてください。'; }
-  // 割増率が法定下限を下回る時の黄警告(労基37条)。会社は上げてよいが下回りは違法の恐れ→非ブロックで注意。
-  function rateFloorWarn(co){
-    if(!window.Warimashi||!Warimashi.belowLegalRates) return '';
-    var pr=function(v){ return (v!=null&&v!=='')?num(v)/100:undefined; };
-    var low=Warimashi.belowLegalRates({ ot:pr(co.rateOt), holiday:pr(co.rateHoliday), night:pr(co.rateNight), over60Add:pr(co.rateOver60) });
-    if(!low.length) return '';
-    var names=low.map(function(x){ return x.label+'（'+Math.round(x.value*100)+'%→法定'+Math.round(x.floor*100)+'%）'; }).join('・');
-    return '<div class="cr-warn" style="margin:6px 2px 0">⚠ 割増の率が<b>法定下限</b>を下回っています：'+names+'。労基法37条の下限（時間外25%／休日35％／深夜+25%／月60時間超+25%）以上が必要です（このまま保存・計算はできます）。</div>';
-  }
-  // 年間所定労働時間が法定(週40h)目安を超える時の黄警告(労基32条)。年間休日過少/長時間所定。役員/休業中は対象外。
-  //  ★ヘルプ(annual)で「黄色で教えます」と約束している警告の実体。変形労働時間制なら適法もあり=注意のみ・非ブロック。
-  function annualHoursInfo(e){
-    if(!e||e.payType==='役員'||e.employmentType==='contractor'||(e.workStatus&&e.workStatus!=='normal')) return null;
-    if(!window.Warimashi||!Warimashi.annualHoursCheck) return null;
-    var co=state.company||{};
-    var ah=(e.annualHolidays!=null&&e.annualHolidays!=='')?e.annualHolidays:co.annualHolidays;
-    var dwh=num((e.dailyWorkH!=null&&e.dailyWorkH!=='')?e.dailyWorkH:co.dailyWorkH)+num((e.dailyWorkM!=null&&e.dailyWorkM!=='')?e.dailyWorkM:co.dailyWorkM)/60;
-    var ly=parseInt(String(state.month||'').slice(0,4),10)||0, leap=(ly%4===0&&ly%100!==0)||(ly%400===0);
-    return Warimashi.annualHoursCheck(ah, dwh, leap);
-  }
-  function annualHoursWarnText(r){ return '<b>年間の労働時間が法律の目安（週40時間）を超えています</b>（約'+fmtN(Math.round(r.annualHours))+'時間／週あたり約'+(Math.round(r.avgWeekly*10)/10)+'時間・労基法32条）。年間休日を増やすか1日の所定を短くしてください。変形労働時間制なら適法な場合もあります（このまま保存・計算はできます）。'; }
-  // 当月の時間外/深夜/休日の総分数(かんたん/詳細 両モード対応)。④36協定上限・⑤年少者規制の判定に使う。
-  function warimashiMins(w){
-    w=w||{};
-    if((w.mode||'easy')==='detail'){ var d=w.detail||{}; var g=function(k){ return dmin(d[k]); };
-      return { otMin:g('ot')+g('otNight')+g('over60')+g('over60Night'), nightMin:g('night')+g('otNight')+g('over60Night')+g('holidayNight'), holidayMin:g('holiday')+g('holidayNight') }; }
-    return { otMin:dmin({h:w.otH,m:w.otM}), nightMin:dmin({h:w.nightH,m:w.nightM}), holidayMin:dmin({h:w.holidayH,m:w.holidayM}) };
-  }
-  // ④36協定 時間外上限(労基36条)＋⑤年少者(18歳未満)の時間外/深夜/休日規制(労基60/61条)の黄警告。役員は労働時間規制の対象外。非ブロック。
-  // ④⑤の警告メッセージ配列(HTMLの<b>込み)を単一ソースで返す。カードはcr-warn・表ビューは⚠tooltipで共用。
-  function laborLimitItems(e){
-    if(!e||e.payType==='役員') return [];
-    var W=window.Warimashi, PC=window.PayrollCalc; if(!W) return []; var m=warimashiMins(e.warimashi); var out=[];
-    if(W.overtimeLimitLevel){ var lv=W.overtimeLimitLevel(m.otMin, m.holidayMin);
-      if(lv==='over100') out.push('<b>時間外＋休日労働</b>が<b>単月100時間以上</b>です。36協定の特別条項でも<b>上限違反の恐れ</b>があります（労基法36条・いわゆる過労死ライン）');
-      else if(lv==='over45') out.push('時間外が<b>月45時間</b>を超えています。原則の上限を超えるには36協定の<b>特別条項</b>が必要です（労基法36条）'); }
-    if(PC&&PC.isMinor&&PC.isMinor(e.birthYmd,state.month)){
-      if(m.nightMin>0) out.push('<b>18歳未満</b>の方に<b>深夜（22時〜翌5時）の労働</b>が入っています。年少者の深夜業は原則禁止です（労基法61条）');
-      if(m.otMin>0||m.holidayMin>0) out.push('<b>18歳未満</b>の方に<b>時間外・休日労働</b>が入っています。年少者は原則できません（労基法60条）'); }
-    // 36協定 特別条項の複数月/年の上限(履歴=保存済み過去11ヶ月[loadOtHistory]＋当月liveを合成)
-    if(W.overtime36Check){
-      var hist=((state._otHist||{})[e.id]||[]).map(function(x){ return { otMin:x.otMin, holidayMin:x.holidayMin }; });
-      var c36=W.overtime36Check(hist.concat([{ otMin:m.otMin, holidayMin:m.holidayMin }]));
-      if(c36.over80) out.push('直近<b>'+c36.over80.months+'か月</b>の時間外＋休日の平均が<b>月80時間</b>を超えています（約'+fmtN(Math.round(c36.over80.avgMin/60))+'h/月）。特別条項でも複数月平均80hが上限です（労基法36条）');
-      if(c36.over720) out.push('直近12か月の時間外が<b>年720時間</b>を超えています（約'+fmtN(Math.round(c36.over720.totalMin/60))+'h/年）。特別条項でも年720hが上限です（労基法36条）');
-      if(c36.over45count>6) out.push('時間外が<b>月45時間を超えた月が年'+c36.over45count+'回</b>あります。特別条項でも年6回までです（労基法36条）'); }
-    return out;
-  }
-  function laborLimitWarn(e){ return laborLimitItems(e).map(function(t){ return '<div class="cr-warn" style="margin:8px 0 0">⚠ '+t+'。</div>'; }).join(''); }
-  function laborLimitText(e){ return laborLimitItems(e).map(function(t){ return t.replace(/<[^>]+>/g,''); }).join(' / '); } // 表ビューの⚠tooltip用(タグ除去)
-  // ③社会保険(健保/厚年)を常用らしい人で恣意的にオフにした時の黄警告(健保法/厚年法の強制加入)。産育休/休職の免除・年齢による自動喪失・短時間は対象外。非ブロック。
-  function shahoOffWarn(e){
-    if(!e||(e.workStatus&&e.workStatus!=='normal')) return '';           // 産育休/休職等=正当な免除/調整
-    if(!(e.payType==='月給'||e.payType==='役員')) return '';             // 時給/日給/歩合の短時間は適用除外の可能性=誤警告回避
-    if(e.shortTimeType) return '';                                       // 短時間就労者/短時間労働者を宣言済=適用除外の可能性=誤警告回避(L-3)
-    var PC=window.PayrollCalc, ap=e.apply||{}, off=[];
-    var healthElig=!(PC&&PC.isHealthTarget)||PC.isHealthTarget(e.birthYmd,state.month);   // 75歳未満=加入対象
-    var pensionElig=!(PC&&PC.isPensionTarget)||PC.isPensionTarget(e.birthYmd,state.month); // 70歳未満=加入対象
-    if(ap.health===false && healthElig) off.push('健康保険');
-    if(ap.pension===false && pensionElig) off.push('厚生年金');
-    if(!off.length) return '';
-    return '<div class="cr-warn" style="margin:6px 2px 0">⚠ '+off.join('・')+'をオフにしています。<b>短時間労働者などの適用除外</b>でなければ、常用の方は<b>加入が必要</b>です（健保法・厚年法。最終判断は会社でご確認ください）。</div>';
-  }
-  // 正社員(通常労働者)の週所定労働時間 = 1日の所定 × 週の労働日数(7 − 休みの曜日数)。会社設定から導出。未設定は法定上限40hで代用。
-  function fullTimeWeeklyH(){
-    var c=state.company||{};
-    var dwh=num(c.dailyWorkH)+num(c.dailyWorkM)/60; if(dwh<=0) return 40;
-    var offDays=((c.holidays||[]).length); var workDays=7-offDays; if(workDays<=0||workDays>7) workDays=5;
-    var h=dwh*workDays; return (h>0&&h<=60)?h:40; // 常識外の値は40hで代用(誤判定防止)
-  }
-  // その人の「所定内 月額賃金」推定(社保88,000円判定用)。残業/賞与/通勤/家族/精皆勤は含めない=最賃算入賃金と同じ考え方。
-  //  時給=時給×(週所定×52/12)/ 日給=日給×月所定日数概算 / 月給等=基本給+最賃算入手当。あくまで概算(黄警告の入口・最終は会社確認)。
-  function shoteiMonthlyWage(e){
-    var wk=num(e.weeklyScheduledH);
-    if(e.payType==='時給'){ return Math.round(num(e.hourly)*(wk>0?wk*52/12:0)); }
-    if(e.payType==='日給'){ var dwh=num((e.dailyWorkH!=''&&e.dailyWorkH!=null)?e.dailyWorkH:(state.company||{}).dailyWorkH)+num((e.dailyWorkM!=''&&e.dailyWorkM!=null)?e.dailyWorkM:(state.company||{}).dailyWorkM)/60; var days=(dwh>0&&wk>0)?(wk/dwh*52/12):0; return Math.round(num(e.base)*days); }
-    return num(e.base)+(minWageTeate?num(minWageTeate(e)):0); // 月給/役員/歩合/カスタム=基本給+最賃算入手当
-  }
-  // ②社保 加入判定の黄警告(短時間労働者)。lib/shaho-kanyu.js。役員/業務委託/休職・既に社保オンは対象外。誤警告ゼロ最優先。
-  function shahoKanyuWarn(e){
-    var SK=(typeof ShahoKanyu!=='undefined')?ShahoKanyu:(window&&window.ShahoKanyu); if(!SK) return '';
-    if(!e||e.employmentType==='contractor'||e.payType==='役員'||(e.workStatus&&e.workStatus!=='normal')) return '';
-    var wk=num(e.weeklyScheduledH); if(wk<=0) return ''; // 週所定未入力=判定材料なし(誤警告しない)
-    var ap=e.apply||{}, alreadyOn=(ap.health!==false)&&(ap.pension!==false); // 既に健保・厚年オン=加入済み→注意不要
-    if(alreadyOn) return '';
-    var r=SK.judge({ weeklyH:wk, fullTimeWeeklyH:fullTimeWeeklyH(), monthlyShoteiWage:shoteiMonthlyWage(e),
-      isStudent:!!e.honninKinrou, tokuteiTekiyo:!!(state.company&&state.company.shakaTokutei), ym:state.month });
-    if(!r.required) return '';
-    return '<div class="cr-warn" style="margin:6px 2px 0">⚠ この方は<b>社会保険（健康保険・厚生年金）の加入対象の可能性</b>があります（'+esc(r.reasons.join('／'))+'）。健保・厚年をオフにしています。最終判断は会社・年金事務所でご確認ください。</div>';
-  }
-  // 対象月の法定値(社保料率・所得税額表・最低賃金)が未収録年度なら暫定計算の黄警告(silent-wrong防止)。値は捏造せず直近収録値で暫定。
-  function statutoryStaleWarn(){
-    var msgs=[]; var S=SHH();
-    if(S&&S.getKenko){ var k=S.getKenko('tokyo', state.month); if(k&&k.stale) msgs.push('社会保険料率・所得税額表'); }
-    var SA=SAI();
-    if(SA&&SA.saiteiStale&&SA.saiteiStale(state.month)) msgs.push('最低賃金');
-    if(!msgs.length) return '';
-    return '<div class="cr-warn" style="margin:0 0 10px">⚠ 対象月（'+esc(state.month)+'）の <b>'+msgs.join('・')+'</b> は未収録の年度です。直近の収録年度の値で<b>暫定計算</b>しています（公式値が公表されたらデータ更新が必要）。</div>';
-  }
-  // 経理向け警告(最賃割れ/差引マイナス/休業手当未入力)。従業員に渡す明細でなく集計/Excelに出す。
-  function empWarnings(e){
-    var w=[]; var mw=minWageInfo(e); if(mw&&!mw.ok) w.push('最低賃金（'+mw.prefName+' 時給'+fmtN(mw.reduce>0?mw.effMinWage:mw.minWage)+'円'+(mw.reduce>0?'・減額特例'+fmtN(mw.reduce)+'%後':'')+'）未満（約'+fmtN(mw.hourly)+'円）');
-    try{ var r=compute(e); if(r&&r.netNegative) w.push('差引支給がマイナス'); }catch(_){}
-    if(e.workStatus==='kyugyo'&&num(e.leavePay)<=0) w.push('休業手当が未入力（平均賃金60%以上・労基26条）');
-    else if(e.workStatus==='kyugyo'&&e.payType==='月給'&&num(e.leavePay)>0&&num(e.leavePay)<0.4*num(e.base)) w.push('休業手当が平均賃金の60%を下回る可能性（労基26条・要確認）'); // 全月休業の下限≒平均賃金(月給/30.4)×0.6×所定20日≒0.4×基本給。誤警告を避け0.4未満のみ検知
-    var h=hoshoInfo(e); if(h&&!h.ok) w.push('保障給なし（完全歩合・労基27条の恐れ）');
-    return w;
-  }
+  function isInMinWage(label){ return PW().isInMinWage(label); }
+  function minWageTeate(e){ return PW().minWageTeate(e); }
+  function minWageInfo(e){ return PW().minWageInfo(e, ctxOf()); }
+  function mwWarnText(mw){ return PW().mwWarnText(mw); }
+  function hoshoInfo(e){ return PW().hoshoInfo(e); }
+  function hoshoWarnText(){ return PW().hoshoWarnText(); }
+  function rateFloorWarn(co){ return PW().rateFloorWarn(co); }
+  function annualHoursInfo(e){ return PW().annualHoursInfo(e, ctxOf()); }
+  function annualHoursWarnText(r){ return PW().annualHoursWarnText(r); }
+  function warimashiMins(w){ return PM().warimashiMins(w); }
+  function laborLimitItems(e){ return PW().laborLimitItems(e, ctxOf()); }
+  function laborLimitWarn(e){ return PW().laborLimitWarn(e, ctxOf()); }
+  function laborLimitText(e){ return PW().laborLimitText(e, ctxOf()); }
+  function shahoOffWarn(e){ return PW().shahoOffWarn(e, ctxOf()); }
+  function fullTimeWeeklyH(){ return PW().fullTimeWeeklyH(ctxOf()); }
+  function shoteiMonthlyWage(e){ return PW().shoteiMonthlyWage(e, ctxOf()); }
+  function shahoKanyuWarn(e){ return PW().shahoKanyuWarn(e, ctxOf()); }
+  function statutoryStaleWarn(){ return PW().statutoryStaleWarn(ctxOf()); }
+  function empWarnings(e){ return PW().empWarnings(e, ctxOf()); }
   function prefOptions(sel){
     var S=SHH(); var K=(S&&S.KENKO_RITSU)||{tokyo:{name:'東京都'}};
     return Object.keys(K).map(function(code){return '<option value="'+code+'"'+(code===sel?' selected':'')+'>'+esc(K[code].name)+'</option>';}).join('');
   }
   // 健保従業員負担率(対象月payYmの社保年度で自動選択)＋子育て支援金(令和8/4〜)。両方healthRateに含めて社保計算へ渡す。
-  function prefRate(code, payYm){ var S=SHH(); if(S&&S.getKenko){ var k=S.getKenko(code,payYm); var sh=S.getShienkin?S.getShienkin(payYm):0; return k.jugyoin+sh; } var K=(S&&S.KENKO_RITSU)||{}; return (K[code]&&K[code].jugyoin)||0.04955; }
+  function prefRate(code, payYm){ return PM().prefRate(code, payYm); }
 
   // ★新規従業員のひな型は"骨組みだけ"=決めつけ金額を持たない(基本給/時給/通勤/住民税/住宅手当は空=要入力)。
   //  勝手に手当や額が付くのを防ぐ。payType/pref/taxClass/fuyou/kintai 等の構造は既定を維持。
@@ -405,32 +276,17 @@
     employees:[defEmp('従業員 1')], open:{},
     inputMode:'monthly', printMode:'monthly', empFilter:'active', bonus:{ payYm:'', payDay:'', byEmp:{} }, confirmed:{}, nencho:{}, onboardDone:false, onboardOutput:false, payPatterns:[], dailySlipLayout:'1col', inputView:'card' };
 
-  // マイカー通勤 1か月非課税限度(片道km・国税庁No.2585 令和8年4月〜)★12区分 公式照合済2026-07★
-  function carCommuteNonTax(km){ km=num(km);
-    if(km<2)return 0; if(km<10)return 4200; if(km<15)return 7300; if(km<25)return 13500; if(km<35)return 19700; if(km<45)return 25900;
-    if(km<55)return 32300; if(km<65)return 38700; if(km<75)return 45700; if(km<85)return 52700; if(km<95)return 59600; return 66400; }
-  function commuteLimit(e){ return e.commuteType==='car' ? carCommuteNonTax(e.commuteKm) : 150000; }
-  // 通勤手当を shikyu に同期（commute>0なら通勤手当(非課税)行を用意・非課税限度を方法/距離で設定）
-  function syncCommute(e){
-    var idx=e.shikyu.findIndex(function(x){return /通勤/.test(x.label);});
-    var v=num(e.commute), lim=commuteLimit(e);
-    if(v>0){ if(idx<0) e.shikyu.push({label:'通勤手当',value:String(v),hikazei:true,nonTaxLimit:lim}); else { e.shikyu[idx].value=String(v); e.shikyu[idx].hikazei=true; e.shikyu[idx].nonTaxLimit=lim; } }
-    else if(idx>=0) e.shikyu.splice(idx,1);
-  }
+  function carCommuteNonTax(km){ return PM().carCommuteNonTax(km); }
+  function commuteLimit(e){ return PM().commuteLimit(e); }
+  function syncCommute(e){ return PM().syncCommute(e); }
   // 支払基礎日数の区分(日本年金機構)。一般=17日/短時間就労者(パート)=17日、3か月とも17日未満なら15日以上の月/短時間労働者(特定適用の社保加入)=11日。
   function stType(e){ return (e&&e.shortTimeType)||''; }
   function stLabel(e){ var t=stType(e); return t==='tanjikan'?'短時間労働者（社保）':t==='part'?'短時間就労者（パート）':''; }
-  function santeiRule(e){ var t=stType(e); return t==='tanjikan'?{primary:11,fallback:0}:t==='part'?{primary:17,fallback:15}:{primary:17,fallback:0}; } // 算定基礎(定時決定)の日数基準
-  function gekkakuTh(e){ return stType(e)==='tanjikan'?11:17; } // 随時改定は17日(短時間労働者のみ11日・パートの15日特例は無い)
-  function shahoBasisOf(e){ var s=e.shaho||{}, t=stType(e), th=(t==='tanjikan'?11:t==='part'?15:17); return PayslipCalc.shahoBase({ mode:s.mode||'teiji', months:s.months||[], mikomi:s.mikomi, value:s.manual, threshold:th }); }
-  // 割増基礎に入れるか（割増賃金は常に除外／明示include優先／明示exclude／既定は通勤・家族を除外＝実態の暫定）
-  function isInBasis(e,label){
-    label=label||''; if(/割増|残業|時間外|深夜|休日(出勤)?手当/.test(label)) return false; // 自動計算する割増系は単価基礎に入れない(二重防止)
-    if((e.wbInclude||[]).indexOf(label)>=0) return true;
-    if((e.wbExclude||[]).indexOf(label)>=0) return false;
-    return !/通勤|家族/.test(label);
-  }
-  function warimashiBasis(e){ return (e.shikyu||[]).filter(function(x){ return isInBasis(e,x.label); }).reduce(function(a,x){return a+num(x.value);},0); }
+  function santeiRule(e){ return PM().santeiRule(e); }
+  function gekkakuTh(e){ return PM().gekkakuTh(e); }
+  function shahoBasisOf(e){ return PM().shahoBasisOf(e); }
+  function isInBasis(e,label){ return PM().isInBasis(e,label); }
+  function warimashiBasis(e){ return PM().warimashiBasis(e); }
   // 割増の基礎に入れる手当チップ(従業員マスタの詳細に表示。毎月でなく一度決める設定)
   function basisBoxHTML(e){
     var labels=(e.shikyu||[]).map(function(x){return x.label;}).filter(function(l){return l && !/割増/.test(l);});
@@ -438,179 +294,27 @@
     var wiz=labels.map(function(l){ var on=isInBasis(e,l); return '<span class="wb-chip'+(on?' on':'')+'" data-wb="'+attr(l)+'">'+(on?'✓ ':'')+esc(l)+'</span>'; }).join('');
     return '<div class="wb-box"><div class="wb-h">割増の基礎に入れる手当<span class="help-i" data-help="warimashiBasis">💡</span></div><div class="wb-chips">'+wiz+'</div><div class="wb-note">通勤・家族手当は既定で外す。住宅手当などは全員一律なら入れる（実態で・詳しくは💡）。</div></div>';
   }
-  function dmin(o){ return num(o&&o.h)*60+num(o&&o.m); }
-  function warimashiOf(e){
-    if(!window.Warimashi) return {total:0,lines:[],unit:0};
-    if(e.payType==='役員') return {total:0,lines:[],unit:0}; // 役員は割増(残業)の概念なし
-    var co=state.company||{};
-    var pctRate=function(v){ return (v!=null&&v!=='')?num(v)/100:undefined; };
-    var rates={ ot:pctRate(co.rateOt), holiday:pctRate(co.rateHoliday), night:pctRate(co.rateNight), over60Add:pctRate(co.rateOver60) };
-    if(e.payType==='歩合'){ // 出来高払=単価(基本給÷総労働時間)に時間外+0.25/深夜+0.25/法定休日+0.35の上乗せのみ(1.0は基本給に内包)。会社の率上書きは歩合にも反映(rates)
-      var wc=e.warimashi||{}; var segc={ ot:dmin({h:wc.otH,m:wc.otM}), night:dmin({h:wc.nightH,m:wc.nightM}), holiday:dmin({h:wc.holidayH,m:wc.holidayM}) };
-      // ★割増の基礎は実際の基本給=高い方(歩合実績 vs 保障給)。保障給が効く月に割増が過小になるのを防ぐ(労基37条)
-      var wmin=workedMin(e); var baseForWari=Warimashi.commissionBasePay(num(e.commissionAmt), e.hourlyGuarantee, wmin);
-      return Warimashi.commission({ commissionTotal:baseForWari, totalWorkMin:wmin, seg:segc, rates:rates }); }
-    var ah=(e.annualHolidays!=null&&e.annualHolidays!=='')?e.annualHolidays:co.annualHolidays; // 会社規定・従業員で任意上書き
-    var dwh=(e.dailyWorkH!=null&&e.dailyWorkH!=='')?e.dailyWorkH:co.dailyWorkH;
-    var dwm=(e.dailyWorkM!=null&&e.dailyWorkM!=='')?e.dailyWorkM:co.dailyWorkM;
-    var ly=parseInt(String(state.month||'').slice(0,4),10)||0; var leap=(ly%4===0&&ly%100!==0)||(ly%400===0); // 対象月の年が閏年なら年間日数366(月平均所定の分母)
-    var mh=(e.minashiH!=null&&e.minashiH!=='')?e.minashiH:co.minashiH; var minashiMin=num(mh)*60; // 固定残業(みなし)時間=会社規定・従業員で上書き可。時間外の基本割増から控除
-    if(e.payType==='カスタム'){ // 固定側=通常割増(easy) + 歩合側=歩合上乗せ(commission) を分けて合算(労基37条・分解はPayRuleのfixedForWari/pieceworkForWari)
-      var pr=payRuleResult(e)||{fixedForWari:0,pieceworkForWari:0}; var wc2=e.warimashi||{};
-      var fixW=Warimashi.easy({ base:pr.fixedForWari, annualHolidays:ah, dailyHours:num(dwh)+num(dwm)/60, rates:rates, leap:leap, otH:wc2.otH, otM:wc2.otM, nightH:wc2.nightH, nightM:wc2.nightM, holidayH:wc2.holidayH, holidayM:wc2.holidayM, minashiMin:minashiMin });
-      var segp={ ot:dmin({h:wc2.otH,m:wc2.otM}), night:dmin({h:wc2.nightH,m:wc2.nightM}), holiday:dmin({h:wc2.holidayH,m:wc2.holidayM}) };
-      var pcW=Warimashi.commission({ commissionTotal:pr.pieceworkForWari, totalWorkMin:workedMin(e), seg:segp, rates:rates });
-      (fixW.lines||[]).forEach(function(l){ l.unit=fixW.unit; }); (pcW.lines||[]).forEach(function(l){ l.unit=pcW.unit; }); // 内訳の単価は各側の実単価(歩合側は commission が「歩合 …」とラベル済)
-      return { total:(fixW.total||0)+(pcW.total||0), lines:(fixW.lines||[]).concat(pcW.lines||[]), unit:(fixW.unit||pcW.unit||0), split:true };
-    }
-    var w=e.warimashi||{}, dailyH=num(dwh)+num(dwm)/60;
-    var common={ base:warimashiBasis(e), annualHolidays:ah, dailyHours:dailyH, rates:rates, leap:leap };
-    // ★時給/日給の割増単価は労基則19条=時給(時給額そのもの) / 日給(日給額÷1日所定時間)。一律手当(月額)は月平均所定で時給換算して加算。
-    //  月給/カスタムは従来どおり(基礎÷月平均所定)＝common.unit未指定。日給者の残業が月給算式で過小になるsilent-wrongを根治(P0)。
-    if(e.payType==='時給'||e.payType==='日給'){
-      var stdH=Warimashi.monthlyStdHours(ah, dailyH, leap);
-      var baseShikyu=(e.shikyu||[]).filter(function(x){return /基本給/.test(x.label||'');}).reduce(function(a,x){return a+num(x.value);},0);
-      var teateMonthly=Math.max(0, warimashiBasis(e)-baseShikyu);
-      var baseHourly=(e.payType==='時給')? num(e.hourly) : (dailyH>0? num(e.base)/dailyH : 0);
-      common.unit = baseHourly + (stdH>0? teateMonthly/stdH : 0);
-    }
-    if(w.mode==='detail'){
-      var d=w.detail||{}; var seg={}; ['ot','otNight','over60','over60Night','night','holiday','holidayNight'].forEach(function(k){ seg[k]=dmin(d[k]); });
-      return Warimashi.detail({ base:common.base, unit:common.unit, annualHolidays:common.annualHolidays, dailyHours:common.dailyHours, rates:common.rates, leap:common.leap, seg:seg, minashiMin:minashiMin });
-    }
-    return Warimashi.easy({ base:common.base, unit:common.unit, annualHolidays:common.annualHolidays, dailyHours:common.dailyHours, rates:common.rates, leap:common.leap,
-      otH:w.otH, otM:w.otM, nightH:w.nightH, nightM:w.nightM, holidayH:w.holidayH, holidayM:w.holidayM, minashiMin:minashiMin });
-  }
-  function kintaiVal(e,re){ var r=(e.kintai||[]).find(function(x){return re.test(x.label||'');}); return r?num(r.value):0; }
-  function workedMin(e){ return num(e.workedH)*60+num(e.workedM); }
-  function workedLabel(e){ var m=workedMin(e); return Math.floor(m/60)+':'+('0'+(m%60)).slice(-2); }
-  // 実出勤日数(日給の基本給用)。無給代休(daikyuDeduct)なら代休取得を出勤から控除
-  function effShukkin(e){ var s=Math.max(0, kintaiVal(e,/出勤/)); if((state.company.ruleOn||{}).daikyu && state.company.daikyuDeduct) s=Math.max(0, s-kintaiVal(e,/代休取得/)); return s; } // 出勤日数は0未満にしない(負の支給を防ぐ)
-  // 時給=時給単価×労働時間 / 日給=日給額×出勤日数 で基本給を自動算出(月給は手入力のまま)
-  // 基本給を状態から導出(単一ソース)。休暇中=休暇中の金額・時給=時給×労働時間・日給=日給×出勤・月給/役員=基本給。復職/再就職で自動的に元へ戻る
-  function syncBasePay(e){
-    if(!e.shikyu) e.shikyu=[];
-    var amt;
-    if(e.workStatus && e.workStatus!=='normal'){ var _lwi=leaveNoWorkInfo(e, state.month); amt=(_lwi&&_lwi.partial)?num(e.base):num(e.leavePay); } // 部分月の産育休=満額(compute側で不就労を欠勤控除)/それ以外=休業中の金額を手入力
-    else if(e.payType==='時給') amt=Math.round(num(e.hourly)*workedMin(e)/60);
-    else if(e.payType==='日給') amt=Math.round(num(e.base)*effShukkin(e));
-    else if(e.payType==='歩合') amt= window.Warimashi?Warimashi.commissionBasePay(e.commissionAmt, e.hourlyGuarantee, workedMin(e)):Math.max(num(e.commissionAmt),Math.round(num(e.hourlyGuarantee)*workedMin(e)/60)); // 歩合実績と保障給(時給×総労働時間)の高い方=労基27条
-    else if(e.payType==='カスタム'){ var _pr=payRuleResult(e); amt=_pr?_pr.base:0; } // 固定+変動{なし/単一/高い方}をPayRuleで評価
-    else amt=num(e.base);
-    var idx=e.shikyu.findIndex(function(x){return /基本給/.test(x.label||'');});
-    if(idx<0) e.shikyu.unshift({label:'基本給',value:String(amt)}); else e.shikyu[idx].value=String(amt);
-  }
+  function dmin(o){ return PM().dmin(o); }
+  function warimashiOf(e){ return PM().warimashiOf(e, ctxOf()); }
+  function kintaiVal(e,re){ return PM().kintaiVal(e,re); }
+  function workedMin(e){ return PM().workedMin(e); }
+  function workedLabel(e){ return PM().workedLabel(e); }
+  function effShukkin(e){ return PM().effShukkin(e, ctxOf()); }
+  function syncBasePay(e){ return PM().syncBasePay(e, ctxOf()); }
   // 在籍判定・入社/退職月の日割は lib/zaiseki.js(純関数・テスト可能)に集約。bare参照で解決。
   function ZK(){ return (typeof Zaiseki!=='undefined')?Zaiseki:(window&&window.Zaiseki); }
   function JZ(){ return (typeof Juminzei!=='undefined')?Juminzei:(window&&window.Juminzei); }
-  // 住民税の当月天引き額: 年額モードは特別徴収12分割+退職時(一括/普通)。既定monthlyは月額直接入力のまま(回帰ゼロ)
-  function residentTaxOf(e){
-    if(e.residentTaxMode==='annual'){ var jz=JZ(); if(jz&&jz.juminForMonth) return jz.juminForMonth({annualTax:num(e.residentTaxAnnual), ym:state.month, retireYmd:e.taishokuYmd, ikkatsu:!!e.residentTaxIkkatsu}); }
-    return num(e.residentTax);
-  }
-  function isActiveInMonth(e, ym){ var z=ZK(); return z?z.isActiveInMonth(e,ym):!(e.retired&&!e.taishokuYmd); }
-  function prorateInfo(e, ym){ var z=ZK(); return z?z.prorateInfo(e,ym):{prorate:false,factor:1,shahoMonth:true,isJoin:false,isLeave:false,zd:0,dim:0,mid:false}; }
-  // 勤怠カレンダー: その月の所定労働日数(暦日−休みの曜日−祝日−会社独自休)。祝日エンジン未読込ならnull
-  function HD(){ return (typeof Holidays!=='undefined')?Holidays:(window&&window.Holidays); }
-  function scheduledDaysOf(ym){ var H=HD(); if(!H)return null; return H.scheduledWorkdays(ym, (state.company&&state.company.holidays)||[], (state.company&&state.company.companyHolidays)||[]); }
-  // 産休/育休が月途中(部分月)のときの当月不就労「所定労働日数」。就労分だけ支払う日割の土台(実務標準=所定労働日方式/freee)。
-  //  対象= workStatus∈{産休,育休} かつ 月給 かつ 完全月給制でない かつ 開始/終了日あり かつ カレンダー可。対象外=null(=従来のleavePay手入力に委ねる=回帰ゼロ)。
-  //  返り値 {total:当月所定, noWork:不就労所定, partial:noWork<total}。partial=false(=全月休業)はleavePay運用。
-  function leaveNoWorkInfo(e, ym){
-    if(!e||!(e.workStatus==='sankyu'||e.workStatus==='ikukyu')) return null;
-    if(e.payType!=='月給') return null;                         // 月給のみ(時給/日給/歩合は実績ベース)
-    if((state.company||{}).kanzenGekkyu) return null;           // 完全月給制は控除しない=従来
-    if(!e.leaveStartYmd || !e.leaveEndYmd) return null;         // 日付未設定=従来フォールバック
-    var H=HD(); if(!H||!H.scheduledWorkdaysBetween) return null; // カレンダー未読込=従来
-    var rest=(state.company&&state.company.holidays)||[], comp=(state.company&&state.company.companyHolidays)||[];
-    var total=H.scheduledWorkdays(ym, rest, comp); if(!(total>0)) return null;
-    var noWork=H.scheduledWorkdaysBetween(ym, rest, comp, e.leaveStartYmd, e.leaveEndYmd);
-    return { total:total, noWork:noWork, partial:(noWork<total) };
-  }
-  // 甲欄の「扶養親族等の数」に足す本人の人的加算(障害者/寡婦orひとり親/勤労学生)。甲(ko)のみ、乙/丙は0。
-  function jintekiOf(e, taxClass){
-    if(taxClass!=='ko' || !(window.PayrollCalc&&PayrollCalc.honninJintekiCount)) return 0;
-    return PayrollCalc.honninJintekiCount({ shogai:!!e.honninShogai, kafuHitorioya:e.honninKafuHitorioya||'', kinrou:!!e.honninKinrou });
-  }
-  function compute(e){
-    syncCommute(e); syncBasePay(e);
-    var pr=prorateInfo(e, state.month); e._prorate=pr;
-    var lw=leaveNoWorkInfo(e, state.month); e._leaveNoWork=lw; // 産休/育休 部分月の不就労所定日数(就労分だけ支払う日割の土台)
-    var sb=shahoBasisOf(e);
-    // 標準報酬未確定時の暫定基礎は「割増を除く固定支給(通勤含む)」。割増(残業)で社保が膨らまないように。
-    var fb=(e.shikyu||[]).reduce(function(a,x){return a+num(x.value);},0);
-    e.hyojunBase = sb.hoshu>0 ? sb.hoshu : fb;
-    var w=warimashiOf(e); e._wari=w; // 割増は満額base(=e.shikyu)で算定済→日割の影響を受けない
-    var shikyu=(e.shikyu||[]).slice();
-    // ★K4 §3: 台帳を取り込んだ月は、台帳の非課税ぶん(hikazei:true の実費等)を非課税支給として別に足す。
-    //  local slice に足すだけ=非永続(再取り込みで重複しない)。hikazei:true→源泉/課税には入らず、総支給と手取りには入る。
-    if(e._ledgerCtx && num(e._ledgerHikazei)>0) shikyu=shikyu.concat([{label:'台帳（非課税支給）', value:num(e._ledgerHikazei), hikazei:true}]);
-    // 入社月/退職月の日割: 基本給＋課税手当を在籍日数で日割(通勤/非課税/割増は除外)。標準報酬(hyojunBase)・割増は満額のまま。
-    if(pr.prorate && pr.factor<1){ shikyu=shikyu.map(function(x){ if(x.hikazei||/通勤|割増/.test(x.label||'')) return x; return {label:x.label, value:Math.round(num(x.value)*pr.factor), hikazei:x.hikazei, nonTaxLimit:x.nonTaxLimit}; }); }
-    if(w.total>0) shikyu=shikyu.concat([{label:'割増賃金',value:w.total}]); // 課税・総支給・雇用保険ベースに算入(日割しない)
-    // 欠勤控除(月給・日給月給制): 月給で欠勤があれば不就労分を控除(完全月給制はしない)。割増基礎/標準報酬は満額のまま(=このローカルshikyuにだけ負の行を足す)
-    // ★日割する月(入社月/退職月)は欠勤控除を併用しない(二重控除防止)
-    var coK=state.company||{};
-    if(!pr.prorate && e.payType==='月給' && !(e.workStatus&&e.workStatus!=='normal') && !coK.kanzenGekkyu){
-      var kday=kintaiVal(e,/欠勤/);
-      if(kday>0){
-        var ahK=(e.annualHolidays!=null&&e.annualHolidays!=='')?e.annualHolidays:coK.annualHolidays;
-        var dhK=num((e.dailyWorkH!=null&&e.dailyWorkH!=='')?e.dailyWorkH:coK.dailyWorkH)+num((e.dailyWorkM!=null&&e.dailyWorkM!=='')?e.dailyWorkM:coK.dailyWorkM)/60;
-        var kgaku=PayrollCalc.calcKekkin({ base:num(e.base), ym:state.month, kekkinDays:kday, annualHolidays:ahK, dailyHours:dhK, method:coK.kekkinMethod });
-        kgaku=Math.min(kgaku, num(e.base)); // 基本給を超えて引かない
-        if(kgaku>0) shikyu=shikyu.concat([{label:'欠勤控除',value:-kgaku}]);
-      }
-    }
-    // 産休/育休が月途中(部分月): 就労分だけ支払う=不就労の所定日数を「所定労働日方式」で控除(実務標準/freee・出典リサーチ)。
-    //  社保は月末基準で別途免除(下)・所得税/雇用保険は残額(支給)に発生。★退職/入社月(pr.prorate)は日割優先で併用しない(二重控除防止)。会社が休業中に払う額はleavePayで加算(任意・通常0)。
-    if(!pr.prorate && lw && lw.partial && !coK.kanzenGekkyu && lw.noWork>0){
-      var lgaku=PayrollCalc.calcKekkin({ base:num(e.base), ym:state.month, kekkinDays:lw.noWork, method:'scheduled', scheduledDays:lw.total });
-      lgaku=Math.min(lgaku, num(e.base)); // 基本給を超えて引かない
-      if(lgaku>0) shikyu=shikyu.concat([{label:(e.workStatus==='ikukyu'?'育休':'産休')+'不就労控除',value:-lgaku}]);
-    }
-    if(lw && lw.partial && num(e.leavePay)>0) shikyu=shikyu.concat([{label:'休業中支給',value:num(e.leavePay)}]); // 会社が休業中に払う額(課税・社保対象・任意)
-    // 産休/育休の社保免除を月末在籍基準で当月判定。日付未設定=null→従来(e.applyの全月免除)のまま=回帰ゼロ。
-    var apply=e.apply;
-    if(e.workStatus==='sankyu'||e.workStatus==='ikukyu'){
-      var zk=ZK();
-      var ex=(zk&&zk.shahoExemptMonthly)?zk.shahoExemptMonthly({leaveType:e.workStatus,startYmd:e.leaveStartYmd,endYmd:e.leaveEndYmd,ym:state.month,leaveDaysInMonth:num(e.leaveDaysInMonth)}):null;
-      e._shahoExemptThisMonth=ex; // 注記用
-      if(ex!=null){ apply=Object.assign({},e.apply||{},{health:ex?false:true,pension:ex?false:true,kaigo:ex?false:true}); }
-    }
-    // 丙欄(日雇い): 所得税=日額表丙欄(日給)×出勤日数。丙は甲乙の算式を使わず表引き(taxClass='hei')
-    var heiAmt=null;
-    // 丙(日雇い)は日額表の表引き=「日給(=日額)」前提。丙×非日給は日額でないので甲で計算(silent-wrong防止・UIで警告)
-    var heiActive=(e.taxClass==='hei' && e.payType==='日給');
-    if(heiActive){ var SHhei=(typeof ShotokuzeiHei!=='undefined')?ShotokuzeiHei:(window&&window.ShotokuzeiHei); if(SHhei) heiAmt=SHhei.heiTax(num(e.base),{year:parseInt(String(state.month).slice(0,4),10)||2026})*kintaiVal(e,/出勤/); }
-    // 社保の当月/翌月徴収(会社設定 shahoTiming)。既定/'current'=現行(回帰ゼロ)。'next'=入社月0/月末退職2/月中退職1(前月分控除)
-    var _tim=(state.company||{}).shahoTiming, _shMult=1, _shMonth=pr.shahoMonth;
-    if(_tim==='next'){ var _zk=ZK(); if(_zk&&_zk.shahoChargeMonths) _shMult=_zk.shahoChargeMonths({timing:'next', ym:state.month, joinYmd:e.joinYmd, taishokuYmd:e.taishokuYmd}); _shMonth=true; /* 翌月はmultで表現し旧shahoMonth抑止 */ }
-    var effTaxClass=(e.taxClass==='hei' && e.payType!=='日給') ? 'ko' : e.taxClass; // 丙×非日給は甲で計算
-    // 甲欄のみ: 本人の人的加算(障害者/寡婦orひとり親/勤労学生)を扶養親族等の数に足す(乙/丙は対象外)
-    var effFuyou=num(e.fuyou)+jintekiOf(e, effTaxClass);
-    // ★K3 業務委託=204条掲載報酬の源泉(区分該当時のみ)。対象額=支給合計(税込・安全側)。非該当(代行)は0=控除ゼロ維持。
-    var contractorGensen=0;
-    // ★源泉の対象額=課税支給のみ(非課税の通勤等 hikazei:true は除外・住宅手当など課税手当は対象)。taxableTotalで課税支給を単一ソース化。
-    if(e.employmentType==='contractor'){ var _SC=SC(); if(_SC){ var _payG=PayslipCalc.taxableTotal(shikyu); contractorGensen=_SC.gensenFor(e.houshuKubun, _payG, {monthlySalary:0}); } }
-    var r=PayslipCalc.computePayslip({ shikyu:shikyu, birthYmd:e.birthYmd, payYm:state.month, fuyou:effFuyou, taxClass:effTaxClass, heiTaxAmount:heiAmt, residentTax:residentTaxOf(e), healthRate:prefRate(e.pref,state.month), employRate:employRateOf((state.company||{}).gyoshu), hyojunBase:e.hyojunBase, apply:apply, extraKojo:e.extraKojo, shahoMonth:_shMonth, shahoMult:_shMult, employmentType:e.employmentType, contractorGensen:contractorGensen });
-    if(e.employmentType!=='contractor') applyNenchoAdj(e, r); // 年末調整の過不足を反映(業務委託=年調なし=対象外)
-    return r;
-  }
-  // 年末調整の過不足(還付/追徴)を、指定した対象月の給与明細に反映する。★法定計算後の純調整=税/社保/雇用/課税には影響しない★。
-  //  e.nenchoAdj={ym,amount}(amount<0=還付/>0=不足額徴収)。amountは反映時にnenComputeのkabusokuを凍結して持つ。
-  function applyNenchoAdj(e, r){
-    var adj=e&&e.nenchoAdj; if(!adj || adj.ym!==state.month) return; var amt=num(adj.amount); if(!amt) return;
-    if(amt<0){ r.shikyu=(r.shikyu||[]).concat([{label:'年末調整還付', value:-amt, hikazei:true}]); r.shikyuTotal=num(r.shikyuTotal)+(-amt); r.net=num(r.net)+(-amt); }
-    else { r.kojo=(r.kojo||[]).concat([{label:'年末調整（不足額徴収）', value:amt}]); r.kojoTotal=num(r.kojoTotal)+amt; r.net=num(r.net)-amt; }
-  }
-  function payDateObj(){
-    var ym=state.month||'2026-06', y=Number(ym.slice(0,4)), m=Number(ym.slice(5,7)), c=state.company||{};
-    var py=y, pm=m; if((c.paydayRel||'next')==='next'){ pm=m+1; if(pm>12){pm=1;py++;} }
-    var dd=String(c.paydayDay==null?'':c.paydayDay); var last=new Date(py, pm, 0).getDate();
-    var day=/末/.test(dd)?last:Math.min(parseInt(dd,10)||25, last); if(day<1)day=1;
-    return {y:py,m:pm,d:day};
-  }
-  function payDateStr(){ var o=payDateObj(); return '令和'+(o.y-2018)+'年'+o.m+'月'+o.d+'日'; }
+  function residentTaxOf(e){ return PM().residentTaxOf(e, ctxOf()); }
+  function isActiveInMonth(e, ym){ return PM().isActiveInMonth(e, ym); }
+  function prorateInfo(e, ym){ return PM().prorateInfo(e, ym); }
+  function HD(){ return (typeof Holidays!=='undefined')?Holidays:(window&&window.Holidays); } // 祝日エンジン(app.js内の他所からも参照する)
+  function scheduledDaysOf(ym){ return PM().scheduledDaysOf(ym, ctxOf()); }
+  function leaveNoWorkInfo(e, ym){ return PM().leaveNoWorkInfo(e, ym, ctxOf()); }
+  function jintekiOf(e, taxClass){ return PM().jintekiOf(e, taxClass); }
+  function compute(e){ return PM().compute(e, ctxOf()); }
+  function applyNenchoAdj(e, r){ return PM().applyNenchoAdj(e, r, ctxOf()); }
+  function payDateObj(){ return PM().payDateObj(ctxOf()); }
+  function payDateStr(){ return PM().payDateStr(ctxOf()); }
   function updatePaydayPreview(){ var el=$('#payday-preview'); if(el) el.textContent='→ 支給日：'+payDateStr(); }
   // 支給サイクルの説明(表示のみ・計算方式は月単位で不変)。日払いは丙欄へ誘導。
   function payCycleNote(){ var el=$('#paycycle-note'); if(!el)return; var c=(state.company&&state.company.payCycle)||'monthly';
@@ -1427,12 +1131,7 @@
     });
   }
   function uiPrompt(label,def,placeholder){ return uiModal({title:label, input:{def:def||'',placeholder:placeholder||''}, buttons:[{label:'キャンセル',val:false},{label:'OK',val:true,primary:true}]}); }
-  // 入社月/退職月の日割・社保の注記(黄・ブロックしない)
-  function prorateNote(e){ var pr=e._prorate, lw=e._leaveNoWork; var msg=[];
-    if(pr&&pr.prorate&&pr.factor<1) msg.push((pr.isJoin&&!pr.isLeave?'入社月':pr.isLeave&&!pr.isJoin?'退職月':'入社/退職月')+'につき在籍'+pr.zd+'日で日割（'+pr.zd+'/'+pr.dim+'日）');
-    if(pr&&pr.mid) msg.push('月中退職のため当月の社保（健保・厚年・介護）は徴収しません（資格喪失=退職日翌日・前月分まで／雇用保険は実支払分）');
-    if(!(pr&&pr.prorate)&&lw&&lw.partial&&lw.noWork>0) msg.push((e.workStatus==='ikukyu'?'育休':'産休')+'で当月の所定'+lw.total+'日のうち'+lw.noWork+'日が不就労のため控除（就労'+(lw.total-lw.noWork)+'日分を支給）。社保は月末基準で免除・所得税/雇用保険は就労分に発生');
-    return msg.length?'<div class="cr-warn" style="margin:0 12px 10px">⚠ '+msg.join('。')+'。</div>':''; }
+  function prorateNote(e){ return PW().prorateNote(e); }
   // ── 勤怠CSV取込(他社勤怠/Excel→当月の給与入力へ。打刻は作らない) ──
   function findEmpForKintai(row){
     var emps=state.employees.filter(function(e){ return isActiveInMonth(e,state.month); });
@@ -3325,7 +3024,7 @@
   /* 統合テスト用API。★本番ブラウザには露出しない（jsdomのときだけ）★=RC1対策の自動統合テスト(tests/integration.mjs)の入口。 */
   try{ if(typeof navigator!=='undefined' && /jsdom/i.test(navigator.userAgent||'')){
     window.__PAYSLIP_TEST={ compute:compute, defEmp:defEmp, mergeEmp:mergeEmp, state:state, buildDailyData:buildDailyData, dailySlipDoc:dailySlipDoc, shimePeriods:shimePeriods, shimeSplit:shimeSplit,
-      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, isInMinWage:isInMinWage, minWageTeate:minWageTeate, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, stType:stType, stLabel:stLabel, santeiRule:santeiRule, gekkakuTh:gekkakuTh, shahoBasisOf:shahoBasisOf, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, ymdPlus1:ymdPlus1, shikakuRows:shikakuRows, shikakuAoa:shikakuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc, applyMigrationRows:applyMigrationRows, buildEmpFromRow:buildEmpFromRow, prevYmOf:prevYmOf, applyLedgerToEmployees:applyLedgerToEmployees, importLedgerForMonth:importLedgerForMonth, payRuleCtx:payRuleCtx, monthYmdRange:monthYmdRange, shahoKanyuWarn:shahoKanyuWarn, fullTimeWeeklyH:fullTimeWeeklyH, shoteiMonthlyWage:shoteiMonthlyWage }; }
+      saveMonthlyPayslips:saveMonthlyPayslips, ensurePayRule:ensurePayRule, minWageInfo:minWageInfo, isInMinWage:isInMinWage, minWageTeate:minWageTeate, setConfirm:setConfirm, renderInput:renderInput, renderInputTableHTML:renderInputTableHTML, effShukkin:effShukkin, onboardSteps:onboardSteps, renderEmpMaster:renderEmpMaster, filterEmpSearch:filterEmpSearch, labelInputsA11y:labelInputsA11y, computeBonus:computeBonus, bonusEntry:bonusEntry, nenAggregate:nenAggregate, confirmedRecs:confirmedRecs, loadBonusYtd:loadBonusYtd, nenchoWizardHTML:nenchoWizardHTML, nenStore:nenStore, nenDeclBannerHTML:nenDeclBannerHTML, makePayPattern:makePayPattern, applyPayPattern:applyPayPattern, openBulkPatternApply:openBulkPatternApply, applyEmpProfile:applyEmpProfile, empProfileStripHTML:empProfileStripHTML, importEmpProfile:importEmpProfile, qrSvg:qrSvg, itemSuggestOptions:itemSuggestOptions, itemSuggestHTML:itemSuggestHTML, bonusItemSuggestOptions:bonusItemSuggestOptions, bonusItemSuggestHTML:bonusItemSuggestHTML, santeiKisoRow:santeiKisoRow, santeiRows:santeiRows, santeiAoa:santeiAoa, stType:stType, stLabel:stLabel, santeiRule:santeiRule, gekkakuTh:gekkakuTh, shahoBasisOf:shahoBasisOf, bonusHarauRows:bonusHarauRows, bonusHarauAoa:bonusHarauAoa, gekkakuRows:gekkakuRows, gekkakuAoa:gekkakuAoa, ymAddLocal:ymAddLocal, extractCity:extractCity, gyoyoRows:gyoyoRows, gyoyoMeisaiAoa:gyoyoMeisaiAoa, gyoyoSoukatsuAoa:gyoyoSoukatsuAoa, roudouRows:roudouRows, roudouSummary:roudouSummary, roudouAoa:roudouAoa, roudouFYof:roudouFYof, ymdPlus1:ymdPlus1, shikakuRows:shikakuRows, shikakuAoa:shikakuAoa, fuyoBuckets:fuyoBuckets, nenCompute:nenCompute, nenGensenHTML:nenGensenHTML, nenGensenDoc:nenGensenDoc, applyMigrationRows:applyMigrationRows, buildEmpFromRow:buildEmpFromRow, prevYmOf:prevYmOf, applyLedgerToEmployees:applyLedgerToEmployees, importLedgerForMonth:importLedgerForMonth, payRuleCtx:payRuleCtx, monthYmdRange:monthYmdRange, shahoKanyuWarn:shahoKanyuWarn, fullTimeWeeklyH:fullTimeWeeklyH, shoteiMonthlyWage:shoteiMonthlyWage, empWarnings:empWarnings, laborLimitItems:laborLimitItems, prorateNote:prorateNote, buildPeople:buildPeople, ctxOf:ctxOf }; }
   }catch(e){}
   /* ---------- 永続化(localStorage既定・window.SUPA設定でSupabaseにも保存) ---------- */
   var PKEY='payslip_state_v1';

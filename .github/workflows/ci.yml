@@ -38,6 +38,14 @@ jobs:
         run: node tests/exally-login.test.mjs
       - name: Golden freeze guard (移設前の真値と入力fixtureが作り直されていないか=SHA256照合)
         run: node tests/golden-immutable.test.mjs
+      - name: Headless guard (lib/ がDOM・通信・非決定性に依存しない=静的+毒化グローバル実行の二重)
+        run: node scripts/verify-headless.mjs
+      - name: Ops golden parity (★1円一致★ 移設前ゴールデン vs ops/payroll.monthly・Excelはセル単位)
+        run: node tests/ops-golden-parity.test.mjs
+      - name: Ops statutory (官公値の実数リテラル・Excel同一ソース・テストAPI非露出の静的ガード)
+        run: node tests/ops-payroll-monthly.test.mjs
+      - name: Law switchpoints (健保R7→R8/支援金2026-04/雇用保険年度/最賃年度の境界前後)
+        run: node tests/law-switchpoints.test.mjs
       - name: Input fixture reproducibility (入力fixtureが生成スクリプトと一致するか)
         run: node scripts/make-input-fixture.mjs --check
       - name: Cache-buster stamp guard (全HTMLが現在の内容ハッシュ ?v= で貼られているか=貼り忘れ検知)
