@@ -36,6 +36,10 @@ jobs:
         run: node tests/meisai-store.mjs
       - name: Login signup分岐 (メール確認ON=確認メール待機画面・確認OFF即ログインは回帰なし)
         run: node tests/exally-login.test.mjs
+      - name: Golden freeze guard (移設前の真値と入力fixtureが作り直されていないか=SHA256照合)
+        run: node tests/golden-immutable.test.mjs
+      - name: Input fixture reproducibility (入力fixtureが生成スクリプトと一致するか)
+        run: node scripts/make-input-fixture.mjs --check
       - name: Cache-buster stamp guard (全HTMLが現在の内容ハッシュ ?v= で貼られているか=貼り忘れ検知)
         run: node scripts/stamp-build.mjs --check
       - name: Statutory drift guard (lib == 中央statutory)
