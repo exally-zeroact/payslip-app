@@ -1,0 +1,3723 @@
+{
+  "meta": {
+    "baseCommit": "1c128e1",
+    "headAtGeneration": "1c128e1",
+    "generator": "scripts/make-periods-golden.mjs",
+    "generatedAt": "2026-07-31T17:56:13.382Z",
+    "inputFixture": "tests/fixtures/periods-input.json",
+    "inputSha256": "fc6dae61b4ff09b9218dc8afbace1527764aeb2b5f69cfe797c786b2307c8b06",
+    "goldenSha256": "72e00afc72c91722339dc84e345db0887377a80360424e7d01d50d6069c9f33a",
+    "note": "★移設前(1c128e1)の期間モードの真値。リポジトリ統合の前後でこれと一致すること。作り直し禁止(sha照合で検知)。"
+  },
+  "datasets": {
+    "buildResults": [
+      {
+        "ym": "2026-02",
+        "method": "monthly",
+        "n": 10,
+        "note": "月末28日 / 月まとめ=分割なし",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜末",
+              "from": "2026-02-01",
+              "to": "2026-02-28",
+              "fromDay": 1,
+              "toDay": 28,
+              "days": 28
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": false
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 28
+        }
+      },
+      {
+        "ym": "2026-02",
+        "method": "half",
+        "n": 10,
+        "note": "月末28日 / 半月=1〜15/16〜末",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜15",
+              "from": "2026-02-01",
+              "to": "2026-02-15",
+              "fromDay": 1,
+              "toDay": 15,
+              "days": 15
+            },
+            {
+              "key": "P2",
+              "label": "16〜末",
+              "from": "2026-02-16",
+              "to": "2026-02-28",
+              "fromDay": 16,
+              "toDay": 28,
+              "days": 13
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 28
+        }
+      },
+      {
+        "ym": "2026-02",
+        "method": "ten",
+        "n": 10,
+        "note": "月末28日 / 10日締め(代行)=1〜10/11〜20/21〜末",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜10",
+              "from": "2026-02-01",
+              "to": "2026-02-10",
+              "fromDay": 1,
+              "toDay": 10,
+              "days": 10
+            },
+            {
+              "key": "P2",
+              "label": "11〜20",
+              "from": "2026-02-11",
+              "to": "2026-02-20",
+              "fromDay": 11,
+              "toDay": 20,
+              "days": 10
+            },
+            {
+              "key": "P3",
+              "label": "21〜末",
+              "from": "2026-02-21",
+              "to": "2026-02-28",
+              "fromDay": 21,
+              "toDay": 28,
+              "days": 8
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 28
+        }
+      },
+      {
+        "ym": "2026-02",
+        "method": "ndays",
+        "n": 7,
+        "note": "月末28日 / 任意N日=7日",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜7",
+              "from": "2026-02-01",
+              "to": "2026-02-07",
+              "fromDay": 1,
+              "toDay": 7,
+              "days": 7
+            },
+            {
+              "key": "P2",
+              "label": "8〜14",
+              "from": "2026-02-08",
+              "to": "2026-02-14",
+              "fromDay": 8,
+              "toDay": 14,
+              "days": 7
+            },
+            {
+              "key": "P3",
+              "label": "15〜21",
+              "from": "2026-02-15",
+              "to": "2026-02-21",
+              "fromDay": 15,
+              "toDay": 21,
+              "days": 7
+            },
+            {
+              "key": "P4",
+              "label": "22〜末",
+              "from": "2026-02-22",
+              "to": "2026-02-28",
+              "fromDay": 22,
+              "toDay": 28,
+              "days": 7
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 28
+        }
+      },
+      {
+        "ym": "2026-02",
+        "method": "ndays",
+        "n": 13,
+        "note": "月末28日 / 任意N日=13日(端数が出る)",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜13",
+              "from": "2026-02-01",
+              "to": "2026-02-13",
+              "fromDay": 1,
+              "toDay": 13,
+              "days": 13
+            },
+            {
+              "key": "P2",
+              "label": "14〜26",
+              "from": "2026-02-14",
+              "to": "2026-02-26",
+              "fromDay": 14,
+              "toDay": 26,
+              "days": 13
+            },
+            {
+              "key": "P3",
+              "label": "27〜末",
+              "from": "2026-02-27",
+              "to": "2026-02-28",
+              "fromDay": 27,
+              "toDay": 28,
+              "days": 2
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 28
+        }
+      },
+      {
+        "ym": "2026-02",
+        "method": "ndays",
+        "n": 1,
+        "note": "月末28日 / 任意N日=1日(極端)",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜1",
+              "from": "2026-02-01",
+              "to": "2026-02-01",
+              "fromDay": 1,
+              "toDay": 1,
+              "days": 1
+            },
+            {
+              "key": "P2",
+              "label": "2〜2",
+              "from": "2026-02-02",
+              "to": "2026-02-02",
+              "fromDay": 2,
+              "toDay": 2,
+              "days": 1
+            },
+            {
+              "key": "P3",
+              "label": "3〜3",
+              "from": "2026-02-03",
+              "to": "2026-02-03",
+              "fromDay": 3,
+              "toDay": 3,
+              "days": 1
+            },
+            {
+              "key": "P4",
+              "label": "4〜4",
+              "from": "2026-02-04",
+              "to": "2026-02-04",
+              "fromDay": 4,
+              "toDay": 4,
+              "days": 1
+            },
+            {
+              "key": "P5",
+              "label": "5〜5",
+              "from": "2026-02-05",
+              "to": "2026-02-05",
+              "fromDay": 5,
+              "toDay": 5,
+              "days": 1
+            },
+            {
+              "key": "P6",
+              "label": "6〜6",
+              "from": "2026-02-06",
+              "to": "2026-02-06",
+              "fromDay": 6,
+              "toDay": 6,
+              "days": 1
+            },
+            {
+              "key": "P7",
+              "label": "7〜7",
+              "from": "2026-02-07",
+              "to": "2026-02-07",
+              "fromDay": 7,
+              "toDay": 7,
+              "days": 1
+            },
+            {
+              "key": "P8",
+              "label": "8〜8",
+              "from": "2026-02-08",
+              "to": "2026-02-08",
+              "fromDay": 8,
+              "toDay": 8,
+              "days": 1
+            },
+            {
+              "key": "P9",
+              "label": "9〜9",
+              "from": "2026-02-09",
+              "to": "2026-02-09",
+              "fromDay": 9,
+              "toDay": 9,
+              "days": 1
+            },
+            {
+              "key": "P10",
+              "label": "10〜10",
+              "from": "2026-02-10",
+              "to": "2026-02-10",
+              "fromDay": 10,
+              "toDay": 10,
+              "days": 1
+            },
+            {
+              "key": "P11",
+              "label": "11〜11",
+              "from": "2026-02-11",
+              "to": "2026-02-11",
+              "fromDay": 11,
+              "toDay": 11,
+              "days": 1
+            },
+            {
+              "key": "P12",
+              "label": "12〜12",
+              "from": "2026-02-12",
+              "to": "2026-02-12",
+              "fromDay": 12,
+              "toDay": 12,
+              "days": 1
+            },
+            {
+              "key": "P13",
+              "label": "13〜13",
+              "from": "2026-02-13",
+              "to": "2026-02-13",
+              "fromDay": 13,
+              "toDay": 13,
+              "days": 1
+            },
+            {
+              "key": "P14",
+              "label": "14〜14",
+              "from": "2026-02-14",
+              "to": "2026-02-14",
+              "fromDay": 14,
+              "toDay": 14,
+              "days": 1
+            },
+            {
+              "key": "P15",
+              "label": "15〜15",
+              "from": "2026-02-15",
+              "to": "2026-02-15",
+              "fromDay": 15,
+              "toDay": 15,
+              "days": 1
+            },
+            {
+              "key": "P16",
+              "label": "16〜16",
+              "from": "2026-02-16",
+              "to": "2026-02-16",
+              "fromDay": 16,
+              "toDay": 16,
+              "days": 1
+            },
+            {
+              "key": "P17",
+              "label": "17〜17",
+              "from": "2026-02-17",
+              "to": "2026-02-17",
+              "fromDay": 17,
+              "toDay": 17,
+              "days": 1
+            },
+            {
+              "key": "P18",
+              "label": "18〜18",
+              "from": "2026-02-18",
+              "to": "2026-02-18",
+              "fromDay": 18,
+              "toDay": 18,
+              "days": 1
+            },
+            {
+              "key": "P19",
+              "label": "19〜19",
+              "from": "2026-02-19",
+              "to": "2026-02-19",
+              "fromDay": 19,
+              "toDay": 19,
+              "days": 1
+            },
+            {
+              "key": "P20",
+              "label": "20〜20",
+              "from": "2026-02-20",
+              "to": "2026-02-20",
+              "fromDay": 20,
+              "toDay": 20,
+              "days": 1
+            },
+            {
+              "key": "P21",
+              "label": "21〜21",
+              "from": "2026-02-21",
+              "to": "2026-02-21",
+              "fromDay": 21,
+              "toDay": 21,
+              "days": 1
+            },
+            {
+              "key": "P22",
+              "label": "22〜22",
+              "from": "2026-02-22",
+              "to": "2026-02-22",
+              "fromDay": 22,
+              "toDay": 22,
+              "days": 1
+            },
+            {
+              "key": "P23",
+              "label": "23〜23",
+              "from": "2026-02-23",
+              "to": "2026-02-23",
+              "fromDay": 23,
+              "toDay": 23,
+              "days": 1
+            },
+            {
+              "key": "P24",
+              "label": "24〜24",
+              "from": "2026-02-24",
+              "to": "2026-02-24",
+              "fromDay": 24,
+              "toDay": 24,
+              "days": 1
+            },
+            {
+              "key": "P25",
+              "label": "25〜25",
+              "from": "2026-02-25",
+              "to": "2026-02-25",
+              "fromDay": 25,
+              "toDay": 25,
+              "days": 1
+            },
+            {
+              "key": "P26",
+              "label": "26〜26",
+              "from": "2026-02-26",
+              "to": "2026-02-26",
+              "fromDay": 26,
+              "toDay": 26,
+              "days": 1
+            },
+            {
+              "key": "P27",
+              "label": "27〜27",
+              "from": "2026-02-27",
+              "to": "2026-02-27",
+              "fromDay": 27,
+              "toDay": 27,
+              "days": 1
+            },
+            {
+              "key": "P28",
+              "label": "28〜末",
+              "from": "2026-02-28",
+              "to": "2026-02-28",
+              "fromDay": 28,
+              "toDay": 28,
+              "days": 1
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 28
+        }
+      },
+      {
+        "ym": "2026-02",
+        "method": "ndays",
+        "n": 30,
+        "note": "月末28日 / 任意N日=30日(月より長い場合あり)",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜末",
+              "from": "2026-02-01",
+              "to": "2026-02-28",
+              "fromDay": 1,
+              "toDay": 28,
+              "days": 28
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 28
+        }
+      },
+      {
+        "ym": "2028-02",
+        "method": "monthly",
+        "n": 10,
+        "note": "月末29日(うるう年) / 月まとめ=分割なし",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜末",
+              "from": "2028-02-01",
+              "to": "2028-02-29",
+              "fromDay": 1,
+              "toDay": 29,
+              "days": 29
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": false
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 29
+        }
+      },
+      {
+        "ym": "2028-02",
+        "method": "half",
+        "n": 10,
+        "note": "月末29日(うるう年) / 半月=1〜15/16〜末",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜15",
+              "from": "2028-02-01",
+              "to": "2028-02-15",
+              "fromDay": 1,
+              "toDay": 15,
+              "days": 15
+            },
+            {
+              "key": "P2",
+              "label": "16〜末",
+              "from": "2028-02-16",
+              "to": "2028-02-29",
+              "fromDay": 16,
+              "toDay": 29,
+              "days": 14
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 29
+        }
+      },
+      {
+        "ym": "2028-02",
+        "method": "ten",
+        "n": 10,
+        "note": "月末29日(うるう年) / 10日締め(代行)=1〜10/11〜20/21〜末",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜10",
+              "from": "2028-02-01",
+              "to": "2028-02-10",
+              "fromDay": 1,
+              "toDay": 10,
+              "days": 10
+            },
+            {
+              "key": "P2",
+              "label": "11〜20",
+              "from": "2028-02-11",
+              "to": "2028-02-20",
+              "fromDay": 11,
+              "toDay": 20,
+              "days": 10
+            },
+            {
+              "key": "P3",
+              "label": "21〜末",
+              "from": "2028-02-21",
+              "to": "2028-02-29",
+              "fromDay": 21,
+              "toDay": 29,
+              "days": 9
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 29
+        }
+      },
+      {
+        "ym": "2028-02",
+        "method": "ndays",
+        "n": 7,
+        "note": "月末29日(うるう年) / 任意N日=7日",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜7",
+              "from": "2028-02-01",
+              "to": "2028-02-07",
+              "fromDay": 1,
+              "toDay": 7,
+              "days": 7
+            },
+            {
+              "key": "P2",
+              "label": "8〜14",
+              "from": "2028-02-08",
+              "to": "2028-02-14",
+              "fromDay": 8,
+              "toDay": 14,
+              "days": 7
+            },
+            {
+              "key": "P3",
+              "label": "15〜21",
+              "from": "2028-02-15",
+              "to": "2028-02-21",
+              "fromDay": 15,
+              "toDay": 21,
+              "days": 7
+            },
+            {
+              "key": "P4",
+              "label": "22〜28",
+              "from": "2028-02-22",
+              "to": "2028-02-28",
+              "fromDay": 22,
+              "toDay": 28,
+              "days": 7
+            },
+            {
+              "key": "P5",
+              "label": "29〜末",
+              "from": "2028-02-29",
+              "to": "2028-02-29",
+              "fromDay": 29,
+              "toDay": 29,
+              "days": 1
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 29
+        }
+      },
+      {
+        "ym": "2028-02",
+        "method": "ndays",
+        "n": 13,
+        "note": "月末29日(うるう年) / 任意N日=13日(端数が出る)",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜13",
+              "from": "2028-02-01",
+              "to": "2028-02-13",
+              "fromDay": 1,
+              "toDay": 13,
+              "days": 13
+            },
+            {
+              "key": "P2",
+              "label": "14〜26",
+              "from": "2028-02-14",
+              "to": "2028-02-26",
+              "fromDay": 14,
+              "toDay": 26,
+              "days": 13
+            },
+            {
+              "key": "P3",
+              "label": "27〜末",
+              "from": "2028-02-27",
+              "to": "2028-02-29",
+              "fromDay": 27,
+              "toDay": 29,
+              "days": 3
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 29
+        }
+      },
+      {
+        "ym": "2028-02",
+        "method": "ndays",
+        "n": 1,
+        "note": "月末29日(うるう年) / 任意N日=1日(極端)",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜1",
+              "from": "2028-02-01",
+              "to": "2028-02-01",
+              "fromDay": 1,
+              "toDay": 1,
+              "days": 1
+            },
+            {
+              "key": "P2",
+              "label": "2〜2",
+              "from": "2028-02-02",
+              "to": "2028-02-02",
+              "fromDay": 2,
+              "toDay": 2,
+              "days": 1
+            },
+            {
+              "key": "P3",
+              "label": "3〜3",
+              "from": "2028-02-03",
+              "to": "2028-02-03",
+              "fromDay": 3,
+              "toDay": 3,
+              "days": 1
+            },
+            {
+              "key": "P4",
+              "label": "4〜4",
+              "from": "2028-02-04",
+              "to": "2028-02-04",
+              "fromDay": 4,
+              "toDay": 4,
+              "days": 1
+            },
+            {
+              "key": "P5",
+              "label": "5〜5",
+              "from": "2028-02-05",
+              "to": "2028-02-05",
+              "fromDay": 5,
+              "toDay": 5,
+              "days": 1
+            },
+            {
+              "key": "P6",
+              "label": "6〜6",
+              "from": "2028-02-06",
+              "to": "2028-02-06",
+              "fromDay": 6,
+              "toDay": 6,
+              "days": 1
+            },
+            {
+              "key": "P7",
+              "label": "7〜7",
+              "from": "2028-02-07",
+              "to": "2028-02-07",
+              "fromDay": 7,
+              "toDay": 7,
+              "days": 1
+            },
+            {
+              "key": "P8",
+              "label": "8〜8",
+              "from": "2028-02-08",
+              "to": "2028-02-08",
+              "fromDay": 8,
+              "toDay": 8,
+              "days": 1
+            },
+            {
+              "key": "P9",
+              "label": "9〜9",
+              "from": "2028-02-09",
+              "to": "2028-02-09",
+              "fromDay": 9,
+              "toDay": 9,
+              "days": 1
+            },
+            {
+              "key": "P10",
+              "label": "10〜10",
+              "from": "2028-02-10",
+              "to": "2028-02-10",
+              "fromDay": 10,
+              "toDay": 10,
+              "days": 1
+            },
+            {
+              "key": "P11",
+              "label": "11〜11",
+              "from": "2028-02-11",
+              "to": "2028-02-11",
+              "fromDay": 11,
+              "toDay": 11,
+              "days": 1
+            },
+            {
+              "key": "P12",
+              "label": "12〜12",
+              "from": "2028-02-12",
+              "to": "2028-02-12",
+              "fromDay": 12,
+              "toDay": 12,
+              "days": 1
+            },
+            {
+              "key": "P13",
+              "label": "13〜13",
+              "from": "2028-02-13",
+              "to": "2028-02-13",
+              "fromDay": 13,
+              "toDay": 13,
+              "days": 1
+            },
+            {
+              "key": "P14",
+              "label": "14〜14",
+              "from": "2028-02-14",
+              "to": "2028-02-14",
+              "fromDay": 14,
+              "toDay": 14,
+              "days": 1
+            },
+            {
+              "key": "P15",
+              "label": "15〜15",
+              "from": "2028-02-15",
+              "to": "2028-02-15",
+              "fromDay": 15,
+              "toDay": 15,
+              "days": 1
+            },
+            {
+              "key": "P16",
+              "label": "16〜16",
+              "from": "2028-02-16",
+              "to": "2028-02-16",
+              "fromDay": 16,
+              "toDay": 16,
+              "days": 1
+            },
+            {
+              "key": "P17",
+              "label": "17〜17",
+              "from": "2028-02-17",
+              "to": "2028-02-17",
+              "fromDay": 17,
+              "toDay": 17,
+              "days": 1
+            },
+            {
+              "key": "P18",
+              "label": "18〜18",
+              "from": "2028-02-18",
+              "to": "2028-02-18",
+              "fromDay": 18,
+              "toDay": 18,
+              "days": 1
+            },
+            {
+              "key": "P19",
+              "label": "19〜19",
+              "from": "2028-02-19",
+              "to": "2028-02-19",
+              "fromDay": 19,
+              "toDay": 19,
+              "days": 1
+            },
+            {
+              "key": "P20",
+              "label": "20〜20",
+              "from": "2028-02-20",
+              "to": "2028-02-20",
+              "fromDay": 20,
+              "toDay": 20,
+              "days": 1
+            },
+            {
+              "key": "P21",
+              "label": "21〜21",
+              "from": "2028-02-21",
+              "to": "2028-02-21",
+              "fromDay": 21,
+              "toDay": 21,
+              "days": 1
+            },
+            {
+              "key": "P22",
+              "label": "22〜22",
+              "from": "2028-02-22",
+              "to": "2028-02-22",
+              "fromDay": 22,
+              "toDay": 22,
+              "days": 1
+            },
+            {
+              "key": "P23",
+              "label": "23〜23",
+              "from": "2028-02-23",
+              "to": "2028-02-23",
+              "fromDay": 23,
+              "toDay": 23,
+              "days": 1
+            },
+            {
+              "key": "P24",
+              "label": "24〜24",
+              "from": "2028-02-24",
+              "to": "2028-02-24",
+              "fromDay": 24,
+              "toDay": 24,
+              "days": 1
+            },
+            {
+              "key": "P25",
+              "label": "25〜25",
+              "from": "2028-02-25",
+              "to": "2028-02-25",
+              "fromDay": 25,
+              "toDay": 25,
+              "days": 1
+            },
+            {
+              "key": "P26",
+              "label": "26〜26",
+              "from": "2028-02-26",
+              "to": "2028-02-26",
+              "fromDay": 26,
+              "toDay": 26,
+              "days": 1
+            },
+            {
+              "key": "P27",
+              "label": "27〜27",
+              "from": "2028-02-27",
+              "to": "2028-02-27",
+              "fromDay": 27,
+              "toDay": 27,
+              "days": 1
+            },
+            {
+              "key": "P28",
+              "label": "28〜28",
+              "from": "2028-02-28",
+              "to": "2028-02-28",
+              "fromDay": 28,
+              "toDay": 28,
+              "days": 1
+            },
+            {
+              "key": "P29",
+              "label": "29〜末",
+              "from": "2028-02-29",
+              "to": "2028-02-29",
+              "fromDay": 29,
+              "toDay": 29,
+              "days": 1
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 29
+        }
+      },
+      {
+        "ym": "2028-02",
+        "method": "ndays",
+        "n": 30,
+        "note": "月末29日(うるう年) / 任意N日=30日(月より長い場合あり)",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜末",
+              "from": "2028-02-01",
+              "to": "2028-02-29",
+              "fromDay": 1,
+              "toDay": 29,
+              "days": 29
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 29
+        }
+      },
+      {
+        "ym": "2026-04",
+        "method": "monthly",
+        "n": 10,
+        "note": "月末30日 / 月まとめ=分割なし",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜末",
+              "from": "2026-04-01",
+              "to": "2026-04-30",
+              "fromDay": 1,
+              "toDay": 30,
+              "days": 30
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": false
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 30
+        }
+      },
+      {
+        "ym": "2026-04",
+        "method": "half",
+        "n": 10,
+        "note": "月末30日 / 半月=1〜15/16〜末",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜15",
+              "from": "2026-04-01",
+              "to": "2026-04-15",
+              "fromDay": 1,
+              "toDay": 15,
+              "days": 15
+            },
+            {
+              "key": "P2",
+              "label": "16〜末",
+              "from": "2026-04-16",
+              "to": "2026-04-30",
+              "fromDay": 16,
+              "toDay": 30,
+              "days": 15
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 30
+        }
+      },
+      {
+        "ym": "2026-04",
+        "method": "ten",
+        "n": 10,
+        "note": "月末30日 / 10日締め(代行)=1〜10/11〜20/21〜末",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜10",
+              "from": "2026-04-01",
+              "to": "2026-04-10",
+              "fromDay": 1,
+              "toDay": 10,
+              "days": 10
+            },
+            {
+              "key": "P2",
+              "label": "11〜20",
+              "from": "2026-04-11",
+              "to": "2026-04-20",
+              "fromDay": 11,
+              "toDay": 20,
+              "days": 10
+            },
+            {
+              "key": "P3",
+              "label": "21〜末",
+              "from": "2026-04-21",
+              "to": "2026-04-30",
+              "fromDay": 21,
+              "toDay": 30,
+              "days": 10
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 30
+        }
+      },
+      {
+        "ym": "2026-04",
+        "method": "ndays",
+        "n": 7,
+        "note": "月末30日 / 任意N日=7日",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜7",
+              "from": "2026-04-01",
+              "to": "2026-04-07",
+              "fromDay": 1,
+              "toDay": 7,
+              "days": 7
+            },
+            {
+              "key": "P2",
+              "label": "8〜14",
+              "from": "2026-04-08",
+              "to": "2026-04-14",
+              "fromDay": 8,
+              "toDay": 14,
+              "days": 7
+            },
+            {
+              "key": "P3",
+              "label": "15〜21",
+              "from": "2026-04-15",
+              "to": "2026-04-21",
+              "fromDay": 15,
+              "toDay": 21,
+              "days": 7
+            },
+            {
+              "key": "P4",
+              "label": "22〜28",
+              "from": "2026-04-22",
+              "to": "2026-04-28",
+              "fromDay": 22,
+              "toDay": 28,
+              "days": 7
+            },
+            {
+              "key": "P5",
+              "label": "29〜末",
+              "from": "2026-04-29",
+              "to": "2026-04-30",
+              "fromDay": 29,
+              "toDay": 30,
+              "days": 2
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 30
+        }
+      },
+      {
+        "ym": "2026-04",
+        "method": "ndays",
+        "n": 13,
+        "note": "月末30日 / 任意N日=13日(端数が出る)",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜13",
+              "from": "2026-04-01",
+              "to": "2026-04-13",
+              "fromDay": 1,
+              "toDay": 13,
+              "days": 13
+            },
+            {
+              "key": "P2",
+              "label": "14〜26",
+              "from": "2026-04-14",
+              "to": "2026-04-26",
+              "fromDay": 14,
+              "toDay": 26,
+              "days": 13
+            },
+            {
+              "key": "P3",
+              "label": "27〜末",
+              "from": "2026-04-27",
+              "to": "2026-04-30",
+              "fromDay": 27,
+              "toDay": 30,
+              "days": 4
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 30
+        }
+      },
+      {
+        "ym": "2026-04",
+        "method": "ndays",
+        "n": 1,
+        "note": "月末30日 / 任意N日=1日(極端)",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜1",
+              "from": "2026-04-01",
+              "to": "2026-04-01",
+              "fromDay": 1,
+              "toDay": 1,
+              "days": 1
+            },
+            {
+              "key": "P2",
+              "label": "2〜2",
+              "from": "2026-04-02",
+              "to": "2026-04-02",
+              "fromDay": 2,
+              "toDay": 2,
+              "days": 1
+            },
+            {
+              "key": "P3",
+              "label": "3〜3",
+              "from": "2026-04-03",
+              "to": "2026-04-03",
+              "fromDay": 3,
+              "toDay": 3,
+              "days": 1
+            },
+            {
+              "key": "P4",
+              "label": "4〜4",
+              "from": "2026-04-04",
+              "to": "2026-04-04",
+              "fromDay": 4,
+              "toDay": 4,
+              "days": 1
+            },
+            {
+              "key": "P5",
+              "label": "5〜5",
+              "from": "2026-04-05",
+              "to": "2026-04-05",
+              "fromDay": 5,
+              "toDay": 5,
+              "days": 1
+            },
+            {
+              "key": "P6",
+              "label": "6〜6",
+              "from": "2026-04-06",
+              "to": "2026-04-06",
+              "fromDay": 6,
+              "toDay": 6,
+              "days": 1
+            },
+            {
+              "key": "P7",
+              "label": "7〜7",
+              "from": "2026-04-07",
+              "to": "2026-04-07",
+              "fromDay": 7,
+              "toDay": 7,
+              "days": 1
+            },
+            {
+              "key": "P8",
+              "label": "8〜8",
+              "from": "2026-04-08",
+              "to": "2026-04-08",
+              "fromDay": 8,
+              "toDay": 8,
+              "days": 1
+            },
+            {
+              "key": "P9",
+              "label": "9〜9",
+              "from": "2026-04-09",
+              "to": "2026-04-09",
+              "fromDay": 9,
+              "toDay": 9,
+              "days": 1
+            },
+            {
+              "key": "P10",
+              "label": "10〜10",
+              "from": "2026-04-10",
+              "to": "2026-04-10",
+              "fromDay": 10,
+              "toDay": 10,
+              "days": 1
+            },
+            {
+              "key": "P11",
+              "label": "11〜11",
+              "from": "2026-04-11",
+              "to": "2026-04-11",
+              "fromDay": 11,
+              "toDay": 11,
+              "days": 1
+            },
+            {
+              "key": "P12",
+              "label": "12〜12",
+              "from": "2026-04-12",
+              "to": "2026-04-12",
+              "fromDay": 12,
+              "toDay": 12,
+              "days": 1
+            },
+            {
+              "key": "P13",
+              "label": "13〜13",
+              "from": "2026-04-13",
+              "to": "2026-04-13",
+              "fromDay": 13,
+              "toDay": 13,
+              "days": 1
+            },
+            {
+              "key": "P14",
+              "label": "14〜14",
+              "from": "2026-04-14",
+              "to": "2026-04-14",
+              "fromDay": 14,
+              "toDay": 14,
+              "days": 1
+            },
+            {
+              "key": "P15",
+              "label": "15〜15",
+              "from": "2026-04-15",
+              "to": "2026-04-15",
+              "fromDay": 15,
+              "toDay": 15,
+              "days": 1
+            },
+            {
+              "key": "P16",
+              "label": "16〜16",
+              "from": "2026-04-16",
+              "to": "2026-04-16",
+              "fromDay": 16,
+              "toDay": 16,
+              "days": 1
+            },
+            {
+              "key": "P17",
+              "label": "17〜17",
+              "from": "2026-04-17",
+              "to": "2026-04-17",
+              "fromDay": 17,
+              "toDay": 17,
+              "days": 1
+            },
+            {
+              "key": "P18",
+              "label": "18〜18",
+              "from": "2026-04-18",
+              "to": "2026-04-18",
+              "fromDay": 18,
+              "toDay": 18,
+              "days": 1
+            },
+            {
+              "key": "P19",
+              "label": "19〜19",
+              "from": "2026-04-19",
+              "to": "2026-04-19",
+              "fromDay": 19,
+              "toDay": 19,
+              "days": 1
+            },
+            {
+              "key": "P20",
+              "label": "20〜20",
+              "from": "2026-04-20",
+              "to": "2026-04-20",
+              "fromDay": 20,
+              "toDay": 20,
+              "days": 1
+            },
+            {
+              "key": "P21",
+              "label": "21〜21",
+              "from": "2026-04-21",
+              "to": "2026-04-21",
+              "fromDay": 21,
+              "toDay": 21,
+              "days": 1
+            },
+            {
+              "key": "P22",
+              "label": "22〜22",
+              "from": "2026-04-22",
+              "to": "2026-04-22",
+              "fromDay": 22,
+              "toDay": 22,
+              "days": 1
+            },
+            {
+              "key": "P23",
+              "label": "23〜23",
+              "from": "2026-04-23",
+              "to": "2026-04-23",
+              "fromDay": 23,
+              "toDay": 23,
+              "days": 1
+            },
+            {
+              "key": "P24",
+              "label": "24〜24",
+              "from": "2026-04-24",
+              "to": "2026-04-24",
+              "fromDay": 24,
+              "toDay": 24,
+              "days": 1
+            },
+            {
+              "key": "P25",
+              "label": "25〜25",
+              "from": "2026-04-25",
+              "to": "2026-04-25",
+              "fromDay": 25,
+              "toDay": 25,
+              "days": 1
+            },
+            {
+              "key": "P26",
+              "label": "26〜26",
+              "from": "2026-04-26",
+              "to": "2026-04-26",
+              "fromDay": 26,
+              "toDay": 26,
+              "days": 1
+            },
+            {
+              "key": "P27",
+              "label": "27〜27",
+              "from": "2026-04-27",
+              "to": "2026-04-27",
+              "fromDay": 27,
+              "toDay": 27,
+              "days": 1
+            },
+            {
+              "key": "P28",
+              "label": "28〜28",
+              "from": "2026-04-28",
+              "to": "2026-04-28",
+              "fromDay": 28,
+              "toDay": 28,
+              "days": 1
+            },
+            {
+              "key": "P29",
+              "label": "29〜29",
+              "from": "2026-04-29",
+              "to": "2026-04-29",
+              "fromDay": 29,
+              "toDay": 29,
+              "days": 1
+            },
+            {
+              "key": "P30",
+              "label": "30〜末",
+              "from": "2026-04-30",
+              "to": "2026-04-30",
+              "fromDay": 30,
+              "toDay": 30,
+              "days": 1
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 30
+        }
+      },
+      {
+        "ym": "2026-04",
+        "method": "ndays",
+        "n": 30,
+        "note": "月末30日 / 任意N日=30日(月より長い場合あり)",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜末",
+              "from": "2026-04-01",
+              "to": "2026-04-30",
+              "fromDay": 1,
+              "toDay": 30,
+              "days": 30
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 30
+        }
+      },
+      {
+        "ym": "2026-07",
+        "method": "monthly",
+        "n": 10,
+        "note": "月末31日 / 月まとめ=分割なし",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜末",
+              "from": "2026-07-01",
+              "to": "2026-07-31",
+              "fromDay": 1,
+              "toDay": 31,
+              "days": 31
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": false
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 31
+        }
+      },
+      {
+        "ym": "2026-07",
+        "method": "half",
+        "n": 10,
+        "note": "月末31日 / 半月=1〜15/16〜末",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜15",
+              "from": "2026-07-01",
+              "to": "2026-07-15",
+              "fromDay": 1,
+              "toDay": 15,
+              "days": 15
+            },
+            {
+              "key": "P2",
+              "label": "16〜末",
+              "from": "2026-07-16",
+              "to": "2026-07-31",
+              "fromDay": 16,
+              "toDay": 31,
+              "days": 16
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 31
+        }
+      },
+      {
+        "ym": "2026-07",
+        "method": "ten",
+        "n": 10,
+        "note": "月末31日 / 10日締め(代行)=1〜10/11〜20/21〜末",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜10",
+              "from": "2026-07-01",
+              "to": "2026-07-10",
+              "fromDay": 1,
+              "toDay": 10,
+              "days": 10
+            },
+            {
+              "key": "P2",
+              "label": "11〜20",
+              "from": "2026-07-11",
+              "to": "2026-07-20",
+              "fromDay": 11,
+              "toDay": 20,
+              "days": 10
+            },
+            {
+              "key": "P3",
+              "label": "21〜末",
+              "from": "2026-07-21",
+              "to": "2026-07-31",
+              "fromDay": 21,
+              "toDay": 31,
+              "days": 11
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 31
+        }
+      },
+      {
+        "ym": "2026-07",
+        "method": "ndays",
+        "n": 7,
+        "note": "月末31日 / 任意N日=7日",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜7",
+              "from": "2026-07-01",
+              "to": "2026-07-07",
+              "fromDay": 1,
+              "toDay": 7,
+              "days": 7
+            },
+            {
+              "key": "P2",
+              "label": "8〜14",
+              "from": "2026-07-08",
+              "to": "2026-07-14",
+              "fromDay": 8,
+              "toDay": 14,
+              "days": 7
+            },
+            {
+              "key": "P3",
+              "label": "15〜21",
+              "from": "2026-07-15",
+              "to": "2026-07-21",
+              "fromDay": 15,
+              "toDay": 21,
+              "days": 7
+            },
+            {
+              "key": "P4",
+              "label": "22〜28",
+              "from": "2026-07-22",
+              "to": "2026-07-28",
+              "fromDay": 22,
+              "toDay": 28,
+              "days": 7
+            },
+            {
+              "key": "P5",
+              "label": "29〜末",
+              "from": "2026-07-29",
+              "to": "2026-07-31",
+              "fromDay": 29,
+              "toDay": 31,
+              "days": 3
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 31
+        }
+      },
+      {
+        "ym": "2026-07",
+        "method": "ndays",
+        "n": 13,
+        "note": "月末31日 / 任意N日=13日(端数が出る)",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜13",
+              "from": "2026-07-01",
+              "to": "2026-07-13",
+              "fromDay": 1,
+              "toDay": 13,
+              "days": 13
+            },
+            {
+              "key": "P2",
+              "label": "14〜26",
+              "from": "2026-07-14",
+              "to": "2026-07-26",
+              "fromDay": 14,
+              "toDay": 26,
+              "days": 13
+            },
+            {
+              "key": "P3",
+              "label": "27〜末",
+              "from": "2026-07-27",
+              "to": "2026-07-31",
+              "fromDay": 27,
+              "toDay": 31,
+              "days": 5
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 31
+        }
+      },
+      {
+        "ym": "2026-07",
+        "method": "ndays",
+        "n": 1,
+        "note": "月末31日 / 任意N日=1日(極端)",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜1",
+              "from": "2026-07-01",
+              "to": "2026-07-01",
+              "fromDay": 1,
+              "toDay": 1,
+              "days": 1
+            },
+            {
+              "key": "P2",
+              "label": "2〜2",
+              "from": "2026-07-02",
+              "to": "2026-07-02",
+              "fromDay": 2,
+              "toDay": 2,
+              "days": 1
+            },
+            {
+              "key": "P3",
+              "label": "3〜3",
+              "from": "2026-07-03",
+              "to": "2026-07-03",
+              "fromDay": 3,
+              "toDay": 3,
+              "days": 1
+            },
+            {
+              "key": "P4",
+              "label": "4〜4",
+              "from": "2026-07-04",
+              "to": "2026-07-04",
+              "fromDay": 4,
+              "toDay": 4,
+              "days": 1
+            },
+            {
+              "key": "P5",
+              "label": "5〜5",
+              "from": "2026-07-05",
+              "to": "2026-07-05",
+              "fromDay": 5,
+              "toDay": 5,
+              "days": 1
+            },
+            {
+              "key": "P6",
+              "label": "6〜6",
+              "from": "2026-07-06",
+              "to": "2026-07-06",
+              "fromDay": 6,
+              "toDay": 6,
+              "days": 1
+            },
+            {
+              "key": "P7",
+              "label": "7〜7",
+              "from": "2026-07-07",
+              "to": "2026-07-07",
+              "fromDay": 7,
+              "toDay": 7,
+              "days": 1
+            },
+            {
+              "key": "P8",
+              "label": "8〜8",
+              "from": "2026-07-08",
+              "to": "2026-07-08",
+              "fromDay": 8,
+              "toDay": 8,
+              "days": 1
+            },
+            {
+              "key": "P9",
+              "label": "9〜9",
+              "from": "2026-07-09",
+              "to": "2026-07-09",
+              "fromDay": 9,
+              "toDay": 9,
+              "days": 1
+            },
+            {
+              "key": "P10",
+              "label": "10〜10",
+              "from": "2026-07-10",
+              "to": "2026-07-10",
+              "fromDay": 10,
+              "toDay": 10,
+              "days": 1
+            },
+            {
+              "key": "P11",
+              "label": "11〜11",
+              "from": "2026-07-11",
+              "to": "2026-07-11",
+              "fromDay": 11,
+              "toDay": 11,
+              "days": 1
+            },
+            {
+              "key": "P12",
+              "label": "12〜12",
+              "from": "2026-07-12",
+              "to": "2026-07-12",
+              "fromDay": 12,
+              "toDay": 12,
+              "days": 1
+            },
+            {
+              "key": "P13",
+              "label": "13〜13",
+              "from": "2026-07-13",
+              "to": "2026-07-13",
+              "fromDay": 13,
+              "toDay": 13,
+              "days": 1
+            },
+            {
+              "key": "P14",
+              "label": "14〜14",
+              "from": "2026-07-14",
+              "to": "2026-07-14",
+              "fromDay": 14,
+              "toDay": 14,
+              "days": 1
+            },
+            {
+              "key": "P15",
+              "label": "15〜15",
+              "from": "2026-07-15",
+              "to": "2026-07-15",
+              "fromDay": 15,
+              "toDay": 15,
+              "days": 1
+            },
+            {
+              "key": "P16",
+              "label": "16〜16",
+              "from": "2026-07-16",
+              "to": "2026-07-16",
+              "fromDay": 16,
+              "toDay": 16,
+              "days": 1
+            },
+            {
+              "key": "P17",
+              "label": "17〜17",
+              "from": "2026-07-17",
+              "to": "2026-07-17",
+              "fromDay": 17,
+              "toDay": 17,
+              "days": 1
+            },
+            {
+              "key": "P18",
+              "label": "18〜18",
+              "from": "2026-07-18",
+              "to": "2026-07-18",
+              "fromDay": 18,
+              "toDay": 18,
+              "days": 1
+            },
+            {
+              "key": "P19",
+              "label": "19〜19",
+              "from": "2026-07-19",
+              "to": "2026-07-19",
+              "fromDay": 19,
+              "toDay": 19,
+              "days": 1
+            },
+            {
+              "key": "P20",
+              "label": "20〜20",
+              "from": "2026-07-20",
+              "to": "2026-07-20",
+              "fromDay": 20,
+              "toDay": 20,
+              "days": 1
+            },
+            {
+              "key": "P21",
+              "label": "21〜21",
+              "from": "2026-07-21",
+              "to": "2026-07-21",
+              "fromDay": 21,
+              "toDay": 21,
+              "days": 1
+            },
+            {
+              "key": "P22",
+              "label": "22〜22",
+              "from": "2026-07-22",
+              "to": "2026-07-22",
+              "fromDay": 22,
+              "toDay": 22,
+              "days": 1
+            },
+            {
+              "key": "P23",
+              "label": "23〜23",
+              "from": "2026-07-23",
+              "to": "2026-07-23",
+              "fromDay": 23,
+              "toDay": 23,
+              "days": 1
+            },
+            {
+              "key": "P24",
+              "label": "24〜24",
+              "from": "2026-07-24",
+              "to": "2026-07-24",
+              "fromDay": 24,
+              "toDay": 24,
+              "days": 1
+            },
+            {
+              "key": "P25",
+              "label": "25〜25",
+              "from": "2026-07-25",
+              "to": "2026-07-25",
+              "fromDay": 25,
+              "toDay": 25,
+              "days": 1
+            },
+            {
+              "key": "P26",
+              "label": "26〜26",
+              "from": "2026-07-26",
+              "to": "2026-07-26",
+              "fromDay": 26,
+              "toDay": 26,
+              "days": 1
+            },
+            {
+              "key": "P27",
+              "label": "27〜27",
+              "from": "2026-07-27",
+              "to": "2026-07-27",
+              "fromDay": 27,
+              "toDay": 27,
+              "days": 1
+            },
+            {
+              "key": "P28",
+              "label": "28〜28",
+              "from": "2026-07-28",
+              "to": "2026-07-28",
+              "fromDay": 28,
+              "toDay": 28,
+              "days": 1
+            },
+            {
+              "key": "P29",
+              "label": "29〜29",
+              "from": "2026-07-29",
+              "to": "2026-07-29",
+              "fromDay": 29,
+              "toDay": 29,
+              "days": 1
+            },
+            {
+              "key": "P30",
+              "label": "30〜30",
+              "from": "2026-07-30",
+              "to": "2026-07-30",
+              "fromDay": 30,
+              "toDay": 30,
+              "days": 1
+            },
+            {
+              "key": "P31",
+              "label": "31〜末",
+              "from": "2026-07-31",
+              "to": "2026-07-31",
+              "fromDay": 31,
+              "toDay": 31,
+              "days": 1
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 31
+        }
+      },
+      {
+        "ym": "2026-07",
+        "method": "ndays",
+        "n": 30,
+        "note": "月末31日 / 任意N日=30日(月より長い場合あり)",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜30",
+              "from": "2026-07-01",
+              "to": "2026-07-30",
+              "fromDay": 1,
+              "toDay": 30,
+              "days": 30
+            },
+            {
+              "key": "P2",
+              "label": "31〜末",
+              "from": "2026-07-31",
+              "to": "2026-07-31",
+              "fromDay": 31,
+              "toDay": 31,
+              "days": 1
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 31
+        }
+      },
+      {
+        "ym": "2026-06",
+        "method": "monthly",
+        "n": 10,
+        "note": "基準月(30日) / 月まとめ=分割なし",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜末",
+              "from": "2026-06-01",
+              "to": "2026-06-30",
+              "fromDay": 1,
+              "toDay": 30,
+              "days": 30
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": false
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 30
+        }
+      },
+      {
+        "ym": "2026-06",
+        "method": "half",
+        "n": 10,
+        "note": "基準月(30日) / 半月=1〜15/16〜末",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜15",
+              "from": "2026-06-01",
+              "to": "2026-06-15",
+              "fromDay": 1,
+              "toDay": 15,
+              "days": 15
+            },
+            {
+              "key": "P2",
+              "label": "16〜末",
+              "from": "2026-06-16",
+              "to": "2026-06-30",
+              "fromDay": 16,
+              "toDay": 30,
+              "days": 15
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 30
+        }
+      },
+      {
+        "ym": "2026-06",
+        "method": "ten",
+        "n": 10,
+        "note": "基準月(30日) / 10日締め(代行)=1〜10/11〜20/21〜末",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜10",
+              "from": "2026-06-01",
+              "to": "2026-06-10",
+              "fromDay": 1,
+              "toDay": 10,
+              "days": 10
+            },
+            {
+              "key": "P2",
+              "label": "11〜20",
+              "from": "2026-06-11",
+              "to": "2026-06-20",
+              "fromDay": 11,
+              "toDay": 20,
+              "days": 10
+            },
+            {
+              "key": "P3",
+              "label": "21〜末",
+              "from": "2026-06-21",
+              "to": "2026-06-30",
+              "fromDay": 21,
+              "toDay": 30,
+              "days": 10
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 30
+        }
+      },
+      {
+        "ym": "2026-06",
+        "method": "ndays",
+        "n": 7,
+        "note": "基準月(30日) / 任意N日=7日",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜7",
+              "from": "2026-06-01",
+              "to": "2026-06-07",
+              "fromDay": 1,
+              "toDay": 7,
+              "days": 7
+            },
+            {
+              "key": "P2",
+              "label": "8〜14",
+              "from": "2026-06-08",
+              "to": "2026-06-14",
+              "fromDay": 8,
+              "toDay": 14,
+              "days": 7
+            },
+            {
+              "key": "P3",
+              "label": "15〜21",
+              "from": "2026-06-15",
+              "to": "2026-06-21",
+              "fromDay": 15,
+              "toDay": 21,
+              "days": 7
+            },
+            {
+              "key": "P4",
+              "label": "22〜28",
+              "from": "2026-06-22",
+              "to": "2026-06-28",
+              "fromDay": 22,
+              "toDay": 28,
+              "days": 7
+            },
+            {
+              "key": "P5",
+              "label": "29〜末",
+              "from": "2026-06-29",
+              "to": "2026-06-30",
+              "fromDay": 29,
+              "toDay": 30,
+              "days": 2
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 30
+        }
+      },
+      {
+        "ym": "2026-06",
+        "method": "ndays",
+        "n": 13,
+        "note": "基準月(30日) / 任意N日=13日(端数が出る)",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜13",
+              "from": "2026-06-01",
+              "to": "2026-06-13",
+              "fromDay": 1,
+              "toDay": 13,
+              "days": 13
+            },
+            {
+              "key": "P2",
+              "label": "14〜26",
+              "from": "2026-06-14",
+              "to": "2026-06-26",
+              "fromDay": 14,
+              "toDay": 26,
+              "days": 13
+            },
+            {
+              "key": "P3",
+              "label": "27〜末",
+              "from": "2026-06-27",
+              "to": "2026-06-30",
+              "fromDay": 27,
+              "toDay": 30,
+              "days": 4
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 30
+        }
+      },
+      {
+        "ym": "2026-06",
+        "method": "ndays",
+        "n": 1,
+        "note": "基準月(30日) / 任意N日=1日(極端)",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜1",
+              "from": "2026-06-01",
+              "to": "2026-06-01",
+              "fromDay": 1,
+              "toDay": 1,
+              "days": 1
+            },
+            {
+              "key": "P2",
+              "label": "2〜2",
+              "from": "2026-06-02",
+              "to": "2026-06-02",
+              "fromDay": 2,
+              "toDay": 2,
+              "days": 1
+            },
+            {
+              "key": "P3",
+              "label": "3〜3",
+              "from": "2026-06-03",
+              "to": "2026-06-03",
+              "fromDay": 3,
+              "toDay": 3,
+              "days": 1
+            },
+            {
+              "key": "P4",
+              "label": "4〜4",
+              "from": "2026-06-04",
+              "to": "2026-06-04",
+              "fromDay": 4,
+              "toDay": 4,
+              "days": 1
+            },
+            {
+              "key": "P5",
+              "label": "5〜5",
+              "from": "2026-06-05",
+              "to": "2026-06-05",
+              "fromDay": 5,
+              "toDay": 5,
+              "days": 1
+            },
+            {
+              "key": "P6",
+              "label": "6〜6",
+              "from": "2026-06-06",
+              "to": "2026-06-06",
+              "fromDay": 6,
+              "toDay": 6,
+              "days": 1
+            },
+            {
+              "key": "P7",
+              "label": "7〜7",
+              "from": "2026-06-07",
+              "to": "2026-06-07",
+              "fromDay": 7,
+              "toDay": 7,
+              "days": 1
+            },
+            {
+              "key": "P8",
+              "label": "8〜8",
+              "from": "2026-06-08",
+              "to": "2026-06-08",
+              "fromDay": 8,
+              "toDay": 8,
+              "days": 1
+            },
+            {
+              "key": "P9",
+              "label": "9〜9",
+              "from": "2026-06-09",
+              "to": "2026-06-09",
+              "fromDay": 9,
+              "toDay": 9,
+              "days": 1
+            },
+            {
+              "key": "P10",
+              "label": "10〜10",
+              "from": "2026-06-10",
+              "to": "2026-06-10",
+              "fromDay": 10,
+              "toDay": 10,
+              "days": 1
+            },
+            {
+              "key": "P11",
+              "label": "11〜11",
+              "from": "2026-06-11",
+              "to": "2026-06-11",
+              "fromDay": 11,
+              "toDay": 11,
+              "days": 1
+            },
+            {
+              "key": "P12",
+              "label": "12〜12",
+              "from": "2026-06-12",
+              "to": "2026-06-12",
+              "fromDay": 12,
+              "toDay": 12,
+              "days": 1
+            },
+            {
+              "key": "P13",
+              "label": "13〜13",
+              "from": "2026-06-13",
+              "to": "2026-06-13",
+              "fromDay": 13,
+              "toDay": 13,
+              "days": 1
+            },
+            {
+              "key": "P14",
+              "label": "14〜14",
+              "from": "2026-06-14",
+              "to": "2026-06-14",
+              "fromDay": 14,
+              "toDay": 14,
+              "days": 1
+            },
+            {
+              "key": "P15",
+              "label": "15〜15",
+              "from": "2026-06-15",
+              "to": "2026-06-15",
+              "fromDay": 15,
+              "toDay": 15,
+              "days": 1
+            },
+            {
+              "key": "P16",
+              "label": "16〜16",
+              "from": "2026-06-16",
+              "to": "2026-06-16",
+              "fromDay": 16,
+              "toDay": 16,
+              "days": 1
+            },
+            {
+              "key": "P17",
+              "label": "17〜17",
+              "from": "2026-06-17",
+              "to": "2026-06-17",
+              "fromDay": 17,
+              "toDay": 17,
+              "days": 1
+            },
+            {
+              "key": "P18",
+              "label": "18〜18",
+              "from": "2026-06-18",
+              "to": "2026-06-18",
+              "fromDay": 18,
+              "toDay": 18,
+              "days": 1
+            },
+            {
+              "key": "P19",
+              "label": "19〜19",
+              "from": "2026-06-19",
+              "to": "2026-06-19",
+              "fromDay": 19,
+              "toDay": 19,
+              "days": 1
+            },
+            {
+              "key": "P20",
+              "label": "20〜20",
+              "from": "2026-06-20",
+              "to": "2026-06-20",
+              "fromDay": 20,
+              "toDay": 20,
+              "days": 1
+            },
+            {
+              "key": "P21",
+              "label": "21〜21",
+              "from": "2026-06-21",
+              "to": "2026-06-21",
+              "fromDay": 21,
+              "toDay": 21,
+              "days": 1
+            },
+            {
+              "key": "P22",
+              "label": "22〜22",
+              "from": "2026-06-22",
+              "to": "2026-06-22",
+              "fromDay": 22,
+              "toDay": 22,
+              "days": 1
+            },
+            {
+              "key": "P23",
+              "label": "23〜23",
+              "from": "2026-06-23",
+              "to": "2026-06-23",
+              "fromDay": 23,
+              "toDay": 23,
+              "days": 1
+            },
+            {
+              "key": "P24",
+              "label": "24〜24",
+              "from": "2026-06-24",
+              "to": "2026-06-24",
+              "fromDay": 24,
+              "toDay": 24,
+              "days": 1
+            },
+            {
+              "key": "P25",
+              "label": "25〜25",
+              "from": "2026-06-25",
+              "to": "2026-06-25",
+              "fromDay": 25,
+              "toDay": 25,
+              "days": 1
+            },
+            {
+              "key": "P26",
+              "label": "26〜26",
+              "from": "2026-06-26",
+              "to": "2026-06-26",
+              "fromDay": 26,
+              "toDay": 26,
+              "days": 1
+            },
+            {
+              "key": "P27",
+              "label": "27〜27",
+              "from": "2026-06-27",
+              "to": "2026-06-27",
+              "fromDay": 27,
+              "toDay": 27,
+              "days": 1
+            },
+            {
+              "key": "P28",
+              "label": "28〜28",
+              "from": "2026-06-28",
+              "to": "2026-06-28",
+              "fromDay": 28,
+              "toDay": 28,
+              "days": 1
+            },
+            {
+              "key": "P29",
+              "label": "29〜29",
+              "from": "2026-06-29",
+              "to": "2026-06-29",
+              "fromDay": 29,
+              "toDay": 29,
+              "days": 1
+            },
+            {
+              "key": "P30",
+              "label": "30〜末",
+              "from": "2026-06-30",
+              "to": "2026-06-30",
+              "fromDay": 30,
+              "toDay": 30,
+              "days": 1
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 30
+        }
+      },
+      {
+        "ym": "2026-06",
+        "method": "ndays",
+        "n": 30,
+        "note": "基準月(30日) / 任意N日=30日(月より長い場合あり)",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜末",
+              "from": "2026-06-01",
+              "to": "2026-06-30",
+              "fromDay": 1,
+              "toDay": 30,
+              "days": 30
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        },
+        "lastDay": {
+          "ok": true,
+          "value": 30
+        }
+      }
+    ],
+    "oddResults": [
+      {
+        "ym": "2026-06",
+        "method": "unknown-method",
+        "n": 10,
+        "note": "知らない締め方 → monthly に倒す",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜末",
+              "from": "2026-06-01",
+              "to": "2026-06-30",
+              "fromDay": 1,
+              "toDay": 30,
+              "days": 30
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": false
+        }
+      },
+      {
+        "ym": "",
+        "method": "ten",
+        "n": 10,
+        "note": "空のym → 例外にしない",
+        "periods": {
+          "ok": true,
+          "value": []
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        }
+      },
+      {
+        "ym": "2026-13",
+        "method": "ten",
+        "n": 10,
+        "note": "13月 → 例外にしない",
+        "periods": {
+          "ok": true,
+          "value": []
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        }
+      },
+      {
+        "ym": "abc",
+        "method": "ten",
+        "n": 10,
+        "note": "壊れたym → 例外にしない",
+        "periods": {
+          "ok": true,
+          "value": []
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        }
+      },
+      {
+        "ym": "2026-06",
+        "method": "ten",
+        "n": 0,
+        "note": "N=0 → 例外にしない",
+        "periods": {
+          "ok": true,
+          "value": [
+            {
+              "key": "P1",
+              "label": "1〜10",
+              "from": "2026-06-01",
+              "to": "2026-06-10",
+              "fromDay": 1,
+              "toDay": 10,
+              "days": 10
+            },
+            {
+              "key": "P2",
+              "label": "11〜20",
+              "from": "2026-06-11",
+              "to": "2026-06-20",
+              "fromDay": 11,
+              "toDay": 20,
+              "days": 10
+            },
+            {
+              "key": "P3",
+              "label": "21〜末",
+              "from": "2026-06-21",
+              "to": "2026-06-30",
+              "fromDay": 21,
+              "toDay": 30,
+              "days": 10
+            }
+          ]
+        },
+        "hasSplit": {
+          "ok": true,
+          "value": true
+        }
+      }
+    ],
+    "keyResults": [
+      {
+        "ymd": "2026-06-01",
+        "ym": "2026-06",
+        "method": "ten",
+        "n": 10,
+        "note": "",
+        "key": {
+          "ok": true,
+          "value": "P1"
+        }
+      },
+      {
+        "ymd": "2026-06-10",
+        "ym": "2026-06",
+        "method": "ten",
+        "n": 10,
+        "note": "",
+        "key": {
+          "ok": true,
+          "value": "P1"
+        }
+      },
+      {
+        "ymd": "2026-06-11",
+        "ym": "2026-06",
+        "method": "ten",
+        "n": 10,
+        "note": "",
+        "key": {
+          "ok": true,
+          "value": "P2"
+        }
+      },
+      {
+        "ymd": "2026-06-20",
+        "ym": "2026-06",
+        "method": "ten",
+        "n": 10,
+        "note": "",
+        "key": {
+          "ok": true,
+          "value": "P2"
+        }
+      },
+      {
+        "ymd": "2026-06-21",
+        "ym": "2026-06",
+        "method": "ten",
+        "n": 10,
+        "note": "",
+        "key": {
+          "ok": true,
+          "value": "P3"
+        }
+      },
+      {
+        "ymd": "2026-06-30",
+        "ym": "2026-06",
+        "method": "ten",
+        "n": 10,
+        "note": "",
+        "key": {
+          "ok": true,
+          "value": "P3"
+        }
+      },
+      {
+        "ymd": "2026-05-31",
+        "ym": "2026-06",
+        "method": "ten",
+        "n": 10,
+        "note": "前月末=範囲外",
+        "key": {
+          "ok": true,
+          "value": null
+        }
+      },
+      {
+        "ymd": "2026-07-01",
+        "ym": "2026-06",
+        "method": "ten",
+        "n": 10,
+        "note": "翌月頭=範囲外",
+        "key": {
+          "ok": true,
+          "value": null
+        }
+      },
+      {
+        "ymd": "2026-06-15",
+        "ym": "2026-06",
+        "method": "monthly",
+        "n": 10,
+        "note": "月まとめは全部P1",
+        "key": {
+          "ok": true,
+          "value": "P1"
+        }
+      },
+      {
+        "ymd": "2026-02-28",
+        "ym": "2026-02",
+        "method": "half",
+        "n": 10,
+        "note": "28日月の末日",
+        "key": {
+          "ok": true,
+          "value": "P2"
+        }
+      },
+      {
+        "ymd": "2028-02-29",
+        "ym": "2028-02",
+        "method": "half",
+        "n": 10,
+        "note": "うるう日",
+        "key": {
+          "ok": true,
+          "value": "P2"
+        }
+      }
+    ],
+    "ledgerResults": [
+      {
+        "method": "monthly",
+        "periods": [
+          {
+            "key": "P1",
+            "from": "2026-06-01",
+            "to": "2026-06-30"
+          }
+        ],
+        "byPeriod": {
+          "ok": true,
+          "value": {
+            "P1": {
+              "label": "1〜末",
+              "from": "2026-06-01",
+              "to": "2026-06-30",
+              "employees": {
+                "E1": {
+                  "ctx": {
+                    "workMin": 1970,
+                    "workDays": 7,
+                    "sales": 88300,
+                    "commission": 57500,
+                    "count": 18
+                  },
+                  "hikazeiAmount": 1200,
+                  "workDays": 7,
+                  "rowCount": 9,
+                  "days": [
+                    "2026-06-01",
+                    "2026-06-03",
+                    "2026-06-10",
+                    "2026-06-11",
+                    "2026-06-20",
+                    "2026-06-21",
+                    "2026-06-30"
+                  ]
+                },
+                "E2": {
+                  "ctx": {
+                    "workMin": 1390,
+                    "workDays": 3,
+                    "sales": 85000,
+                    "commission": 57000,
+                    "count": 13
+                  },
+                  "hikazeiAmount": 3000,
+                  "workDays": 3,
+                  "rowCount": 4,
+                  "days": [
+                    "2026-06-05",
+                    "2026-06-15",
+                    "2026-06-25"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "entriesInPeriod": [
+          {
+            "key": "P1",
+            "ymds": {
+              "ok": true,
+              "value": [
+                "2026-06-01",
+                "2026-06-03",
+                "2026-06-03",
+                "2026-06-03",
+                "2026-06-10",
+                "2026-06-11",
+                "2026-06-20",
+                "2026-06-21",
+                "2026-06-30",
+                "2026-06-05",
+                "2026-06-15",
+                "2026-06-25",
+                "2026-06-25"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "method": "half",
+        "periods": [
+          {
+            "key": "P1",
+            "from": "2026-06-01",
+            "to": "2026-06-15"
+          },
+          {
+            "key": "P2",
+            "from": "2026-06-16",
+            "to": "2026-06-30"
+          }
+        ],
+        "byPeriod": {
+          "ok": true,
+          "value": {
+            "P1": {
+              "label": "1〜15",
+              "from": "2026-06-01",
+              "to": "2026-06-15",
+              "employees": {
+                "E1": {
+                  "ctx": {
+                    "workMin": 1190,
+                    "workDays": 4,
+                    "sales": 56000,
+                    "commission": 35000,
+                    "count": 11
+                  },
+                  "hikazeiAmount": 1200,
+                  "workDays": 4,
+                  "rowCount": 6,
+                  "days": [
+                    "2026-06-01",
+                    "2026-06-03",
+                    "2026-06-10",
+                    "2026-06-11"
+                  ]
+                },
+                "E2": {
+                  "ctx": {
+                    "workMin": 930,
+                    "workDays": 2,
+                    "sales": 57000,
+                    "commission": 38000,
+                    "count": 9
+                  },
+                  "hikazeiAmount": 0,
+                  "workDays": 2,
+                  "rowCount": 2,
+                  "days": [
+                    "2026-06-05",
+                    "2026-06-15"
+                  ]
+                }
+              }
+            },
+            "P2": {
+              "label": "16〜末",
+              "from": "2026-06-16",
+              "to": "2026-06-30",
+              "employees": {
+                "E1": {
+                  "ctx": {
+                    "workMin": 780,
+                    "workDays": 3,
+                    "sales": 32300,
+                    "commission": 22500,
+                    "count": 7
+                  },
+                  "hikazeiAmount": 0,
+                  "workDays": 3,
+                  "rowCount": 3,
+                  "days": [
+                    "2026-06-20",
+                    "2026-06-21",
+                    "2026-06-30"
+                  ]
+                },
+                "E2": {
+                  "ctx": {
+                    "workMin": 460,
+                    "workDays": 1,
+                    "sales": 28000,
+                    "commission": 19000,
+                    "count": 4
+                  },
+                  "hikazeiAmount": 3000,
+                  "workDays": 1,
+                  "rowCount": 2,
+                  "days": [
+                    "2026-06-25"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "entriesInPeriod": [
+          {
+            "key": "P1",
+            "ymds": {
+              "ok": true,
+              "value": [
+                "2026-06-01",
+                "2026-06-03",
+                "2026-06-03",
+                "2026-06-03",
+                "2026-06-10",
+                "2026-06-11",
+                "2026-06-05",
+                "2026-06-15"
+              ]
+            }
+          },
+          {
+            "key": "P2",
+            "ymds": {
+              "ok": true,
+              "value": [
+                "2026-06-20",
+                "2026-06-21",
+                "2026-06-30",
+                "2026-06-25",
+                "2026-06-25"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "method": "ten",
+        "periods": [
+          {
+            "key": "P1",
+            "from": "2026-06-01",
+            "to": "2026-06-10"
+          },
+          {
+            "key": "P2",
+            "from": "2026-06-11",
+            "to": "2026-06-20"
+          },
+          {
+            "key": "P3",
+            "from": "2026-06-21",
+            "to": "2026-06-30"
+          }
+        ],
+        "byPeriod": {
+          "ok": true,
+          "value": {
+            "P1": {
+              "label": "1〜10",
+              "from": "2026-06-01",
+              "to": "2026-06-10",
+              "employees": {
+                "E1": {
+                  "ctx": {
+                    "workMin": 990,
+                    "workDays": 3,
+                    "sales": 48000,
+                    "commission": 29000,
+                    "count": 9
+                  },
+                  "hikazeiAmount": 1200,
+                  "workDays": 3,
+                  "rowCount": 5,
+                  "days": [
+                    "2026-06-01",
+                    "2026-06-03",
+                    "2026-06-10"
+                  ]
+                },
+                "E2": {
+                  "ctx": {
+                    "workMin": 480,
+                    "workDays": 1,
+                    "sales": 30000,
+                    "commission": 20000,
+                    "count": 5
+                  },
+                  "hikazeiAmount": 0,
+                  "workDays": 1,
+                  "rowCount": 1,
+                  "days": [
+                    "2026-06-05"
+                  ]
+                }
+              }
+            },
+            "P2": {
+              "label": "11〜20",
+              "from": "2026-06-11",
+              "to": "2026-06-20",
+              "employees": {
+                "E1": {
+                  "ctx": {
+                    "workMin": 410,
+                    "workDays": 2,
+                    "sales": 16500,
+                    "commission": 12500,
+                    "count": 4
+                  },
+                  "hikazeiAmount": 0,
+                  "workDays": 2,
+                  "rowCount": 2,
+                  "days": [
+                    "2026-06-11",
+                    "2026-06-20"
+                  ]
+                },
+                "E2": {
+                  "ctx": {
+                    "workMin": 450,
+                    "workDays": 1,
+                    "sales": 27000,
+                    "commission": 18000,
+                    "count": 4
+                  },
+                  "hikazeiAmount": 0,
+                  "workDays": 1,
+                  "rowCount": 1,
+                  "days": [
+                    "2026-06-15"
+                  ]
+                }
+              }
+            },
+            "P3": {
+              "label": "21〜末",
+              "from": "2026-06-21",
+              "to": "2026-06-30",
+              "employees": {
+                "E1": {
+                  "ctx": {
+                    "workMin": 570,
+                    "workDays": 2,
+                    "sales": 23800,
+                    "commission": 16000,
+                    "count": 5
+                  },
+                  "hikazeiAmount": 0,
+                  "workDays": 2,
+                  "rowCount": 2,
+                  "days": [
+                    "2026-06-21",
+                    "2026-06-30"
+                  ]
+                },
+                "E2": {
+                  "ctx": {
+                    "workMin": 460,
+                    "workDays": 1,
+                    "sales": 28000,
+                    "commission": 19000,
+                    "count": 4
+                  },
+                  "hikazeiAmount": 3000,
+                  "workDays": 1,
+                  "rowCount": 2,
+                  "days": [
+                    "2026-06-25"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "entriesInPeriod": [
+          {
+            "key": "P1",
+            "ymds": {
+              "ok": true,
+              "value": [
+                "2026-06-01",
+                "2026-06-03",
+                "2026-06-03",
+                "2026-06-03",
+                "2026-06-10",
+                "2026-06-05"
+              ]
+            }
+          },
+          {
+            "key": "P2",
+            "ymds": {
+              "ok": true,
+              "value": [
+                "2026-06-11",
+                "2026-06-20",
+                "2026-06-15"
+              ]
+            }
+          },
+          {
+            "key": "P3",
+            "ymds": {
+              "ok": true,
+              "value": [
+                "2026-06-21",
+                "2026-06-30",
+                "2026-06-25",
+                "2026-06-25"
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "aggregateResults": {
+      "E1": {
+        "ok": true,
+        "value": {
+          "ctx": {
+            "workMin": 2900,
+            "workDays": 11,
+            "sales": 125100,
+            "commission": 84100,
+            "count": 23
+          },
+          "hikazeiAmount": 1200,
+          "workDays": 11,
+          "rowCount": 13,
+          "days": [
+            "2026-05-30",
+            "2026-05-31",
+            "2026-06-01",
+            "2026-06-03",
+            "2026-06-10",
+            "2026-06-11",
+            "2026-06-20",
+            "2026-06-21",
+            "2026-06-30",
+            "2026-07-01",
+            "2026-07-03"
+          ]
+        }
+      },
+      "E2": {
+        "ok": true,
+        "value": {
+          "ctx": {
+            "workMin": 1489,
+            "workDays": 3,
+            "sales": 85099,
+            "commission": 57999,
+            "count": 22
+          },
+          "hikazeiAmount": 3000,
+          "workDays": 3,
+          "rowCount": 5,
+          "days": [
+            "2026-06-05",
+            "2026-06-15",
+            "2026-06-25"
+          ]
+        }
+      },
+      "all": {
+        "ok": true,
+        "value": {
+          "ctx": {
+            "workMin": 4389,
+            "workDays": 14,
+            "sales": 210199,
+            "commission": 142099,
+            "count": 45
+          },
+          "hikazeiAmount": 4200,
+          "workDays": 14,
+          "rowCount": 18,
+          "days": [
+            "2026-05-30",
+            "2026-05-31",
+            "2026-06-01",
+            "2026-06-03",
+            "2026-06-05",
+            "2026-06-10",
+            "2026-06-11",
+            "2026-06-15",
+            "2026-06-20",
+            "2026-06-21",
+            "2026-06-25",
+            "2026-06-30",
+            "2026-07-01",
+            "2026-07-03"
+          ]
+        }
+      },
+      "unifyByDay": {
+        "ok": true,
+        "value": [
+          "2026-05-30",
+          "2026-05-31",
+          "2026-06-01",
+          "2026-06-03",
+          "2026-06-03",
+          "2026-06-03",
+          "2026-06-10",
+          "2026-06-11",
+          "2026-06-20",
+          "2026-06-21",
+          "2026-06-30",
+          "2026-07-01",
+          "2026-07-03",
+          "2026-06-07"
+        ]
+      },
+      "unifyEmployee": {
+        "ok": true,
+        "value": {
+          "ctx": {
+            "workMin": 3122,
+            "workDays": 12,
+            "sales": 129544,
+            "commission": 88544,
+            "count": 24
+          },
+          "hikazeiAmount": 1200,
+          "workDays": 12,
+          "rowCount": 14,
+          "days": [
+            "2026-05-30",
+            "2026-05-31",
+            "2026-06-01",
+            "2026-06-03",
+            "2026-06-07",
+            "2026-06-10",
+            "2026-06-11",
+            "2026-06-20",
+            "2026-06-21",
+            "2026-06-30",
+            "2026-07-01",
+            "2026-07-03"
+          ]
+        }
+      }
+    },
+    "appResults": [
+      {
+        "ym": "2026-06",
+        "payCycle": "monthly",
+        "shimeMethod": "monthly",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": false
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1"
+          ]
+        }
+      },
+      {
+        "ym": "2026-06",
+        "payCycle": "monthly",
+        "shimeMethod": "half",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": true
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1",
+            "P2"
+          ]
+        }
+      },
+      {
+        "ym": "2026-06",
+        "payCycle": "monthly",
+        "shimeMethod": "ten",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": true
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1",
+            "P2",
+            "P3"
+          ]
+        }
+      },
+      {
+        "ym": "2026-06",
+        "payCycle": "monthly",
+        "shimeMethod": "ndays",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": true
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1",
+            "P2",
+            "P3"
+          ]
+        }
+      },
+      {
+        "ym": "2026-06",
+        "payCycle": "semimonthly",
+        "shimeMethod": "monthly",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": false
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1"
+          ]
+        }
+      },
+      {
+        "ym": "2026-06",
+        "payCycle": "semimonthly",
+        "shimeMethod": "half",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": true
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1",
+            "P2"
+          ]
+        }
+      },
+      {
+        "ym": "2026-06",
+        "payCycle": "semimonthly",
+        "shimeMethod": "ten",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": true
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1",
+            "P2",
+            "P3"
+          ]
+        }
+      },
+      {
+        "ym": "2026-06",
+        "payCycle": "semimonthly",
+        "shimeMethod": "ndays",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": true
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1",
+            "P2",
+            "P3"
+          ]
+        }
+      },
+      {
+        "ym": "2026-06",
+        "payCycle": "weekly",
+        "shimeMethod": "monthly",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": false
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1"
+          ]
+        }
+      },
+      {
+        "ym": "2026-06",
+        "payCycle": "weekly",
+        "shimeMethod": "half",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": false
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1",
+            "P2"
+          ]
+        }
+      },
+      {
+        "ym": "2026-06",
+        "payCycle": "weekly",
+        "shimeMethod": "ten",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": false
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1",
+            "P2",
+            "P3"
+          ]
+        }
+      },
+      {
+        "ym": "2026-06",
+        "payCycle": "weekly",
+        "shimeMethod": "ndays",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": false
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1",
+            "P2",
+            "P3"
+          ]
+        }
+      },
+      {
+        "ym": "2026-06",
+        "payCycle": "daily",
+        "shimeMethod": "monthly",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": false
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1"
+          ]
+        }
+      },
+      {
+        "ym": "2026-06",
+        "payCycle": "daily",
+        "shimeMethod": "half",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": false
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1",
+            "P2"
+          ]
+        }
+      },
+      {
+        "ym": "2026-06",
+        "payCycle": "daily",
+        "shimeMethod": "ten",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": false
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1",
+            "P2",
+            "P3"
+          ]
+        }
+      },
+      {
+        "ym": "2026-06",
+        "payCycle": "daily",
+        "shimeMethod": "ndays",
+        "shimeN": "10",
+        "shimeSplit": {
+          "ok": true,
+          "value": false
+        },
+        "shimePeriods": {
+          "ok": true,
+          "value": [
+            "P1",
+            "P2",
+            "P3"
+          ]
+        }
+      }
+    ]
+  }
+}

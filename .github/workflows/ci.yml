@@ -46,8 +46,12 @@ jobs:
         run: node tests/ops-payroll-monthly.test.mjs
       - name: Law switchpoints (健保R7→R8/支援金2026-04/雇用保険年度/最賃年度の境界前後)
         run: node tests/law-switchpoints.test.mjs
+      - name: Periods golden (期間分割K2が移設前と一致・月末28/29/30/31・月またぎ・日払週払は分割しない)
+        run: node tests/periods-golden.test.mjs
       - name: Input fixture reproducibility (入力fixtureが生成スクリプトと一致するか)
         run: node scripts/make-input-fixture.mjs --check
+      - name: Periods fixture reproducibility (期間fixtureが生成スクリプトと一致するか)
+        run: node scripts/make-periods-fixture.mjs --check
       - name: Cache-buster stamp guard (全HTMLが現在の内容ハッシュ ?v= で貼られているか=貼り忘れ検知)
         run: node scripts/stamp-build.mjs --check
       - name: Statutory drift guard (lib == 中央statutory)
