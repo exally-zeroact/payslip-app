@@ -30,7 +30,7 @@
     {name:'クラシック紺', accent:'#2E4A6B', line:'#C8D2DE', ink:'#1a2733'},
     {name:'セピア',       accent:'#6f5a3e', line:'#cfc9b8', ink:'#23261f'},
     {name:'グレー',       accent:'#595959', line:'#D9D9D9', ink:'#23261f'},
-    {name:'ミント',       accent:'#3D9E72', line:'#C8ECD8', ink:'#1a4a2e'},
+    {name:'ミント',       accent:'#3D9E72', line:'#C8ECD8', ink:'#2E7D54'},
     {name:'モノクロ',     accent:'#404040', line:'#BFBFBF', ink:'#000000'}
   ];
   var PAYTYPES=['月給','時給','日給','歩合','役員','カスタム'];
@@ -2934,7 +2934,7 @@
       var st=document.createElement('style'); st.id='qrprint-style';
       st.textContent='@media print{body>*{visibility:hidden!important}#qrprint-print,#qrprint-print *{visibility:visible!important}#qrprint-print{position:absolute;left:0;top:0;width:100%;padding:14px;box-sizing:border-box}'+css+'}';
       var pc=document.createElement('div'); pc.id='qrprint-print';
-      pc.innerHTML='<h1 style="font-size:15px;margin:0 0 10px;color:#1a4a2e">Web給与明細 アクセス用QRコード</h1><div style="display:flex;flex-wrap:wrap;gap:12px">'+cards+'</div>';
+      pc.innerHTML='<h1 style="font-size:15px;margin:0 0 10px;color:#2E7D54">Web給与明細 アクセス用QRコード</h1><div style="display:flex;flex-wrap:wrap;gap:12px">'+cards+'</div>';
       document.head.appendChild(st); document.body.appendChild(pc);
       setTimeout(function(){ try{ window.print(); }catch(e){} setTimeout(function(){ pc.remove(); st.remove(); }, 800); }, 120);
     });

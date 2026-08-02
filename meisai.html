@@ -14,7 +14,7 @@
 <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22給与明細%22%2C%22short_name%22%3A%22給与明細%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23F0FAF4%22%2C%22theme_color%22%3A%22%233D9E72%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%253D%2527http%253A%252F%252Fwww.w3.org%252F2000%252Fsvg%2527%2520width%253D%2527192%2527%2520height%253D%2527192%2527%253E%253Crect%2520width%253D%2527192%2527%2520height%253D%2527192%2527%2520rx%253D%252742%2527%2520fill%253D%2527%25233D9E72%2527%252F%253E%253Ctext%2520x%253D%252796%2527%2520y%253D%2527130%2527%2520font-size%253D%2527104%2527%2520font-family%253D%2527sans-serif%2527%2520fill%253D%2527white%2527%2520text-anchor%253D%2527middle%2527%253E給%253C%252Ftext%253E%253C%252Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Noto Sans JP',sans-serif;color:#1a4a2e;background:#F0FAF4;-webkit-text-size-adjust:100%;min-height:100vh;}
+body{font-family:'Noto Sans JP',sans-serif;color:#2E7D54;background:#F0FAF4;-webkit-text-size-adjust:100%;min-height:100vh;}
 .mhead{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;height:50px;padding:0 16px;background:#fff;border-bottom:1px solid #e3ede8;}
 .mhead .logo{font-family:'DM Mono',monospace;font-size:18px;color:#52B788;}
 .mhead .sub{font-size:10px;letter-spacing:.16em;color:#7aa08c;}
@@ -22,7 +22,7 @@ body{font-family:'Noto Sans JP',sans-serif;color:#1a4a2e;background:#F0FAF4;-web
 .card{background:#fff;border:1px solid #d4eae0;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 1px 4px rgba(30,80,46,.06);}
 .card h2{font-size:15px;color:#2E7D54;margin-bottom:10px;}
 .lead{font-size:12.5px;color:#3D6B53;line-height:1.7;}
-.finput{width:100%;padding:12px;border:1.5px solid #d4eae0;border-radius:10px;font-size:16px;color:#1A4A2E;background:#fff;-webkit-appearance:none;}
+.finput{width:100%;padding:12px;border:1.5px solid #d4eae0;border-radius:10px;font-size:16px;color:#2E7D54;background:#fff;-webkit-appearance:none;}
 .finput.num{font-family:'DM Mono',monospace;letter-spacing:.14em;text-align:center;}
 .lbl{font-size:11px;font-weight:700;color:#3D6B53;margin:2px 0 5px;display:block;}
 .btn{width:100%;padding:13px;background:#3D9E72;color:#fff;border:none;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 3px 12px rgba(61,158,114,.3);margin-top:12px;}
@@ -30,7 +30,7 @@ body{font-family:'Noto Sans JP',sans-serif;color:#1a4a2e;background:#F0FAF4;-web
 .err{color:#C0392B;font-size:12px;margin-top:8px;min-height:16px;}
 .consent-box{background:#F0FAF4;border:1.5px solid #C8ECD8;border-radius:10px;padding:12px;font-size:12px;color:#3D6B53;line-height:1.75;margin:10px 0;}
 .dlist .drow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border:1px solid #d4eae0;border-radius:12px;background:#fff;margin-bottom:8px;cursor:pointer;}
-.dlist .drow .dl{font-size:13px;font-weight:700;color:#1a4a2e;}
+.dlist .drow .dl{font-size:13px;font-weight:700;color:#2E7D54;}
 .dlist .drow .ds{font-size:11px;color:#7aa08c;}
 .dlist .drow .dv{font-family:'DM Mono',monospace;font-weight:700;color:#2E7D54;white-space:nowrap;}
 .badge-new{display:inline-block;font-size:9px;background:#52B788;color:#fff;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
@@ -160,15 +160,15 @@ body{font-family:'Noto Sans JP',sans-serif;color:#1a4a2e;background:#F0FAF4;-web
 </div>
 
 <!-- ★既存Service Worker/キャッシュを削除して常に最新に(古い版が居座る問題の根絶) --><script>try{if('serviceWorker'in navigator){navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();});});}if(window.caches){caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k);});});}}catch(e){}</script>
-<script src="js/render.js?v=9f0b6661"></script>
-<script src="lib/nencho-declaration.js?v=9f0b6661"></script>
+<script src="js/render.js?v=04655c0f"></script>
+<script src="lib/nencho-declaration.js?v=04655c0f"></script>
 <!-- PDF保存=jsPDFで自前生成(A4ぴったり1ページ・ブラウザのフッター無し)。iOSのwebページ印刷は必ずURL/日付フッターが付き余白で2ページ化するため不使用。 -->
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <!-- 本番はSupabase(RPC)。window.SUPA/supabase未読込ならstore.jsはlocalStorage層にフォールバック。 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/supa-config.js?v=9f0b6661"></script>
-<script src="js/store.js?v=9f0b6661"></script>
-<script src="js/meisai.js?v=9f0b6661"></script>
+<script src="js/supa-config.js?v=04655c0f"></script>
+<script src="js/store.js?v=04655c0f"></script>
+<script src="js/meisai.js?v=04655c0f"></script>
 </body>
 </html>
