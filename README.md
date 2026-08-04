@@ -1,3 +1,26 @@
+> # ★このリポジトリは凍結しました（2026-08-04）★
+>
+> **中身はここでは動きません。** `payslip-app-olive.vercel.app` に来た人は
+> **すべて `https://exally.vercel.app/kyuyo/` へ 308 で飛びます**（`vercel.json`）。
+>
+> | 何 | 今の場所 |
+> |---|---|
+> | 給与(Kyually) 本番 | https://exally.vercel.app/kyuyo/ |
+> | Web明細 | https://exally.vercel.app/kyuyo/meisai.html?t=... |
+> | 管理 | https://exally.vercel.app/kyuyo/admin.html |
+> | ソース | `exally-zeroact/exally` の `kyuyo/` |
+>
+> **なぜ飛ばすか**: 中身は古いのに **本番のデータ（本物の給料）を見ていた**。
+> 誰かが開くと、古い計算で本物の数字を触れてしまう。「古い」と書くだけでは人は開く。
+>
+> **`sw.js` だけは飛ばしていません。** 端末に住み着いた Service Worker は
+> サーバを塞いだだけでは消えず、`sw.js` まで飛ばすと更新に失敗して**古いSWが永久に居座る**ため、
+> 「自分を登録解除してキャッシュを消す」中身をそのまま返しています。
+>
+> 見張り: `exally` の `node scripts/check-hosts.mjs`（週1・月曜9時JST＋手動）／一覧は `exally` の `docs/HOSTS.md`
+>
+> ---
+
 # 給与明細アプリ（ZEROACT / payslip-app）
 
 ブラウザで日本の給与明細を作成・計算・プレビュー・印刷(PDF)・Excel出力できる Web アプリ。

@@ -1,5 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "redirects": [
+    { "source": "/", "destination": "https://exally.vercel.app/kyuyo/", "permanent": true },
+    { "source": "/index.html", "destination": "https://exally.vercel.app/kyuyo/", "permanent": true },
+    { "source": "/meisai", "destination": "https://exally.vercel.app/kyuyo/meisai.html", "permanent": true },
+    { "source": "/meisai.html", "destination": "https://exally.vercel.app/kyuyo/meisai.html", "permanent": true },
+    { "source": "/admin", "destination": "https://exally.vercel.app/kyuyo/admin.html", "permanent": true },
+    { "source": "/admin.html", "destination": "https://exally.vercel.app/kyuyo/admin.html", "permanent": true },
+    { "source": "/:path((?!sw\\.js).*)", "destination": "https://exally.vercel.app/kyuyo/", "permanent": true }
+  ]
 }
