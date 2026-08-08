@@ -1,3 +1,5 @@
+★このrepoは凍結。給与の本体は exally-staging/kyuyo/ にあります。ここを触らないこと。★
+
 # CLAUDE.md — payslip-app（Kyually / 給与明細）
 
 本番: https://payslip-app-olive.vercel.app （管理画面 /admin）。GitHub: exally-zeroact/payslip-app・main。
