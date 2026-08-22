@@ -29,6 +29,33 @@ function eq(label, a, b) { if (canon(a) !== canon(b)) diffs.push(label + ': lib=
 
 function row(rows, kind, year) { const r = rows.find(x => x.kind === kind && x.year === year); return r ? r.data : null; }
 
+// ── 発効日(hatsuko)は「同じ日か」で比べる ──
+//   lib は ISO(2025-10-18)、中央は和暦(令和7年10月18日)。★同じ日を別の書き方で持っているだけ★。
+//   ★書き方の違いは通す／日そのものが違えば 赤にする／読めない書き方も 赤にする★
+//   （hatsuko は画面にも紙にも出ていない＝実測 2026-08-23。使っているのはこの検査だけ）
+function toISODay(v) {
+  if (typeof v !== 'string') return v;
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(v);
+  if (m) return m[1] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[3]).padStart(2, '0');
+  m = /^令和(\d+)年(\d+)月(\d+)日$/.exec(v);      // 令和1年 = 2019年 ⇒ 2018 + N
+  if (m) return (2018 + Number(m[1])) + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[3]).padStart(2, '0');
+  return '★読めない発効日:' + v + '★';
+}
+function normSaitei(t) {
+  const o = {};
+  for (const k of Object.keys(t)) { o[k] = { ...t[k] }; if ('hatsuko' in o[k]) o[k].hatsuko = toISODay(o[k].hatsuko); }
+  return o;
+}
+// ★自己診断＝毎回 走る。読み替えが壊れたら ここで止まる（見張りが黙って通るのを防ぐ）★
+for (const [inp, want] of [['令和7年10月18日', '2025-10-18'], ['令和8年1月1日', '2026-01-01'],
+                           ['令和7年10月3日', '2025-10-03'], ['2025-12-01', '2025-12-01'],
+                           ['へんな日付', '★読めない発効日:へんな日付★']]) {
+  if (toISODay(inp) !== want) {
+    console.log('✗ 発効日の読み替えが壊れています: ' + inp + ' → ' + toISODay(inp) + '（正 ' + want + '）');
+    process.exit(3);
+  }
+}
+
 function verify(rows) {
   // ── 社保(健保47県total/介護total) 令和7/令和8 ──
   for (const year of [2025, 2026]) {
@@ -39,7 +66,7 @@ function verify(rows) {
   }
   // ── 最賃47県 ──
   const sai = row(rows, 'saitei_chingin', 2025);
-  if (sai) { eq('最賃todofuken', SAI.todofuken, sai.todofuken); eq('最賃全国平均', SAI.ZENKOKU_HEIKIN, sai.zenkoku_heikin); } else diffs.push('saitei_chingin 中央に無し');
+  if (sai) { eq('最賃todofuken', normSaitei(SAI.todofuken), normSaitei(sai.todofuken)); eq('最賃全国平均', SAI.ZENKOKU_HEIKIN, sai.zenkoku_heikin); } else diffs.push('saitei_chingin 中央に無し');
   // ── 雇用 令和7/8 ──
   for (const year of [2025, 2026]) { const d = row(rows, 'koyo', year); if (d) eq('雇用' + year, KOYO.RATES[year], d); else diffs.push('koyo/' + year + ' 中央に無し'); }
   // ── 所得税 月額(densan) 令和7/8 ──
