@@ -50,7 +50,29 @@
   .seg button.on.trial,.seg button.on.paid,.seg button.on.free{background:var(--accent);border-color:var(--accent);}
   .seg button.on.disabled{background:#C0392B;border-color:#C0392B;}
   .empty{text-align:center;color:var(--muted);font-size:13px;padding:24px;}
-  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#2E7D54;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;}
+  /* ★★2026-09-10 司さん「色が 濃いすぎるし 背景ボックスの 使い方が 悪くないか」★★
+       直した 形を 見て →「★絶対 これが ええ★」
+       ⇒「Exally や 他の アプリで ★前みたいな 重たい感じに なってる所★ あったら ★先に 直せ★」
+     ★色を 選び直して いません★＝★塗る 広さを 変えただけ★
+       前 … ★#2E7D54 で 箱の 全面を 塗る★＋白い 字
+       後 … ★白地・薄い黒の 字・濃い緑は 左の 5px の 帯だけ★
+     ★実測（Exally の 同じ 箱で 絵を 撮って 点を 数えた）★
+       箱の 中の 暗い 点 … 88% → ★6%★（★14.8分の1★）
+     ★★2026-09-10 司さん「アプリごとに 色分け 使い分けろよ」★★
+       ⇒ 調べたら ★給与は Kyually という 別の 製品★（<title> … Kyually — 給与明細）
+         なのに 帯が ★Exally と 同じ #2E7D54（差 0.0）★でした
+       ⇒★Kyually 自身の ロゴ色 #52B788 に する★
+         （記憶 reference_exally_brand_and_kyually_pwa_2026-07-14
+           ＝「icon-512/192（Kyually＝DM Mono ★#52B788★・淡ミント白地）」
+             「.logo は DM Mono/#52B788」）
+       ⇒★色を 作って いません＝この 製品が 元から 持つ ロゴ色★
+       ★Exally の 緑との 差 … 85.8★（青どうしの 差 55.1 より 離れて いる）
+       ★admin は「Exally 管理」ですが 知らせは Kyually の 画面にも 出るので
+         ★製品の 色（#52B788）★に します★
+     ★手本★ exally `book.html` の `#toast`（2026-09-10・PR #64） */
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#fff;color:#333333;border:1px solid #D4EDE1;border-left:5px solid #52B788;text-align:left;padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;box-shadow:0 8px 28px rgba(30,60,40,.22);}
+  /* ★白地に なったので 太字は 読める 色に する★ */
+  .toast b{color:#52B788;font-weight:700;}
   .toast.show{opacity:1;}
   .hide{display:none;}
   /* タブ */
