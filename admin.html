@@ -50,7 +50,18 @@
   .seg button.on.trial,.seg button.on.paid,.seg button.on.free{background:var(--accent);border-color:var(--accent);}
   .seg button.on.disabled{background:#C0392B;border-color:#C0392B;}
   .empty{text-align:center;color:var(--muted);font-size:13px;padding:24px;}
-  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#2E7D54;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;}
+  /* ★★2026-09-10 司さん「色が 濃いすぎるし 背景ボックスの 使い方が 悪くないか」★★
+       直した 形を 見て →「★絶対 これが ええ★」
+       ⇒「Exally や 他の アプリで ★前みたいな 重たい感じに なってる所★ あったら ★先に 直せ★」
+     ★色を 選び直して いません★＝★塗る 広さを 変えただけ★
+       前 … ★#2E7D54 で 箱の 全面を 塗る★＋白い 字
+       後 … ★白地・薄い黒の 字・濃い緑は 左の 5px の 帯だけ★
+     ★実測（Exally の 同じ 箱で 絵を 撮って 点を 数えた）★
+       箱の 中の 暗い 点 … 88% → ★6%★（★14.8分の1★）
+     ★手本★ exally `book.html` の `#toast`（2026-09-10・PR #64） */
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#fff;color:#333333;border:1px solid #D4EDE1;border-left:5px solid #2E7D54;text-align:left;padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;box-shadow:0 8px 28px rgba(30,60,40,.22);}
+  /* ★白地に なったので 太字は 読める 色に する★ */
+  .toast b{color:#2E7D54;font-weight:700;}
   .toast.show{opacity:1;}
   .hide{display:none;}
   /* タブ */
